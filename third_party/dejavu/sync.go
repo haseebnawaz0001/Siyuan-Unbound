@@ -55,12 +55,18 @@ type MergeResult struct {
 	Time                        time.Time
 	Upserts, Removes, Conflicts []*entity.File
 
+	// Merges holds documents that changed on both sides and were reconciled per block. They are deliberately kept out
+	// of Upserts: restoreFiles checks Upserts out over the working copy, which would replace the local document with
+	// the cloud one before the merged content is written. Being listed here instead means the local file stays on disk
+	// and is only ever overwritten by the merge result itself.
+	Merges []*entity.File
+
 	UpsertPetals []string // storage/petal/petals.json 中变更的插件，在思源中计算并填充
 	RemovePetals []string // storage/petal/petals.json 中删除的插件，在思源中计算并填充
 }
 
 func (mr *MergeResult) DataChanged() bool {
-	return len(mr.Upserts) > 0 || len(mr.Removes) > 0 || len(mr.Conflicts) > 0
+	return len(mr.Upserts) > 0 || len(mr.Removes) > 0 || len(mr.Conflicts) > 0 || len(mr.Merges) > 0
 }
 
 type DownloadTrafficStat struct {
@@ -332,12 +338,11 @@ func (repo *Repo) sync0(context map[string]interface{},
 				}
 
 				// Both sides edited the document. If they edited different blocks the two sets of edits can be merged
-				// instead of losing one of them, so try that before falling back to conflict handling.
+				// instead of losing one of them, so try that before falling back to conflict handling. The file is
+				// recorded as a merge rather than an upsert so restoreFiles leaves the local copy in place.
 				if merged, merges := repo.tryMergeSyBlocks(localUpsert, cloudUpsert, latestSyncFiles, nowStr, context); merges {
-					mergeResult.Upserts = append(mergeResult.Upserts, cloudUpsert)
-					if nil != merged.Data {
-						mergedTrees = append(mergedTrees, merged)
-					}
+					mergeResult.Merges = append(mergeResult.Merges, cloudUpsert)
+					mergedTrees = append(mergedTrees, merged)
 					continue
 				}
 
@@ -444,12 +449,12 @@ func (repo *Repo) sync0(context map[string]interface{},
 		return
 	}
 
-	// Overwrite the checked-out cloud copies with the block-level merge results. This has to happen after the checkout
-	// above and before the merge index below, so the index captures the combined content and uploads it.
-	if err = repo.writeMergedTrees(mergedTrees); nil != err {
-		logging.LogErrorf("write merged trees failed: %s", err)
-		return
-	}
+	// Apply the block-level merge results. These documents are not in mergeResult.Upserts, so restoreFiles left the
+	// local copy untouched and that is what gets replaced here. This runs before the merge index below so the index
+	// captures the combined content and uploads it. A failed write demotes the document to a conflict and leaves the
+	// local file alone rather than aborting the sync.
+	repo.writeMergedTrees(mergeResult, mergedTrees)
+	defer repo.removeMergeTempDir(nowStr)
 
 	// 处理合并
 	err = repo.mergeSync(mergeResult, localChanged, true, latest, cloudLatest, cloudChunkIDs, trafficStat, context)
