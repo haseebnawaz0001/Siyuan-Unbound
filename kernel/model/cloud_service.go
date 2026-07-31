@@ -21,8 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -220,7 +218,6 @@ var (
 func RefreshCheckJob2H() {
 	go refreshSubscriptionExpirationRemind()
 	go refreshUser()
-	go refreshAnnouncement()
 }
 
 func RefreshCheckJob6H() {
@@ -278,56 +275,6 @@ func refreshCheckDownloadInstallPkg() {
 
 	time.Sleep(3 * time.Minute)
 	checkDownloadInstallPkg()
-}
-
-func refreshAnnouncement() {
-	defer logging.Recover()
-
-	time.Sleep(1 * time.Minute)
-	announcementConf := filepath.Join(util.HomeDir, ".config", "siyuan", "announcement.json")
-	var existingAnnouncements, newAnnouncements []*Announcement
-	if gulu.File.IsExist(announcementConf) {
-		data, err := os.ReadFile(announcementConf)
-		if err != nil {
-			logging.LogErrorf("read announcement conf failed: %s", err)
-			return
-		}
-		if err = gulu.JSON.UnmarshalJSON(data, &existingAnnouncements); err != nil {
-			logging.LogErrorf("unmarshal announcement conf failed: %s", err)
-			os.Remove(announcementConf)
-			return
-		}
-	}
-
-	for _, announcement := range getAnnouncements() {
-		var exist bool
-		for _, existingAnnouncement := range existingAnnouncements {
-			if announcement.Id == existingAnnouncement.Id {
-				exist = true
-				break
-			}
-		}
-		if !exist {
-			existingAnnouncements = append(existingAnnouncements, announcement)
-			if Conf.CloudRegion == announcement.Region {
-				newAnnouncements = append(newAnnouncements, announcement)
-			}
-		}
-	}
-
-	data, err := gulu.JSON.MarshalJSON(existingAnnouncements)
-	if err != nil {
-		logging.LogErrorf("marshal announcement conf failed: %s", err)
-		return
-	}
-	if err = os.WriteFile(announcementConf, data, 0644); err != nil {
-		logging.LogErrorf("write announcement conf failed: %s", err)
-		return
-	}
-
-	for _, newAnnouncement := range newAnnouncements {
-		util.PushMsg(fmt.Sprintf(Conf.Language(11), newAnnouncement.URL, newAnnouncement.Title), 0)
-	}
 }
 
 func RefreshUser(token string) {

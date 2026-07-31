@@ -466,7 +466,7 @@ func InitConf() {
 		Conf.System.Name = util.GetDeviceName()
 	}
 	if util.ContainerStd == util.Container {
-		Conf.System.ID = util.GetDeviceID()
+		// 设备标识为随机值，仅在首次生成后保持不变，因此这里不再每次启动重新生成，否则同步设备列表会在每次重启后新增条目
 		Conf.System.Name = util.GetDeviceName()
 	}
 	Conf.System.DisabledFeatures = util.DisabledFeatures

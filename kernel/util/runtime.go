@@ -32,7 +32,6 @@ import (
 	"time"
 
 	"github.com/88250/gulu"
-	"github.com/denisbrodbeck/machineid"
 	"github.com/go-ole/go-ole"
 	"github.com/go-ole/go-ole/oleutil"
 	"github.com/jaypipes/ghw"
@@ -193,13 +192,7 @@ func RandomSleep(minMills, maxMills int) {
 }
 
 func GetDeviceID() string {
-	if ContainerStd == Container {
-		machineID, err := machineid.ID()
-		if err != nil {
-			return gulu.Rand.String(12)
-		}
-		return machineID
-	}
+	// 使用随机标识而非机器硬件标识，避免设备指纹外泄；该值首次生成后会持久化在 conf.json 中，因此每个安装保持稳定
 	return gulu.Rand.String(12)
 }
 
