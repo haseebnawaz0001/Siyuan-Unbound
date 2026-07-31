@@ -437,15 +437,11 @@ func InitConf() {
 	if nil == Conf.System.NetworkProxy {
 		Conf.System.NetworkProxy = &conf.NetworkProxy{}
 	}
-	if "" == Conf.System.ID {
-		Conf.System.ID = util.GetDeviceID()
-	}
+	Conf.System.ID = resolveDeviceID(Conf.System.ID)
 	if "" == Conf.System.Name {
 		Conf.System.Name = util.GetDeviceName()
 	}
 	if util.ContainerStd == util.Container {
-		// The device name is a random value that stays fixed once first generated, so it is not regenerated on
-		// every startup here; otherwise the sync device list would gain a new entry after every restart
 		Conf.System.Name = util.GetDeviceName()
 	}
 	Conf.System.DisabledFeatures = util.DisabledFeatures
@@ -521,6 +517,18 @@ func InitConf() {
 	Conf.Sync.Local.Endpoint = util.NormalizeLocalPath(Conf.Sync.Local.Endpoint)
 	Conf.Sync.Local.Timeout = util.NormalizeTimeout(Conf.Sync.Local.Timeout)
 	Conf.Sync.Local.ConcurrentReqs = util.NormalizeConcurrentReqs(Conf.Sync.Local.ConcurrentReqs, conf.ProviderLocal)
+
+	if !Conf.Sync.S3CloudNameMigrated {
+		// Before S3 gained sync directories, listing them returned the bucket name and that name was written back into
+		// CloudName. S3 object keys are now prefixed with the sync directory, so a leftover bucket name would point at
+		// an empty prefix and the whole workspace would be re-uploaded. Reset it once, to the default directory the
+		// pre-prefix keys already live under. Runs exactly once: the flag is saved below whether or not it applied.
+		if conf.ProviderS3 == Conf.Sync.Provider && "main" != Conf.Sync.CloudName {
+			logging.LogInfof("reset S3 sync dir name [%s] to [main] for the sync directory prefix migration", Conf.Sync.CloudName)
+			Conf.Sync.CloudName = "main"
+		}
+		Conf.Sync.S3CloudNameMigrated = true
+	}
 
 	if util.ContainerDocker == util.Container {
 		Conf.Sync.Perception = false
@@ -773,6 +781,62 @@ func writeCookieKey(cookieKey string) {
 	if err := os.WriteFile(cookieKeyPath, []byte(cookieKey), 0644); err != nil {
 		logging.LogErrorf("save cookie key file [%s] failed: %s", cookieKeyPath, err)
 	}
+}
+
+// deviceIDPath returns the path of the device identifier file. It sits next to port.json and cookie.key in the user
+// config directory, deliberately outside the workspace: the identifier has to describe the machine, not the notes.
+func deviceIDPath() string {
+	return filepath.Join(util.HomeDir, ".config", "siyuan", "device.id")
+}
+
+// readDeviceID returns the identifier recorded for this machine, or the empty string if there is none yet.
+func readDeviceID() (deviceID string) {
+	p := deviceIDPath()
+	if !gulu.File.IsExist(p) {
+		return
+	}
+
+	data, err := os.ReadFile(p)
+	if err != nil {
+		logging.LogErrorf("read device ID file [%s] failed: %s", p, err)
+		return
+	}
+
+	deviceID = string(bytes.TrimSpace(data))
+	return
+}
+
+// resolveDeviceID returns the identifier to use for this machine, generating and recording one on first use. The
+// identifier used to be derived from the hardware, and then to be regenerated on every startup; both are gone, so it
+// now has to be anchored somewhere outside the workspace. If it lived only in conf.json, copying a workspace folder to
+// a second machine would carry the identifier along, and cloud sync would then hand each machine the other's lock:
+// syncLock treats a lock held by its own device ID as free to take, so both could write at once.
+//
+// current is the identifier already in conf.json, used only when the file cannot be written -- a read-only config
+// directory should not mean a brand new sync device on every restart.
+func resolveDeviceID(current string) string {
+	if deviceID := readDeviceID(); "" != deviceID {
+		return deviceID
+	}
+
+	deviceID := util.GetDeviceID()
+	p := deviceIDPath()
+	if err := os.MkdirAll(filepath.Dir(p), 0755); err != nil {
+		logging.LogErrorf("create device ID file dir [%s] failed: %s", filepath.Dir(p), err)
+		return fallbackDeviceID(current, deviceID)
+	}
+	if err := os.WriteFile(p, []byte(deviceID), 0644); err != nil {
+		logging.LogErrorf("save device ID file [%s] failed: %s", p, err)
+		return fallbackDeviceID(current, deviceID)
+	}
+	return deviceID
+}
+
+func fallbackDeviceID(current, generated string) string {
+	if "" != current {
+		return current
+	}
+	return generated
 }
 
 func initLang() {
