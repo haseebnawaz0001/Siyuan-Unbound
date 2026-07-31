@@ -113,9 +113,11 @@
 - Android/iOS/鸿蒙 App
 - Docker 部署
 - [API](docs/API.zh-CN.md)
+- [Fork 说明](docs/FORK.md)
+- [使用自己的存储进行同步](docs/SYNC.md)
 - 社区集市
 
-部分功能需要付费会员才能使用，更多细节请参考[定价](https://b3log.org/siyuan/pricing.html)。
+同步到自己提供的存储（S3、WebDAV 或本地文件系统目录）无需订阅会员，付费会员对应的是思源笔记自己的云端服务，更多细节请参考[定价](https://b3log.org/siyuan/pricing.html)。
 
 ## 🏗️ 架构和生态
 
@@ -126,7 +128,7 @@
 | [lute](https://github.com/88250/lute)                    | 编辑器引擎        | ![GitHub forks](https://img.shields.io/github/forks/88250/lute)                 | ![GitHub Repo stars](https://img.shields.io/github/stars/88250/lute)                 |
 | [chrome](https://github.com/siyuan-note/siyuan-chrome)   | Chrome/Edge 扩展 | ![GitHub forks](https://img.shields.io/github/forks/siyuan-note/siyuan-chrome)  | ![GitHub Repo stars](https://img.shields.io/github/stars/siyuan-note/siyuan-chrome)  |
 | [bazaar](https://github.com/siyuan-note/bazaar)          | 社区集市         | ![GitHub forks](https://img.shields.io/github/forks/siyuan-note/bazaar)         | ![GitHub Repo stars](https://img.shields.io/github/stars/siyuan-note/bazaar)         |
-| [dejavu](https://github.com/siyuan-note/dejavu)          | 数据仓库         | ![GitHub forks](https://img.shields.io/github/forks/siyuan-note/dejavu)         | ![GitHub Repo stars](https://img.shields.io/github/stars/siyuan-note/dejavu)         |
+| [dejavu](third_party/dejavu)                             | 数据仓库         | 内置分支 | 内置分支 |
 | [petal](https://github.com/siyuan-note/petal)            | 插件 API       | ![GitHub forks](https://img.shields.io/github/forks/siyuan-note/petal)          | ![GitHub Repo stars](https://img.shields.io/github/stars/siyuan-note/petal)          |
 | [android](https://github.com/siyuan-note/siyuan-android) | Android App  | ![GitHub forks](https://img.shields.io/github/forks/siyuan-note/siyuan-android) | ![GitHub Repo stars](https://img.shields.io/github/stars/siyuan-note/siyuan-android) |
 | [ios](https://github.com/siyuan-note/siyuan-ios)         | iOS App      | ![GitHub forks](https://img.shields.io/github/forks/siyuan-note/siyuan-ios)     | ![GitHub Repo stars](https://img.shields.io/github/stars/siyuan-note/siyuan-ios)     |
@@ -555,7 +557,7 @@ CLI 可执行文件为 `<安装目录>/resources/kernel/SiYuan-Kernel`，可通�
 
 不支持通过第三方同步盘进行数据同步，否则可能会导致数据损坏。
 
-虽然不支持第三方同步盘，但是支持对接第三方云端存储（会员特权）。
+虽然不支持第三方同步盘，但是支持对接自己的 S3、WebDAV 或本地文件系统存储进行同步，且无需订阅会员，详见[使用自己的存储进行同步](docs/SYNC.md)。
 
 ### 思源是开源的吗？
 
@@ -598,7 +600,7 @@ CLI 可执行文件为 `<安装目录>/resources/kernel/SiYuan-Kernel`，可通�
 
 大部分功能是免费的，即使是在商业环境下使用。
 
-会员特权需要付费后才能使用，请参考[定价](https://b3log.org/siyuan/pricing.html)。
+仍然需要付费的是思源笔记自己的云端服务：官方云端同步、云端图片/资源文件托管、云端提醒、导出时的 CDN 资源转换，以及链滴发布/账号相关服务，请参考[定价](https://b3log.org/siyuan/pricing.html)。同步到自己提供的存储（S3、WebDAV 或本地文件系统目录）不在此列。
 
 如果你没有会员特权需求但又想支持开发，欢迎进行捐赠：[靠爱发电 - 链滴](https://ld246.com/sponsor)
 

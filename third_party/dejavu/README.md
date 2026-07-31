@@ -6,6 +6,24 @@
 
 [DejaVu](https://github.com/siyuan-note/dejavu) is the component of data snapshot and sync for [SiYuan](https://github.com/siyuan-note/siyuan).
 
+## 🍴 Fork notice
+
+This is a fork of [`github.com/siyuan-note/dejavu`](https://github.com/siyuan-note/dejavu), vendored into the SiYuan fork at `third_party/dejavu`, taken from upstream commit `v0.0.0-20260715095305-8462fe30163c`.
+
+It is wired into the kernel by a committed `replace` directive in `kernel/go.mod` — a deliberate exception to the usual rule against committing `replace` directives, because the path is inside the repository and so resolves for every clone and in CI.
+
+**This is a separate Go module**: `go test ./...` run in `kernel/` does not run its tests. Verify changes from inside `third_party/dejavu` with `gofmt -l .`, `go vet ./...` and `go test -count=1 ./...`. `test/sync` is a real two-client sync simulation and is the best regression signal available.
+
+Upstream fixes do not flow in automatically; they have to be merged by hand.
+
+What diverges from upstream:
+
+1. **Block-level `.sy` merge** (`sync_merge_blocks.go`) — a document changed on both sides is merged per block using the last synced index as the common ancestor, instead of always producing a conflict. The local tree is the base and is never overwritten, so a missed detection can only fail to apply a cloud edit, never discard a local one. The merge refuses and falls back to upstream's conflict handling whenever the structure differs, the same block changed on both sides, the block contains other blocks, block IDs are duplicated or empty, or the notebook is encrypted.
+2. **S3 object keys namespaced by sync directory** (`cloud/s3.go`) — keys are prefixed `siyuan/<dir>/repo/...` so one bucket can hold several workspaces; the directory named `main` keeps the historical bucket-root layout for backward compatibility. `CreateRepo`/`RemoveRepo` are implemented and `listRepos` enumerates key prefixes.
+3. **`getNotFound` data race fixed** (`cloud/s3.go`) — concurrent workers appended to a shared slice with no lock. A lost append reports a chunk that is missing from the cloud as present, so it is never uploaded and the cloud repository is silently left incomplete.
+
+See [`FORK.md`](../../docs/FORK.md) and [`SYNC.md`](../../docs/SYNC.md) for the full picture.
+
 ## ✨ Features
 
 * Git-like version control

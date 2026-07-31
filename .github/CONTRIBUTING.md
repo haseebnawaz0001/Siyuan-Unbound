@@ -43,6 +43,8 @@ Note: In the development environment, the kernel process will not be automatical
 2. Open CGO support, that is, configure the environment variable `CGO_ENABLED=1`
 3. On Windows, add the directory reported by `go env GOBIN` to `PATH`; if it is empty, add the `bin` subdirectory of `go env GOPATH`
 
+Note: The repository also vendors a second Go module, a fork of the dejavu sync engine, at `third_party/dejavu`, wired in by a committed `replace` directive in `kernel/go.mod`. It must be present for the kernel to build — anything that stages only `kernel/` will fail to resolve the replacement. It is a separate module: `go test ./...` run in `kernel/` does not run its tests, so run them from inside `third_party/dejavu` instead. See [`FORK.md`](../docs/FORK.md) for details.
+
 ### Desktop
 
 * `cd kernel`
@@ -96,6 +98,10 @@ Modify Go source code:
    `C.size_t(len(b))` to `C.socklen_t(len(b))`
 
 For other details, please refer to https://github.com/siyuan-note/siyuan/issues/13184
+
+## Code comments
+
+This fork writes source code comments in English, which diverges from upstream SiYuan, where comments are written in Chinese.
 
 ## Issue workflow
 

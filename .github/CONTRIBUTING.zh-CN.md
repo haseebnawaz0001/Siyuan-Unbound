@@ -43,6 +43,8 @@ NPM 镜像：
 2. 打开 CGO 支持，即配置环境变量 `CGO_ENABLED=1`
 3. Windows 下需将 `go env GOBIN` 输出的目录添加到 `PATH`；如果输出为空，则添加 `go env GOPATH` 目录下的 `bin` 子目录
 
+注意：仓库中还内置了第二个 Go 模块——dejavu 同步引擎的分叉版本，位于 `third_party/dejavu`，通过 `kernel/go.mod` 中一条已提交的 `replace` 指令接入。它必须存在，内核才能构建成功——只暂存 `kernel/` 目录的操作会因无法解析该 `replace` 而失败。它是一个独立的模块：在 `kernel/` 目录下运行 `go test ./...` 不会运行它的测试，请改为在 `third_party/dejavu` 目录内运行测试。详见 [`FORK.md`](../docs/FORK.md)。
+
 ### 桌面端
 
 * `cd kernel`
@@ -96,6 +98,10 @@ NPM 镜像：
    `C.size_t(len(b))` 改为 `C.socklen_t(len(b))`
 
 其他细节请参考 https://github.com/siyuan-note/siyuan/issues/13184
+
+## 代码注释
+
+本分叉版的源码注释使用英文书写，这一点与上游思源笔记不同——上游的注释使用中文书写。
 
 ## Issue 流程
 

@@ -110,9 +110,11 @@ Most features are free, even for commercial use.
 - Android/iOS/HarmonyOS App
 - Docker deployment
 - [API](https://github.com/siyuan-note/siyuan/blob/master/docs/API.md)
+- [Fork notes](docs/FORK.md)
+- [Sync with your own storage](docs/SYNC.md)
 - Community marketplace
 
-Some features are only available to paid members, for more details please refer to [Pricing](https://b3log.org/siyuan/en/pricing.html).
+Syncing to storage you provide yourself (S3, WebDAV or a local filesystem directory) requires no subscription. The paid tier covers SiYuan's own hosted cloud services, for more details please refer to [Pricing](https://b3log.org/siyuan/en/pricing.html).
 
 ## 🏗️ Architecture and Ecosystem
 
@@ -123,7 +125,7 @@ Some features are only available to paid members, for more details please refer 
 | [lute](https://github.com/88250/lute)                    | Editor engine         | ![GitHub forks](https://img.shields.io/github/forks/88250/lute)                 | ![GitHub Repo stars](https://img.shields.io/github/stars/88250/lute)                 |
 | [chrome](https://github.com/siyuan-note/siyuan-chrome)   | Chrome/Edge extension | ![GitHub forks](https://img.shields.io/github/forks/siyuan-note/siyuan-chrome)  | ![GitHub Repo stars](https://img.shields.io/github/stars/siyuan-note/siyuan-chrome)  |
 | [bazaar](https://github.com/siyuan-note/bazaar)          | Community marketplace | ![GitHub forks](https://img.shields.io/github/forks/siyuan-note/bazaar)         | ![GitHub Repo stars](https://img.shields.io/github/stars/siyuan-note/bazaar)         |
-| [dejavu](https://github.com/siyuan-note/dejavu)          | Data repo             | ![GitHub forks](https://img.shields.io/github/forks/siyuan-note/dejavu)         | ![GitHub Repo stars](https://img.shields.io/github/stars/siyuan-note/dejavu)         |
+| [dejavu](third_party/dejavu)                             | Data repo             | Vendored fork | Vendored fork |
 | [petal](https://github.com/siyuan-note/petal)            | Plugin API            | ![GitHub forks](https://img.shields.io/github/forks/siyuan-note/petal)          | ![GitHub Repo stars](https://img.shields.io/github/stars/siyuan-note/petal)          |
 | [android](https://github.com/siyuan-note/siyuan-android) | Android App           | ![GitHub forks](https://img.shields.io/github/forks/siyuan-note/siyuan-android) | ![GitHub Repo stars](https://img.shields.io/github/stars/siyuan-note/siyuan-android) |
 | [ios](https://github.com/siyuan-note/siyuan-ios)         | iOS App               | ![GitHub forks](https://img.shields.io/github/forks/siyuan-note/siyuan-ios)     | ![GitHub Repo stars](https://img.shields.io/github/stars/siyuan-note/siyuan-ios)     |
@@ -454,7 +456,7 @@ The data is saved in the workspace data folder:
 
 Data synchronization through third-party synchronization disks is not supported, otherwise data may be corrupted.
 
-Although it does not support third-party sync disks, it supports connecting with third-party cloud storage (Members' privileges).
+Although it does not support third-party sync disks, it does support connecting your own S3, WebDAV or local filesystem storage for sync, and this needs no subscription, see [Sync with your own storage](docs/SYNC.md) for details.
 
 ### Is SiYuan open source?
 
@@ -495,7 +497,7 @@ The block icon is omitted for the first sub-block under the list item. You can m
 
 Most features are free, even for commercial use.
 
-Member's privileges can only be used after payment, please refer to [Pricing](https://b3log.org/siyuan/en/pricing.html).
+What still requires payment is SiYuan's own hosted services: official cloud sync, cloud image/asset hosting, cloud reminders, CDN asset rewriting on export, and Liandi publishing/account services, please refer to [Pricing](https://b3log.org/siyuan/en/pricing.html). Syncing to storage you provide yourself (S3, WebDAV or a local filesystem directory) is not among them.
 
 ## 🙏 Acknowledgement
 

@@ -109,9 +109,11 @@ SiYuanは、プライバシーを最優先とする個人の知識管理シス�
 - Android/iOS/HarmonyOSアプリ
 - Dockerデプロイメント
 - [API](https://github.com/siyuan-note/siyuan/blob/master/docs/API.md)
+- [フォークについて](docs/FORK.md)
+- [自分のストレージで同期する](docs/SYNC.md)
 - コミュニティマーケットプレイス
 
-一部の機能は有料会員のみ利用可能です。詳細については[価格](https://b3log.org/siyuan/en/pricing.html)をご覧ください。
+自分で用意したストレージ（S3、WebDAV、またはローカルファイルシステムのディレクトリ）への同期にサブスクリプションは不要です。有料プランが対象とするのはSiYuan自身がホストするクラウドサービスです。詳細については[価格](https://b3log.org/siyuan/en/pricing.html)をご覧ください。
 
 ## 🏗️ アーキテクチャとエコシステム
 
@@ -122,7 +124,7 @@ SiYuanは、プライバシーを最優先とする個人の知識管理シス�
 | [lute](https://github.com/88250/lute)                    | エディタエンジン        | ![GitHub forks](https://img.shields.io/github/forks/88250/lute)                 | ![GitHub Repo stars](https://img.shields.io/github/stars/88250/lute)                 |
 | [chrome](https://github.com/siyuan-note/siyuan-chrome)   | Chrome/Edge拡張   | ![GitHub forks](https://img.shields.io/github/forks/siyuan-note/siyuan-chrome)  | ![GitHub Repo stars](https://img.shields.io/github/stars/siyuan-note/siyuan-chrome)  |
 | [bazaar](https://github.com/siyuan-note/bazaar)          | コミュニティマーケットプレイス | ![GitHub forks](https://img.shields.io/github/forks/siyuan-note/bazaar)         | ![GitHub Repo stars](https://img.shields.io/github/stars/siyuan-note/bazaar)         |
-| [dejavu](https://github.com/siyuan-note/dejavu)          | データリポジトリ        | ![GitHub forks](https://img.shields.io/github/forks/siyuan-note/dejavu)         | ![GitHub Repo stars](https://img.shields.io/github/stars/siyuan-note/dejavu)         |
+| [dejavu](third_party/dejavu)                             | データリポジトリ        | 同梱フォーク | 同梱フォーク |
 | [petal](https://github.com/siyuan-note/petal)            | プラグインAPI        | ![GitHub forks](https://img.shields.io/github/forks/siyuan-note/petal)          | ![GitHub Repo stars](https://img.shields.io/github/stars/siyuan-note/petal)          |
 | [android](https://github.com/siyuan-note/siyuan-android) | Androidアプリ      | ![GitHub forks](https://img.shields.io/github/forks/siyuan-note/siyuan-android) | ![GitHub Repo stars](https://img.shields.io/github/stars/siyuan-note/siyuan-android) |
 | [ios](https://github.com/siyuan-note/siyuan-ios)         | iOSアプリ          | ![GitHub forks](https://img.shields.io/github/forks/siyuan-note/siyuan-ios)     | ![GitHub Repo stars](https://img.shields.io/github/stars/siyuan-note/siyuan-ios)     |
@@ -435,7 +437,7 @@ ln -s /インストール先/SiYuan/resources/kernel/SiYuan-Kernel /usr/local/bi
 
 サードパーティの同期ディスクを介したデータ同期はサポートされていません。そうしないとデータが破損する可能性があります。
 
-サードパーティの同期ディスクをサポートしていない場合でも、サードパーティのクラウドストレージと接続することはサポートされています（会員特典）。
+サードパーティの同期ディスクはサポートしていませんが、自分で用意したS3、WebDAV、またはローカルファイルシステムのストレージに接続して同期することはサポートしており、サブスクリプションは不要です。詳しくは[自分のストレージで同期する](docs/SYNC.md)をご覧ください。
 
 ### SiYuanはオープンソースですか？
 
@@ -476,7 +478,7 @@ SiYuanは完全にオープンソースであり、貢献を歓迎します：
 
 ほとんどの機能は無料で、商業利用も可能です。
 
-会員特典は支払い後にのみ利用可能です。詳細については[価格](https://b3log.org/siyuan/en/pricing.html)をご覧ください。
+現在も有料なのはSiYuan自身がホストするサービスです。公式クラウド同期、クラウド画像/アセットホスティング、クラウドリマインダー、エクスポート時のCDNアセット変換、そしてLiandiの公開/アカウント関連サービスです。詳細については[価格](https://b3log.org/siyuan/en/pricing.html)をご覧ください。自分で用意したストレージ（S3、WebDAV、またはローカルファイルシステムのディレクトリ）への同期はこれに含まれません。
 
 ## 🙏 謝辞
 

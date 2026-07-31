@@ -2,6 +2,13 @@
 
 SiYuan repository guide. Module path `github.com/siyuan-note/siyuan`, license AGPL-3.0.
 
+**This is a fork, and it diverges from upstream in four ways that will bite you if you assume otherwise.** Full detail in `docs/FORK.md`; the short version:
+
+1. **Telemetry is removed.** No hardware device fingerprint, no announcement pull. The `rhy` endpoint stayed because the bazaar depends on it.
+2. **English is the default language and source comments are written in English.** Upstream detects the OS locale and comments in Chinese.
+3. **Sync to user-supplied storage (S3 / WebDAV / local filesystem) needs no account or subscription.** SiYuan's own hosted services are still gated, deliberately — do not remove those gates.
+4. **dejavu is vendored at `third_party/dejavu` with a committed `replace` directive.** Do not revert it; see §2.
+
 **Architecture:** Go kernel (`kernel/`) + TypeScript frontend (`app/`), plus a separate `export` bundle (global `Protyle`, entry `src/protyle/method.ts`) for rendering rich content in exported HTML / PDF preview. Read versions from `kernel/go.mod`, `app/package.json`, `kernel/util/working.go`.
 
 ---
@@ -27,7 +34,7 @@ SiYuan spans several repos. This repo (`siyuan`) holds the kernel + Electron/web
 | `siyuan-testing` | Playwright end-to-end tests for a running SiYuan instance; test data belongs in the `SiYuan Testing` notebook — see that repository's `AGENTS.md` |
 | `petal` | SiYuan Plugin API declaration (the plugin system is named "petal"); consumed by plugins, not a kernel Go dependency |
 | `lute` | Markdown/Kramdown AST engine — the editor + `.sy` format; also the source of the bundled `lute.min.js` (a GopherJS build served to the frontend). **Lives under `$GOPATH/src/github.com/88250/lute`, not as a sibling repo** |
-| `dejavu` | Data repo / sync engine (encrypted snapshots) |
+| `dejavu` | Data repo / sync engine (encrypted snapshots). **Forked and vendored in this repo at `third_party/dejavu`** — not an external module here; see the cross-repo notes below |
 | `riff` | Spaced-repetition (SRS) flashcard scheduler |
 | `gulu` | General Go utility library (`gulu.Ret`, `gulu.JSON`, …) |
 | `eventbus` | In-process event bus |
@@ -41,7 +48,8 @@ All Go libraries above are dependencies in `kernel/go.mod`. GitHub org: `siyuan-
 
 ### Cross-repo notes
 
-- **Editing any Go dependency (Lute / dejavu / gulu / eventbus / riff / filelock / httpclient / logging / go-sqlite3 / pdfcpu / epub / …):** these are imported by the kernel as Go modules (`kernel/go.mod`). To test a local change, add a temporary `replace` in `kernel/go.mod` pointing at your local checkout — but **never commit that `replace`**; it breaks builds for everyone else.
+- **Editing any Go dependency (Lute / gulu / eventbus / riff / filelock / httpclient / logging / go-sqlite3 / pdfcpu / epub / …):** these are imported by the kernel as Go modules (`kernel/go.mod`). To test a local change, add a temporary `replace` in `kernel/go.mod` pointing at your local checkout — but **never commit that `replace`**; it points at a path that exists only on your machine, so it breaks builds for everyone else. The commented-out `replace` lines at the bottom of `kernel/go.mod` are exactly this.
+- **dejavu is the one exception, and it is permanent.** This fork vendors it at `third_party/dejavu` and commits `replace github.com/siyuan-note/dejavu => ../third_party/dejavu`. That directive stays: the path is inside the repository, so it resolves for every clone and in CI. Two consequences — `third_party/dejavu` is a **separate Go module**, so `go test ./...` in `kernel/` does not run its tests; and anything that stages only `kernel/` (the root `Dockerfile`, for one) must also stage `third_party/` or `go mod download` fails on a missing replacement directory. Upstream dejavu fixes do not arrive automatically; merge them by hand. See `docs/FORK.md` §4.
 - **Rebuilding `lute.min.js`:** it's the JS build of the Go `lute` project — generated upstream and checked into `app/stage/protyle/js/lute/`. Don't edit it here; change `lute`, rebuild, and copy the artifact in.
 - **Mobile apps (`siyuan-android` / `siyuan-ios` / `siyuan-harmony`):** each is a separate native app that wraps the kernel built from this repo. For how to build, vendor the kernel binding, and wire everything up, **read each project's own README** — the toolchains and steps differ per platform and aren't documented here.
 - **`siyuan-chrome`:** independent TypeScript project; it only interacts with a running SiYuan instance through the public HTTP API documented in `docs/API.md`.
@@ -59,6 +67,8 @@ Top level (repo root):
 | `app/appearance/` | Themes, icons, **i18n** (`appearance/langs/*.json`) |
 | `app/stage/` | Build output served by the kernel |
 | `app/changelogs/` | Per-version changelog markdown |
+| `third_party/` | Vendored forks of dependencies that had to be modified. Currently only `dejavu` (the sync engine) — a separate Go module, wired in by a committed `replace` in `kernel/go.mod` |
+| `docs/` | Reference documentation: `FORK.md` (how this fork diverges from upstream), `SYNC.md` (bring-your-own-storage sync), `WORKSPACE.md`, `SY-FORMAT.md`, `ENCRYPTED-NOTEBOOK.md`, `API.md` |
 | `.github/` | `CONTRIBUTING.md` (+zh-CN), `SECURITY.md`, `CODE_OF_CONDUCT.md`, `PULL_REQUEST_TEMPLATE.md`, issue templates, `workflows/` |
 | `scripts/` | Release packaging: `win-build.bat`, `darwin-build.sh`, `linux-build.sh`, `parse-changelog.py`, `check-lang-keys.py` |
 
@@ -124,15 +134,16 @@ Four webpack configs each emit a separate bundle to `app/stage/build/{app,deskto
 3. **Frontend verification:** Do not use `npx webpack` or `pnpm dev` to verify changes; after changes, run `cd app && pnpm run lint` to check code style
 4. **Frontend build:** Do NOT run `pnpm build` — the developer runs `pnpm dev` manually, and `pnpm build` will conflict with it, producing broken bundles
 5. **Kernel development:** After modifying Go code, do not compile the kernel binary or restart a running kernel; the developer handles both manually
-6. **Icons:** Do not hand-write SVG; use existing icons from `app/appearance/icons/litheness/icon.js` when possible
-7. **User guide:** When editing the user guide, follow `docs/SY-FORMAT.md`
-8. **Git:**
+6. **Sync engine verification:** `third_party/dejavu` is a separate Go module, so verifying it from `kernel/` proves nothing. Run `gofmt -l .`, `go vet ./...` and `go test -count=1 ./...` **from inside `third_party/dejavu`**. Its `test/sync` package is a data-driven two-client sync simulation and is the best regression signal in the repo — keep it green
+7. **Icons:** Do not hand-write SVG; use existing icons from `app/appearance/icons/litheness/icon.js` when possible
+8. **User guide:** When editing the user guide, follow `docs/SY-FORMAT.md`
+9. **Git:**
    - **NEVER** run `git commit` / `git push` unless explicitly asked — no exceptions
    - When you do commit, follow the style of recent commits (gitmoji prefix + subject, in English)
    - Append the full issue/PR URL to the end of the commit title (e.g. `https://github.com/siyuan-note/siyuan/issues/<NNN>`, not the `#NNN` short form — it is clickable) only when a related issue exists; never put the URL in the commit body, and do not fabricate one
-9. **GitHub:** Prefer the GitHub CLI (`gh`) for all GitHub operations, including reading issues, comments, pull requests, commits, statuses, and metadata. If `gh` is unavailable or does not support the operation, fall back to the GitHub API or web interface
-10. **Issue titles:** Whenever the user asks to generate an issue title, provide it in English regardless of the wording of the request; do not start it with `Fix`, and describe the observed behavior directly instead
-11. **LD246:** When accessing `ld246.com`, set the HTTP `User-Agent` header to `SiYuan-Coding-Agent`
+10. **GitHub:** Prefer the GitHub CLI (`gh`) for all GitHub operations, including reading issues, comments, pull requests, commits, statuses, and metadata. If `gh` is unavailable or does not support the operation, fall back to the GitHub API or web interface
+11. **Issue titles:** Whenever the user asks to generate an issue title, provide it in English regardless of the wording of the request; do not start it with `Fix`, and describe the observed behavior directly instead
+12. **LD246:** When accessing `ld246.com`, set the HTTP `User-Agent` header to `SiYuan-Coding-Agent`
 
 ---
 

@@ -110,9 +110,11 @@ Daha fazla bilgi için [SiYuan İngilizce Tartışma Forumu](https://liuyun.io)�
 - Android / iOS / HarmonyOS uygulamaları
 - Docker dağıtımı
 - [API](https://github.com/siyuan-note/siyuan/blob/master/docs/API.md)
+- [Fork notları](docs/FORK.md)
+- [Kendi depolamanla senkronizasyon](docs/SYNC.md)
 - Topluluk pazaryeri
 
-Bazı özellikler yalnızca ücretli üyeler için geçerlidir. Detaylar için [Fiyatlandırma](https://b3log.org/siyuan/en/pricing.html) sayfasına göz atabilirsin.
+Kendi sağladığın depolamaya (S3, WebDAV veya yerel bir dosya sistemi dizini) senkronizasyon için üyelik gerekmez. Ücretli plan SiYuan'ın kendi barındırdığı bulut hizmetlerini kapsar, detaylar için [Fiyatlandırma](https://b3log.org/siyuan/en/pricing.html) sayfasına göz atabilirsin.
 
 ## 🏗️ Mimari ve Ekosistem
 
@@ -123,7 +125,7 @@ Bazı özellikler yalnızca ücretli üyeler için geçerlidir. Detaylar için [
 | [lute](https://github.com/88250/lute)                    | Editör motoru         | ![GitHub forks](https://img.shields.io/github/forks/88250/lute)                | ![GitHub Repo stars](https://img.shields.io/github/stars/88250/lute)               |
 | [chrome](https://github.com/siyuan-note/siyuan-chrome)   | Chrome/Edge eklentisi | ![GitHub forks](https://img.shields.io/github/forks/siyuan-note/siyuan-chrome) | ![GitHub Repo stars](https://img.shields.io/github/stars/siyuan-note/siyuan-chrome) |
 | [bazaar](https://github.com/siyuan-note/bazaar)          | Topluluk pazaryeri    | ![GitHub forks](https://img.shields.io/github/forks/siyuan-note/bazaar)        | ![GitHub Repo stars](https://img.shields.io/github/stars/siyuan-note/bazaar)       |
-| [dejavu](https://github.com/siyuan-note/dejavu)          | Veri deposu (repo)    | ![GitHub forks](https://img.shields.io/github/forks/siyuan-note/dejavu)        | ![GitHub Repo stars](https://img.shields.io/github/stars/siyuan-note/dejavu)       |
+| [dejavu](third_party/dejavu)                             | Veri deposu (repo)    | Depoya gömülü fork | Depoya gömülü fork |
 | [petal](https://github.com/siyuan-note/petal)            | Eklenti API’si        | ![GitHub forks](https://img.shields.io/github/forks/siyuan-note/petal)         | ![GitHub Repo stars](https://img.shields.io/github/stars/siyuan-note/petal)        |
 | [android](https://github.com/siyuan-note/siyuan-android) | Android uygulaması    | ![GitHub forks](https://img.shields.io/github/forks/siyuan-note/siyuan-android)| ![GitHub Repo stars](https://img.shields.io/github/stars/siyuan-note/siyuan-android)|
 | [ios](https://github.com/siyuan-note/siyuan-ios)         | iOS uygulaması        | ![GitHub forks](https://img.shields.io/github/forks/siyuan-note/siyuan-ios)    | ![GitHub Repo stars](https://img.shields.io/github/stars/siyuan-note/siyuan-ios)   |
@@ -441,7 +443,7 @@ Veriler, çalışma alanı klasöründeki `data` klasöründe saklanır:
 
 Üçüncü taraf senkronizasyon diskleriyle (örneğin OneDrive, Dropbox vb.) veri senkronizasyonu **desteklenmez**. Aksi takdirde veriler bozulabilir.
 
-Bununla birlikte, üyelik avantajları kapsamında **üçüncü taraf bulut depolama hizmetleriyle bağlantı** desteklenmektedir.
+Bununla birlikte, kendi S3, WebDAV veya yerel dosya sistemi depolamanla bağlantı kurarak senkronizasyon yapman desteklenmektedir ve bunun için üyelik gerekmez, ayrıntılar için [Kendi depolamanla senkronizasyon](docs/SYNC.md) sayfasına bakabilirsin.
 
 ### SiYuan açık kaynak mı?
 
@@ -484,7 +486,7 @@ Liste öğesinin altındaki ilk alt blok, blok simgesi görünmeyen bloktur. İm
 
 Çoğu özellik ücretsizdir — ticari kullanım da dahil. 
 
-Ancak üyelik ayrıcalıkları yalnızca ödeme sonrasında kullanılabilir. Detaylar için [Fiyatlandırma](https://b3log.org/siyuan/en/pricing.html) sayfasına bakabilirsiniz.
+Hâlâ ücretli olan, SiYuan'ın kendi barındırdığı hizmetlerdir: resmi bulut senkronizasyonu, bulut görsel/varlık barındırma, bulut hatırlatıcılar, dışa aktarımda CDN varlık dönüştürme ve Liandi yayınlama/hesap hizmetleri, detaylar için [Fiyatlandırma](https://b3log.org/siyuan/en/pricing.html) sayfasına bakabilirsiniz. Kendi sağladığın depolamaya (S3, WebDAV veya yerel bir dosya sistemi dizini) senkronizasyon bunların arasında değildir.
 
 ## 🙏 Teşekkür
 

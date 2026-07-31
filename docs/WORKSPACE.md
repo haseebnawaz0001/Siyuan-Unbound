@@ -72,6 +72,21 @@ Workspace-root entries:
 | `temp/` | Rebuildable indexes, queues, caches, logs, and exports |
 | `corrupted/` | Optional quarantine for corrupted data (auto-created when needed) |
 
+### Outside the workspace: the user config directory
+
+Not everything the kernel keeps track of lives under the workspace root. A small user config directory at `~/.config/siyuan/` (the same path on every platform) holds files that describe the machine and the set of known workspaces, not any single workspace's content:
+
+| File | What it is |
+|---|---|
+| `workspace.json` | The list of known workspace directories and which one was last opened |
+| `port.json` | The kernel port in use for each running workspace, so a running instance can be found |
+| `cookie.key` | The key used to sign session cookies |
+| `device.id` | The identifier of this machine, used to coordinate the cloud sync lock |
+
+None of these four are part of the workspace: copying, moving, or restoring a workspace directory carries none of them along, and needs none of them to work again on the same machine — the kernel regenerates or rediscovers what it needs from `~/.config/siyuan/` on next launch.
+
+`device.id` deserves a bit more explanation because it is easy to assume it belongs in `conf/conf.json` instead. It has to live outside the workspace precisely so that copying a workspace folder does not also copy a device identity onto another machine: if the identifier travelled with the workspace, two machines sharing one workspace copy would present the same device ID to cloud sync, and the sync lock treats a lock held by its own device ID as free to take — so both machines could end up writing to the cloud at once. See §6 for how `conf/conf.json` still relates to this file.
+
 ---
 
 ## 3. Top-level layout of `data/`
@@ -202,6 +217,8 @@ Be careful to distinguish the two `conf.json` files:
 | `<boxID>/.siyuan/conf.json` | **Inside a notebook** | That notebook only (BoxConf) |
 
 `conf/conf.json` holds UI appearance, account, sync, AI, flashcard, and other workspace-level settings.
+
+Its `system.id` field is a cache of the device identifier, not the source of truth: the real value lives in `~/.config/siyuan/device.id`, outside the workspace (see the "Outside the workspace" subsection under §2). `system.id` is only consulted as a fallback if `device.id` cannot be read or written.
 
 ---
 
