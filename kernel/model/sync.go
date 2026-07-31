@@ -520,8 +520,11 @@ var (
 )
 
 func CreateCloudSyncDir(name string) (err error) {
+	// S3 stores each sync directory under its own key prefix, so directories can be created and removed the same way
+	// they are for the official provider and the local filesystem. WebDAV still expects the directory to be managed on
+	// the server itself.
 	switch Conf.Sync.Provider {
-	case conf.ProviderSiYuan, conf.ProviderLocal:
+	case conf.ProviderSiYuan, conf.ProviderLocal, conf.ProviderS3:
 		break
 	default:
 		err = errors.New(Conf.Language(131))
@@ -547,8 +550,11 @@ func CreateCloudSyncDir(name string) (err error) {
 }
 
 func RemoveCloudSyncDir(name string) (err error) {
+	// S3 stores each sync directory under its own key prefix, so directories can be created and removed the same way
+	// they are for the official provider and the local filesystem. WebDAV still expects the directory to be managed on
+	// the server itself.
 	switch Conf.Sync.Provider {
-	case conf.ProviderSiYuan, conf.ProviderLocal:
+	case conf.ProviderSiYuan, conf.ProviderLocal, conf.ProviderS3:
 		break
 	default:
 		err = errors.New(Conf.Language(131))
@@ -617,10 +623,6 @@ func ListCloudSyncDir() (syncDirs []*Sync, hSize string, err error) {
 	hSize = "-"
 	if conf.ProviderSiYuan == Conf.Sync.Provider {
 		hSize = humanize.BytesCustomCeil(uint64(size), 2)
-	}
-	if conf.ProviderS3 == Conf.Sync.Provider {
-		Conf.Sync.CloudName = syncDirs[0].CloudName
-		Conf.Save()
 	}
 	return
 }

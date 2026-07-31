@@ -225,6 +225,12 @@ replace github.com/mattn/go-sqlite3 => github.com/88250/go-sqlite3 v1.14.13-0.20
 
 replace github.com/pdfcpu/pdfcpu => github.com/88250/pdfcpu v0.3.14-0.20250424122812-f10e8d9d8d46
 
+// This fork vendors dejavu (the sync engine) at ../third_party/dejavu so the conflict merge can resolve .sy documents
+// per block instead of letting the cloud copy overwrite the whole file. Forked from
+// github.com/siyuan-note/dejavu v0.0.0-20260715095305-8462fe30163c. The path is relative to the repository, so it
+// resolves for every clone and in CI -- unlike the absolute developer paths commented out below.
+replace github.com/siyuan-note/dejavu => ../third_party/dejavu
+
 //replace github.com/88250/lute => F:\golang\gopath\src\github.com\88250\lute
 //replace github.com/siyuan-note/dejavu => D:\88250\dejavu
 //replace github.com/siyuan-note/riff => D:\88250\riff

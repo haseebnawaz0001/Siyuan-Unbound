@@ -33,11 +33,14 @@ type Sync struct {
 
 func NewSync() *Sync {
 	return &Sync{
-		CloudName:           "main",
-		Enabled:             false,
-		Perception:          false,
-		Mode:                1,
-		GenerateConflictDoc: false,
+		CloudName:  "main",
+		Enabled:    false,
+		Perception: false,
+		Mode:       1,
+		// Default to keeping a visible copy of the losing side of a conflict. Block-level merging resolves edits to
+		// different blocks automatically, so a conflict now means the same block really was edited on two devices, and
+		// leaving that copy only in the history directory makes it easy to lose work without noticing.
+		GenerateConflictDoc: true,
 		Provider:            ProviderSiYuan,
 		Interval:            30,
 	}
