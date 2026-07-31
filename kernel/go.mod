@@ -14,11 +14,9 @@ require (
 	github.com/ConradIrwin/font v0.2.2-0.20260202161408-44ae4cf5fb22
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/PuerkitoBio/goquery v1.11.0
-	github.com/Xuanwo/go-locale v1.1.3
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de
 	github.com/asaskevich/EventBus v0.0.0-20200907212545-49d423059eef
 	github.com/common-nighthawk/go-figure v0.0.0-20210622060536-734e95fb86be
-	github.com/denisbrodbeck/machineid v1.0.1
 	github.com/dgraph-io/ristretto v0.2.0
 	github.com/disintegration/imaging v1.6.2
 	github.com/djherbis/times v1.6.0
@@ -212,7 +210,7 @@ require (
 	golang.org/x/arch v0.23.0 // indirect
 	golang.org/x/crypto v0.54.0
 	golang.org/x/image v0.44.0
-	golang.org/x/oauth2 v0.35.0 // indirect
+	golang.org/x/oauth2 v0.35.0
 	golang.org/x/tools v0.47.0 // indirect
 	google.golang.org/protobuf v1.36.10 // indirect
 	gopkg.in/cenkalti/backoff.v1 v1.1.0 // indirect

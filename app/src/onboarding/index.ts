@@ -114,7 +114,7 @@ const renderOnboarding = (app: App) => {
     <svg><use xlink:href="#iconDownload"></use></svg>${window.siyuan.languages.importExistingData}
 </button>
 <button class="b3-button b3-button--outline fn__block" data-type="sync">
-    <svg><use xlink:href="#iconCloud"></use></svg>${window.siyuan.languages.loginAndSync}
+    <svg><use xlink:href="#iconCloud"></use></svg>${0 === window.siyuan.config.sync.provider ? window.siyuan.languages.loginAndSync : window.siyuan.languages.syncNow}
 </button>
 <button class="b3-button b3-button--outline fn__block" data-type="guide">
     <svg><use xlink:href="#iconHelp"></use></svg>${window.siyuan.languages.userGuide}

@@ -65,7 +65,8 @@ type SyncProviderFieldDef =
 
 type SyncProviderIntroDef = {
     genIntro: () => string;
-    genUnpaidIntro: () => string;
+    // Only rendered when isProviderConfigAllowed() is false, which now happens for the official cloud alone.
+    genUnpaidIntro?: () => string;
     isProviderConfigAllowed: () => boolean;
 };
 
@@ -80,13 +81,6 @@ type SyncProviderDef = SyncProviderIntroDef | SyncThirdPartyProviderDef;
 
 const isThirdPartySyncProviderDef = (def: SyncProviderDef): def is SyncThirdPartyProviderDef => {
     return "configKey" in def;
-};
-
-const genThirdPartyUnpaidIntro = (): string => {
-    const accountServer = getCloudURL("");
-    return `<div>
-    ${window.siyuan.languages._kernel[214].replaceAll("${accountServer}", accountServer)}
-</div>`;
 };
 
 const SYNC_PROVIDER_DEFS: Record<Config.ISync["provider"], SyncProviderDef> = {
@@ -131,11 +125,8 @@ const SYNC_PROVIDER_DEFS: Record<Config.ISync["provider"], SyncProviderDef> = {
         genIntro: () => `<div class="b3-label b3-label--inner">
     ${window.siyuan.languages.syncThirdPartyProviderS3Intro}
     <div class="fn__hr"></div>
-    <em>${window.siyuan.languages.proFeature}</em>
-    <div class="fn__hr"></div>
     ${window.siyuan.languages.syncThirdPartyProviderTip}
 </div>`,
-        genUnpaidIntro: genThirdPartyUnpaidIntro,
         fields: [
             {type: "input", label: "Endpoint", id: "endpoint"},
             {type: "input", label: "Access Key", id: "accessKey"},
@@ -162,11 +153,8 @@ const SYNC_PROVIDER_DEFS: Record<Config.ISync["provider"], SyncProviderDef> = {
         genIntro: () => `<div class="b3-label b3-label--inner">
     ${window.siyuan.languages.syncThirdPartyProviderWebDAVIntro}
     <div class="fn__hr"></div>
-    <em>${window.siyuan.languages.proFeature}</em>
-    <div class="fn__hr"></div>
     ${window.siyuan.languages.syncThirdPartyProviderTip}
 </div>`,
-        genUnpaidIntro: genThirdPartyUnpaidIntro,
         fields: [
             {type: "input", label: "Endpoint", id: "endpoint"},
             {type: "input", label: "Username", id: "username"},
@@ -190,12 +178,6 @@ const SYNC_PROVIDER_DEFS: Record<Config.ISync["provider"], SyncProviderDef> = {
     </div>
     <div class="fn__hr"></div>
     ${window.siyuan.languages.syncThirdPartyProviderLocalIntro}
-    <div class="fn__hr"></div>
-    <em>${window.siyuan.languages.proFeature}</em>
-</div>`,
-        genUnpaidIntro: () => `${genThirdPartyUnpaidIntro()}<div class="ft__error">
-    <div class="fn__hr--b"></div>
-    ${window.siyuan.languages.mobileNotSupport}
 </div>`,
         fields: [
             {type: "input", label: "Endpoint", id: "endpoint"},
@@ -224,13 +206,11 @@ const buildProviderConfigKeywords = (): string[] => {
         window.siyuan.languages.cloudIntro10,
         window.siyuan.languages.cloudIntro11,
         // Hints shown when not subscribed, when running locally and so on
-        window.siyuan.languages._kernel[214].replaceAll("${accountServer}", accountServer),
         window.siyuan.languages.mobileNotSupport,
         // S3 / WebDAV / local third party providers
         window.siyuan.languages.syncThirdPartyProviderS3Intro,
         window.siyuan.languages.syncThirdPartyProviderWebDAVIntro,
         window.siyuan.languages.syncThirdPartyProviderLocalIntro,
-        window.siyuan.languages.proFeature,
         window.siyuan.languages.syncThirdPartyProviderTip,
         // Action buttons
         window.siyuan.languages.cloudStoragePurge,
@@ -265,7 +245,7 @@ const renderProviderConfig = (root: Element) => {
     let html = "";
     if (def) {
         if (!def.isProviderConfigAllowed()) {
-            html = def.genUnpaidIntro();
+            html = def.genUnpaidIntro?.() ?? "";
         } else if (isThirdPartySyncProviderDef(def)) {
             html = `${def.genIntro()}${def.fields.map(genProviderField).join("")}${genProviderActionButtons(def.configKey)}`;
         } else {
