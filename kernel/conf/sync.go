@@ -26,6 +26,7 @@ type Sync struct {
 	Stat                string  `json:"stat"`                // Most recent sync stats info
 	GenerateConflictDoc bool    `json:"generateConflictDoc"` // Whether to generate a conflict document on cloud sync conflict
 	Provider            int     `json:"provider"`            // Cloud storage service provider
+	S3CloudNameMigrated bool    `json:"s3CloudNameMigrated"` // Whether the one-shot S3 sync directory name reset has already run, see conf.InitConf
 	S3                  *S3     `json:"s3"`                  // S3 object storage service configuration
 	WebDAV              *WebDAV `json:"webdav"`              // WebDAV service configuration
 	Local               *Local  `json:"local"`               // Local file system service configuration
@@ -42,6 +43,8 @@ func NewSync() *Sync {
 		// leaving that copy only in the history directory makes it easy to lose work without noticing.
 		GenerateConflictDoc: true,
 		Provider:            ProviderSiYuan,
+		// A fresh config has never had a bucket name written into CloudName, so the migration must not fire for it.
+		S3CloudNameMigrated: true,
 		Interval:            30,
 	}
 }
