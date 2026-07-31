@@ -68,7 +68,7 @@ Top level (repo root):
 | `app/stage/` | Build output served by the kernel |
 | `app/changelogs/` | Per-version changelog markdown |
 | `third_party/` | Vendored forks of dependencies that had to be modified. Currently only `dejavu` (the sync engine) — a separate Go module, wired in by a committed `replace` in `kernel/go.mod` |
-| `docs/` | Reference documentation: `FORK.md` (how this fork diverges from upstream), `SYNC.md` (bring-your-own-storage sync), `WORKSPACE.md`, `SY-FORMAT.md`, `ENCRYPTED-NOTEBOOK.md`, `API.md` |
+| `docs/` | Reference documentation: `FORK.md` (how this fork diverges from upstream), `SYNC.md` (bring-your-own-storage sync), `BUILD.md` (building from source), `DEPLOY.md` (Docker / Unraid / TrueNAS), `WORKSPACE.md`, `SY-FORMAT.md`, `ENCRYPTED-NOTEBOOK.md`, `API.md` |
 | `.github/` | `CONTRIBUTING.md` (+zh-CN), `SECURITY.md`, `CODE_OF_CONDUCT.md`, `PULL_REQUEST_TEMPLATE.md`, issue templates, `workflows/` |
 | `scripts/` | Release packaging: `win-build.bat`, `darwin-build.sh`, `linux-build.sh`, `parse-changelog.py`, `check-lang-keys.py` |
 
