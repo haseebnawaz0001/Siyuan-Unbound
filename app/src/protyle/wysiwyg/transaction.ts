@@ -27,7 +27,7 @@ import {cancelSB, genEmptyElement, genSBElement, refreshSbResize} from "../../bl
 import {hideElements} from "../ui/hideElements";
 import {reloadProtyle} from "../util/reload";
 import {countBlockWord} from "../../layout/status";
-import {isPaidUser, needSubscribe} from "../../util/needSubscribe";
+import {needSubscribe} from "../../util/needSubscribe";
 import {resize} from "../util/resize";
 import {processClonePHElement} from "../render/util";
 import {scrollCenter} from "../../util/highlightById";
@@ -100,8 +100,8 @@ const promiseTransaction = (options: {
     // would reach the kernel before the write and return stale data
     const pendingEmbedElements = new Set<Element>();
     /// #if MOBILE
-    if (((0 !== window.siyuan.config.sync.provider && isPaidUser()) ||
-            (0 === window.siyuan.config.sync.provider && !needSubscribe(""))) &&
+    // User-supplied storage providers need no account; only the official provider requires a subscription.
+    if ((0 !== window.siyuan.config.sync.provider || !needSubscribe("")) &&
         window.siyuan.config.repo.key && window.siyuan.config.sync.enabled) {
         document.getElementById("toolbarSync").classList.remove("fn__none");
     }

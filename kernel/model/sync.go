@@ -260,19 +260,12 @@ func checkSync(boot, exit, byHand bool) bool {
 		return false
 	}
 
-	switch Conf.Sync.Provider {
-	case conf.ProviderSiYuan:
-		if !IsSubscriber() {
-			Conf.Sync.Enabled = false
-			Conf.Save()
-			return false
-		}
-	case conf.ProviderWebDAV, conf.ProviderS3, conf.ProviderLocal:
-		if !IsPaidUser() {
-			Conf.Sync.Enabled = false
-			Conf.Save()
-			return false
-		}
+	// Only the official provider stores data on SiYuan's servers and therefore needs an account. S3, WebDAV and the
+	// local filesystem sync to storage the user supplies themselves, so they are available without signing in.
+	if SyncProviderRequiresAccount(Conf.Sync.Provider) && !IsSubscriber() {
+		Conf.Sync.Enabled = false
+		Conf.Save()
+		return false
 	}
 
 	if 7 < autoSyncErrCount && !byHand {

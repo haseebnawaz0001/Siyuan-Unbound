@@ -72,6 +72,12 @@ const syncAndDismissOnSuccess = (app: App) => {
 };
 
 const loginAndSync = (app: App) => {
+    // A user-supplied storage provider (S3, WebDAV, local filesystem) needs no SiYuan account, so sync straight away
+    // rather than prompting the user to log in first.
+    if (0 !== window.siyuan.config.sync.provider) {
+        syncAndDismissOnSuccess(app);
+        return;
+    }
     if (window.siyuan.user) {
         if (isPaidUser()) {
             syncAndDismissOnSuccess(app);

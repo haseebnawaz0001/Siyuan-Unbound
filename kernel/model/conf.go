@@ -1197,6 +1197,13 @@ func IsPaidUser() bool {
 	return 1 == u.UserSiYuanOneTimePayStatus
 }
 
+// SyncProviderRequiresAccount reports whether a sync provider stores data on SiYuan's own servers and therefore needs a
+// signed-in account. Providers backed by storage the user supplies themselves (S3, WebDAV, the local filesystem) talk
+// only to that storage, so they require no account and no subscription.
+func SyncProviderRequiresAccount(provider int) bool {
+	return conf.ProviderSiYuan == provider
+}
+
 const (
 	MaskedUserData       = ""
 	MaskedAccessAuthCode = "*******"

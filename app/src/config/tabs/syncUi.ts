@@ -2,8 +2,15 @@ import {showMessage} from "../../dialog/message";
 import {fetchPost, fetchSyncPost} from "../../util/fetch";
 import {confirmDialog} from "../../dialog/confirmDialog";
 import {isInIOS, saveExportFile} from "../../protyle/util/compatibility";
-import {isPaidUser, needSubscribe} from "../../util/needSubscribe";
+import {needSubscribe} from "../../util/needSubscribe";
 import {getCloudURL} from "../util/about";
+
+/**
+ * Whether the configuration form for a user-supplied storage provider may be shown.
+ * S3, WebDAV and the local filesystem sync to storage the user owns and never contact SiYuan's servers, so they need
+ * no account and no subscription. Only the official provider (0) is account-gated.
+ */
+const userSuppliedStorageAllowed = (): boolean => true;
 
 /** Refreshes the visibility and the dynamic panels of the sync tab from the current config, called from syncRuntime */
 export const refreshSyncTabPanels = (root: Element) => {
@@ -19,7 +26,7 @@ export const refreshSyncModeRelatedItems = (root: Element) => {
 };
 
 const setSyncConfigItemVisible = (root: Element) => {
-    const visible = window.siyuan.config.sync.provider === 0 ? !needSubscribe("") : isPaidUser();
+    const visible = window.siyuan.config.sync.provider === 0 ? !needSubscribe("") : userSuppliedStorageAllowed();
     [
         "cloudSpace",
         "sync.enabled",
@@ -117,7 +124,7 @@ const SYNC_PROVIDER_DEFS: Record<Config.ISync["provider"], SyncProviderDef> = {
         },
     },
     2: {
-        isProviderConfigAllowed: isPaidUser,
+        isProviderConfigAllowed: userSuppliedStorageAllowed,
         configKey: "s3",
         api: "/api/sync/setSyncProviderS3",
         getConfig: () => window.siyuan.config.sync.s3,
@@ -148,7 +155,7 @@ const SYNC_PROVIDER_DEFS: Record<Config.ISync["provider"], SyncProviderDef> = {
         ],
     },
     3: {
-        isProviderConfigAllowed: isPaidUser,
+        isProviderConfigAllowed: userSuppliedStorageAllowed,
         configKey: "webdav",
         api: "/api/sync/setSyncProviderWebDAV",
         getConfig: () => window.siyuan.config.sync.webdav,
@@ -173,7 +180,7 @@ const SYNC_PROVIDER_DEFS: Record<Config.ISync["provider"], SyncProviderDef> = {
         ],
     },
     4: {
-        isProviderConfigAllowed: isPaidUser,
+        isProviderConfigAllowed: userSuppliedStorageAllowed,
         configKey: "local",
         api: "/api/sync/setSyncProviderLocal",
         getConfig: () => window.siyuan.config.sync.local,

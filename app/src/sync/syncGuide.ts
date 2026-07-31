@@ -1,4 +1,4 @@
-import {isPaidUser, needSubscribe} from "../util/needSubscribe";
+import {needSubscribe} from "../util/needSubscribe";
 import {showMessage} from "../dialog/message";
 import {fetchPost} from "../util/fetch";
 import {Dialog} from "../dialog";
@@ -164,15 +164,9 @@ export const syncGuide = (app?: App) => {
         /// #endif
         showMessage(window.siyuan.languages._kernel[29].replaceAll("${accountServer}", getCloudURL("")));
         return;
-    } else if (!isPaidUser()) {
-        /// #if !MOBILE
-        if (app) {
-            openSetting(app, "sync");
-        }
-        /// #endif
-        showMessage(window.siyuan.languages._kernel[214].replaceAll("${accountServer}", getCloudURL("")));
-        return;
     }
+    // Providers other than the official one (S3, WebDAV, local filesystem) sync to storage the user supplies
+    // themselves, so they are not account-gated and fall through to the key/enable/sync steps below.
     if (!window.siyuan.config.repo.key) {
         setKey(true);
         return;
