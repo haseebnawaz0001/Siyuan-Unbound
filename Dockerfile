@@ -34,6 +34,10 @@ EORUN
 
 WORKDIR /kernel
 ADD kernel/go.* .
+# kernel/go.mod replaces github.com/siyuan-note/dejavu with ../third_party/dejavu, so the vendored module has to be
+# staged as a sibling of /kernel before the module graph is resolved, or `go mod download` fails on a missing
+# replacement directory. See docs/FORK.md.
+ADD third_party/ /third_party/
 RUN --mount=type=cache,target=/root/.cache/go-build --mount=type=cache,target=/go/pkg \
     go mod download
 
@@ -56,6 +60,6 @@ COPY --from=go-build --chmod=755 /kernel/kernel /kernel/entrypoint.sh .
 COPY --from=node-build /artifacts .
 
 ENTRYPOINT ["/opt/siyuan/entrypoint.sh"]
-# 默认启动伺服。若通过 `docker run` / `command:` 传额外参数，需自行带上 `serve` 子命令，
-# 否则用户参数会整体覆盖 CMD。
+# Serve by default. Extra arguments passed through `docker run` / `command:` replace CMD wholesale, so they have to
+# include the `serve` subcommand themselves.
 CMD ["/opt/siyuan/kernel", "serve"]
