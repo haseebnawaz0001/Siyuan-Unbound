@@ -304,6 +304,10 @@ var (
 	ErrCloudForbidden          = errors.New("cloud forbidden")           // ErrCloudForbidden 描述了云端存储服务禁止访问的错误
 	ErrCloudTooManyRequests    = errors.New("cloud too many requests")   // ErrCloudTooManyRequests 描述了云端存储服务请求过多的错误
 	ErrDecryptFailed           = errors.New("decrypt failed")            // ErrDecryptFailed 描述了解密失败的错误
+
+	// ErrCloudInvalidDirName reports a cloud sync directory name that cannot be used as a storage key. Callers are
+	// expected to validate names themselves; this is the backstop for the ones that do not.
+	ErrCloudInvalidDirName = errors.New("invalid cloud directory name")
 )
 
 func IsValidCloudDirName(cloudDirName string) bool {

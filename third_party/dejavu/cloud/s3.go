@@ -469,9 +469,25 @@ func (s3 *S3) listRepos() (ret []*Repo, err error) {
 
 	ret = []*Repo{}
 
+	// The directory currently in use is always listed, even before its first sync has written anything. Omitting it
+	// would leave the caller's own selection missing from the list it offers the user.
+	seen := map[string]bool{}
+	addRepo := func(name string) {
+		if "" == name || seen[name] {
+			return
+		}
+		seen[name] = true
+		ret = append(ret, &Repo{Name: name, Size: 0, Updated: ""})
+	}
+	if dir := s3.Conf.Dir; "" != dir {
+		addRepo(dir)
+	} else {
+		addRepo(defaultCloudDir)
+	}
+
 	// The historical layout keeps the repo at the bucket root and is reported as the default directory.
 	if _, statErr := s3.statFile(path.Join("repo", "refs", "latest")); nil == statErr {
-		ret = append(ret, &Repo{Name: defaultCloudDir, Size: 0, Updated: ""})
+		addRepo(defaultCloudDir)
 	}
 
 	prefix, delimiter := "siyuan/", "/"
@@ -495,11 +511,7 @@ func (s3 *S3) listRepos() (ret []*Repo, err error) {
 			if nil == commonPrefix.Prefix {
 				continue
 			}
-			name := strings.Trim(strings.TrimPrefix(*commonPrefix.Prefix, prefix), delimiter)
-			if "" == name || defaultCloudDir == name {
-				continue
-			}
-			ret = append(ret, &Repo{Name: name, Size: 0, Updated: ""})
+			addRepo(strings.Trim(strings.TrimPrefix(*commonPrefix.Prefix, prefix), delimiter))
 		}
 	}
 
@@ -515,6 +527,10 @@ func (s3 *S3) CreateRepo(name string) (err error) {
 	if "" == name || defaultCloudDir == name {
 		// The default directory is the bucket root, which always exists.
 		return
+	}
+	if !IsValidCloudDirName(name) {
+		// Validated here as well as by the caller: this is a library, and the name goes straight into an object key.
+		return ErrCloudInvalidDirName
 	}
 
 	svc := s3.getService()
@@ -535,41 +551,60 @@ func (s3 *S3) CreateRepo(name string) (err error) {
 func (s3 *S3) RemoveRepo(name string) (err error) {
 	if "" == name || defaultCloudDir == name {
 		// Refuse to wipe the bucket root, which is shared with the default directory.
-		return ErrCloudObjectNotFound
+		return ErrCloudInvalidDirName
+	}
+	if !IsValidCloudDirName(name) {
+		// Without this, a name like "." would resolve to the prefix "siyuan/" and take every directory with it.
+		return ErrCloudInvalidDirName
 	}
 
 	svc := s3.getService()
-	ctx, cancelFn := context.WithTimeout(context.Background(), time.Duration(s3.S3.Timeout)*time.Second)
-	defer cancelFn()
-
 	prefix := path.Join("siyuan", name) + "/"
 	limit := int32(1000)
-	paginator := as3.NewListObjectsV2Paginator(svc, &as3.ListObjectsV2Input{
-		Bucket:  aws.String(s3.Conf.S3.Bucket),
-		Prefix:  aws.String(prefix),
-		MaxKeys: &limit,
-	})
-	for paginator.HasMorePages() {
-		output, pErr := paginator.NextPage(ctx)
-		if nil != pErr {
-			return pErr
+
+	// Each request gets its own deadline. A single deadline spanning the whole traversal would expire partway through
+	// a large directory and leave it half deleted.
+	for {
+		var keys []as3Types.ObjectIdentifier
+		listCtx, listCancelFn := context.WithTimeout(context.Background(), time.Duration(s3.S3.Timeout)*time.Second)
+		output, listErr := svc.ListObjectsV2(listCtx, &as3.ListObjectsV2Input{
+			Bucket:  aws.String(s3.Conf.S3.Bucket),
+			Prefix:  aws.String(prefix),
+			MaxKeys: &limit,
+		})
+		listCancelFn()
+		if nil != listErr {
+			return listErr
 		}
 		if nil == output {
-			break
+			return
 		}
 		for _, entry := range output.Contents {
 			if nil == entry.Key {
 				continue
 			}
-			if _, delErr := svc.DeleteObject(ctx, &as3.DeleteObjectInput{
-				Bucket: aws.String(s3.Conf.S3.Bucket),
-				Key:    entry.Key,
-			}); nil != delErr {
-				return delErr
-			}
+			keys = append(keys, as3Types.ObjectIdentifier{Key: entry.Key})
 		}
+		if 1 > len(keys) {
+			return
+		}
+
+		delCtx, delCancelFn := context.WithTimeout(context.Background(), time.Duration(s3.S3.Timeout)*time.Second)
+		delOutput, delErr := svc.DeleteObjects(delCtx, &as3.DeleteObjectsInput{
+			Bucket: aws.String(s3.Conf.S3.Bucket),
+			Delete: &as3Types.Delete{Objects: keys, Quiet: aws.Bool(true)},
+		})
+		delCancelFn()
+		if nil != delErr {
+			return delErr
+		}
+		if nil != delOutput && 0 < len(delOutput.Errors) {
+			first := delOutput.Errors[0]
+			return fmt.Errorf("delete cloud dir object [%s] failed: %s", aws.ToString(first.Key), aws.ToString(first.Message))
+		}
+		// Re-list rather than paginating: the keys just removed are gone, so the next page is simply the new first page.
+		// This also terminates only once the prefix is genuinely empty.
 	}
-	return
 }
 
 func (s3 *S3) statFile(key string) (info *objectInfo, err error) {
@@ -615,12 +650,17 @@ func (s3 *S3) getNotFound(keys []string) (ret []string, err error) {
 	}
 
 	waitGroup := &sync.WaitGroup{}
+	// The workers all append to ret. Without the lock an append can be lost, which reports a chunk that is missing
+	// from the cloud as present: it is then never uploaded, and the cloud repo is quietly left incomplete.
+	retLock := &sync.Mutex{}
 	p, _ := ants.NewPoolWithFunc(poolSize, func(arg interface{}) {
 		defer waitGroup.Done()
 		key := arg.(string)
 		info, statErr := s3.statFile(key)
 		if nil == info || nil != statErr {
+			retLock.Lock()
 			ret = append(ret, key)
+			retLock.Unlock()
 		}
 	})
 
