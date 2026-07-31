@@ -5,7 +5,7 @@ import {isInIOS, saveExportFile} from "../../protyle/util/compatibility";
 import {isPaidUser, needSubscribe} from "../../util/needSubscribe";
 import {getCloudURL} from "../util/about";
 
-/** 按当前配置刷新同步 Tab 可见性与动态面板（供 syncRuntime 调用） */
+/** Refreshes the visibility and the dynamic panels of the sync tab from the current config, called from syncRuntime */
 export const refreshSyncTabPanels = (root: Element) => {
     setSyncConfigItemVisible(root);
     setSyncModeRelatedConfigItemVisible(root);
@@ -13,7 +13,7 @@ export const refreshSyncTabPanels = (root: Element) => {
     renderCloudSpace(root);
 };
 
-/** 仅刷新与同步模式相关的配置项可见性（供 syncRuntime 调用） */
+/** Refreshes only the visibility of the setting items that depend on the sync mode, called from syncRuntime */
 export const refreshSyncModeRelatedItems = (root: Element) => {
     setSyncModeRelatedConfigItemVisible(root);
 };
@@ -46,7 +46,7 @@ const setSyncModeRelatedConfigItemVisible = (root: Element) => {
     root.querySelector(`#${CSS.escape("sync.perception")}`)?.closest(".config-item")?.classList.toggle("fn__none", !(isProviderOfficialAutoSync && window.siyuan.config.sync.provider === 0 && window.siyuan.config.system.container !== "docker"));
 };
 
-/** 同步提供商配置区检索关键词（供 syncTab 注册 slot） */
+/** Search keywords of the sync provider config area, used when syncTab registers the slot */
 export const getSyncProviderConfigKeywords = (): string[] => buildProviderConfigKeywords();
 
 type SyncProviderConfigKey = Extract<keyof Config.ISync, "s3" | "webdav" | "local">;
@@ -201,7 +201,7 @@ const SYNC_PROVIDER_DEFS: Record<Config.ISync["provider"], SyncProviderDef> = {
 const buildProviderConfigKeywords = (): string[] => {
     const accountServer = getCloudURL("");
     return [
-        // 官方云（provider === 0）
+        // Official cloud (provider === 0)
         window.siyuan.languages.syncOfficialProviderIntro,
         window.siyuan.languages._kernel[29].replaceAll("${accountServer}", accountServer),
         window.siyuan.languages._kernel[295],
@@ -216,20 +216,20 @@ const buildProviderConfigKeywords = (): string[] => {
         window.siyuan.languages.cloudIntro9,
         window.siyuan.languages.cloudIntro10,
         window.siyuan.languages.cloudIntro11,
-        // 未订阅 / 本地等提示
+        // Hints shown when not subscribed, when running locally and so on
         window.siyuan.languages._kernel[214].replaceAll("${accountServer}", accountServer),
         window.siyuan.languages.mobileNotSupport,
-        // S3 / WebDAV / 本地第三方
+        // S3 / WebDAV / local third party providers
         window.siyuan.languages.syncThirdPartyProviderS3Intro,
         window.siyuan.languages.syncThirdPartyProviderWebDAVIntro,
         window.siyuan.languages.syncThirdPartyProviderLocalIntro,
         window.siyuan.languages.proFeature,
         window.siyuan.languages.syncThirdPartyProviderTip,
-        // 操作按钮
+        // Action buttons
         window.siyuan.languages.cloudStoragePurge,
         window.siyuan.languages.import,
         window.siyuan.languages.export,
-        // 表单标签与选项（硬编码英文）
+        // Form labels and options, hardcoded in English
         "Endpoint",
         "Access Key",
         "Secret Key",
@@ -390,7 +390,7 @@ const saveSyncProviderConfigValues = (configElement: Element) => {
     }
     const data = readProviderConfigFields(configElement, def.getConfig());
     const configKey = def.configKey;
-    // 使用 fetchSyncPost：内核返回 code < 0 时 fetchPost 不会调用回调，此处需始终回写界面与已保存配置一致
+    // fetchSyncPost is used because fetchPost skips the callback when the kernel returns code < 0, while the UI always has to be written back to match the saved config
     fetchSyncPost(def.api, {[configKey]: data})
         .then((response) => {
             if (response.code === 0 && response.data?.[configKey]) {

@@ -6,7 +6,7 @@
     <meta name="color-scheme" content="light dark">
     <link rel="stylesheet" href="window.css">
     <style>
-        /* workspace.html 独有样式，公共样式在 window.css 中 */
+        /* Styles unique to workspace.html; shared styles live in window.css */
         .layout {
             display: flex;
             min-height: 100vh;
@@ -111,7 +111,7 @@
             word-break: break-all;
         }
 
-        /* 安全模式分支（渲染进程崩溃恢复）独有样式 */
+        /* Styles unique to the safe mode branch (renderer process crash recovery) */
         .crash-tip {
             font-size: 18px;
             color: #222;
@@ -159,7 +159,7 @@
             background-color: #2c66e0;
         }
 
-        /* 次操作按钮：透明背景 + 描边，与主操作（安全模式）形成对比 */
+        /* Secondary action button: transparent background + outline, contrasting with the primary action (safe mode) */
         .b3-button--outline {
             color: rgba(0, 0, 0, .75);
             background-color: transparent;
@@ -328,7 +328,7 @@
     const path = require("path")
     const {ipcRenderer} = require("electron")
 
-    // 渲染可用工作空间列表
+    // Render the list of available workspaces
     const wsRaw = decodeURIComponent(getSearch("workspaces"))
     const wsList = wsRaw.split("\n").filter(item => "" !== item.trim())
     let langData = applyLang(currentLang)
@@ -372,13 +372,13 @@
 
     langSelect.addEventListener("change", (event) => {
         langData = applyLang(event.target.value)
-        // 重新渲染列表项按钮文案
+        // Re-render the list item button labels
         renderWsList()
     })
 
     initWindowChrome()
 
-    // 渲染进程崩溃恢复：显示安全模式选择，工作空间丢失时要求用户重新选择。
+    // Renderer process crash recovery: show the safe mode choice, and ask the user to re-select if the workspace is missing.
     const isCrash = "1" === getSearch("crash");
     const isCrashWorkspaceMissing = "1" === getSearch("crashWorkspaceMissing");
     let crashWorkspace = decodeURIComponent(getSearch("workspace"));
@@ -416,10 +416,10 @@
             });
         });
     } else if (0 < wsList.length) {
-        // 存在可用工作空间时渲染左列列表
+        // Render the left column list when there are available workspaces
         renderWsList()
     } else {
-        // 没有可用工作空间时隐藏左列，显示右列空提示
+        // Hide the left column and show the right column's empty state hint when no workspaces are available
         document.querySelector(".wsPanel").classList.add("fn__none")
         document.querySelector(".emptyHint").classList.remove("fn__none")
     }

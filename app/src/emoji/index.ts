@@ -45,8 +45,8 @@ export const unicode2Emoji = (unicode: string, className = "", needSpan = false,
                 emoji = `<span class="${className}">${emoji}</span>`;
             }
         } catch (e) {
-            // 自定义表情搜索报错 https://github.com/siyuan-note/siyuan/issues/5883
-            // 这里忽略错误不做处理
+            // Custom emoji search error https://github.com/siyuan-note/siyuan/issues/5883
+            // The error is ignored here and not handled
         }
     }
     return emoji;
@@ -550,7 +550,7 @@ export const openEmojiPanel = (
     }
     lazyLoadEmoji(dialog.element);
     lazyLoadEmojiImg(dialog.element);
-    // 不能使用 getEventName 否则 https://github.com/siyuan-note/siyuan/issues/5472
+    // Cannot use getEventName, otherwise https://github.com/siyuan-note/siyuan/issues/5472
     dialog.element.addEventListener("click", (event) => {
         let target = event.target as HTMLElement;
         while (target && target !== dialog.element) {
@@ -564,7 +564,7 @@ export const openEmojiPanel = (
                     }
                     emojisContentElement.scrollTo({
                         top: titleElement.offsetTop - 77,
-                        // behavior: "smooth"  不能使用，否则无法定位
+                        // behavior: "smooth"  cannot be used, otherwise positioning fails
                     });
                 }
                 break;
@@ -599,7 +599,7 @@ export const openEmojiPanel = (
                     unicode = target.getAttribute("src");
                     dialog.destroy();
                 } else {
-                    // 随机
+                    // Random
                     unicode = getRandomEmoji();
                 }
                 if (type === "notebook") {
@@ -768,7 +768,7 @@ const putEmojis = (protyle: IProtyle) => {
         window.siyuan.emojis[0].items.forEach(emojiITem => {
             emojis[emojiITem.keywords] = protyle.options.hint.emojiPath + "/" + emojiITem.unicode;
         });
-        // Lute 已为所有编辑器共享单例，PutEmojis 只需调用一次
+        // Lute is already a shared singleton across all editors, so PutEmojis only needs to be called once
         lute.PutEmojis(emojis);
     }
 };

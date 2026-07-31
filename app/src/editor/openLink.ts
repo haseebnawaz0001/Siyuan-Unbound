@@ -35,7 +35,7 @@ export const openLink = (app: App, aLink: string, event?: MouseEvent, ctrlIsPres
         if (Constants.SIYUAN_ASSETS_EXTS.includes(pathPosix().extname(linkAddress)) &&
             (
                 !linkAddress.endsWith(".pdf") ||
-                // 本地 pdf 仅 assets/ 开头的才使用 siyuan 打开
+                // For a local PDF, only open it with SiYuan if the path starts with assets/
                 (linkAddress.endsWith(".pdf") && linkAddress.startsWith("assets/"))
             )
         ) {
@@ -69,7 +69,7 @@ export const openLink = (app: App, aLink: string, event?: MouseEvent, ctrlIsPres
         }
     } else if (linkAddress) {
         if (0 > linkAddress.indexOf(":")) {
-            // 使用 : 判断，不使用 :// 判断 Open external application protocol invalid https://github.com/siyuan-note/siyuan/issues/10075
+            // Check for ":" instead of "://", since "Open external application protocol invalid" https://github.com/siyuan-note/siyuan/issues/10075
             // Support click to open hyperlinks like `www.foo.com` https://github.com/siyuan-note/siyuan/issues/9986
             linkAddress = `https://${linkAddress}`;
         }
@@ -93,8 +93,8 @@ export const openByMobile = (uri: string) => {
     }
     if (isInIOS()) {
         if (uri.startsWith("assets/")) {
-            // iOS 16.7 之前的版本，uri 需要 encodeURIComponent
-            // 保留 query 参数（如 ?box=<id>），只编码 path 部分
+            // On versions before iOS 16.7, the uri needs encodeURIComponent
+            // Keep the query parameters (e.g. ?box=<id>) as-is, only encode the path part
             const pathAndQuery = uri.replace("assets/", "");
             const queryIdx = pathAndQuery.indexOf("?");
             let encodedPath = pathAndQuery;
@@ -105,7 +105,7 @@ export const openByMobile = (uri: string) => {
             }
             window.webkit.messageHandlers.openLink.postMessage(location.origin + "/assets/" + encodeURIComponent(encodedPath) + query);
         } else if (uri.startsWith("/")) {
-            // 导出 zip 返回的是已经 encode 过的，因此不能再 encode
+            // What the export-zip endpoint returns is already encoded, so it must not be encoded again
             window.webkit.messageHandlers.openLink.postMessage(location.origin + uri);
         } else {
             try {

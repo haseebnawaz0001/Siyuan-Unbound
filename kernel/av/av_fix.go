@@ -49,8 +49,9 @@ func CheckSpec(av *AttributeView) (err error) {
 	return
 }
 
-// upgradeSpec5 将旧的扁平过滤规则数组包装为单个隐式 AND 根组，支持递归嵌套分组。
-// 原有叶子条件一条不丢，整体作为根组的子节点保留。
+// upgradeSpec5 wraps the old flat filter array into a single implicit AND root group, enabling recursive
+// nested grouping.
+// None of the original leaf conditions are dropped; they are all kept as children of the root group.
 func upgradeSpec5(av *AttributeView) {
 	if 5 <= av.Spec {
 		return
@@ -58,16 +59,17 @@ func upgradeSpec5(av *AttributeView) {
 
 	for _, view := range av.Views {
 		if 1 == len(view.Filters) && nil != view.Filters[0] && view.Filters[0].IsGroup() {
-			continue // 已经是根组形式，无需包装
+			continue // Already in root group form, no need to wrap
 		}
-		// 收集非 nil 的原有条件
+		// Collect the non-nil original conditions
 		var children []*ViewFilter
 		for _, f := range view.Filters {
 			if nil != f {
 				children = append(children, f)
 			}
 		}
-		// 包装成 AND 根组，原条件作为子节点（空时即为空根组）
+		// Wrap into an AND root group, with the original conditions as children (an empty root group if there
+		// are none)
 		view.Filters = []*ViewFilter{{Combination: FilterCombinationAnd, Filters: children}}
 	}
 
@@ -100,7 +102,7 @@ func upgradeSpec3(av *AttributeView) {
 		return
 	}
 
-	// 将 view.table.rowIds 或 view.gallery.cardIds 复制到 view.itemIds
+	// Copy view.table.rowIds or view.gallery.cardIds into view.itemIds
 	for _, view := range av.Views {
 		if 0 < len(view.ItemIDs) {
 			continue
@@ -126,7 +128,7 @@ func upgradeSpec2(av *AttributeView) {
 		return
 	}
 
-	// 如果存在 view.table.filters/sorts/pageSize 则复制覆盖到 view.filters/sorts/pageSize
+	// If view.table.filters/sorts/pageSize exist, copy them over to view.filters/sorts/pageSize
 	for _, view := range av.Views {
 		if 1 > len(view.Filters) {
 			view.Filters = []*ViewFilter{}
@@ -151,7 +153,7 @@ func upgradeSpec2(av *AttributeView) {
 			view.Table.ShowIcon = true
 		}
 
-		// 清理过滤和排序规则中不存在的键
+		// Remove keys from the filter and sort rules that no longer exist
 		tmpFilters := []*ViewFilter{}
 		for _, f := range view.Filters {
 			if k, _ := av.GetKey(f.Column); nil != k {
@@ -181,7 +183,7 @@ func upgradeSpec1(av *AttributeView) {
 	for _, kv := range av.KeyValues {
 		switch kv.Key.Type {
 		case KeyTypeBlock:
-			// 补全 block 的创建时间和更新时间
+			// Fill in the block's created and updated time
 			for _, v := range kv.Values {
 				if 0 == v.Block.Created {
 					logging.LogWarnf("block [%s] created time is empty", v.BlockID)
@@ -221,26 +223,26 @@ func upgradeSpec1(av *AttributeView) {
 					v.KeyID = kv.Key.ID
 				}
 
-				// 校验日期 IsNotEmpty
+				// Validate date IsNotEmpty
 				if KeyTypeDate == kv.Key.Type {
 					if nil != v.Date && 0 != v.Date.Content && !v.Date.IsNotEmpty {
 						v.Date.IsNotEmpty = true
 					}
 				}
 
-				// 校验数字 IsNotEmpty
+				// Validate number IsNotEmpty
 				if KeyTypeNumber == kv.Key.Type {
 					if nil != v.Number && 0 != v.Number.Content && !v.Number.IsNotEmpty {
 						v.Number.IsNotEmpty = true
 					}
 				}
 
-				// 清空关联实际值
+				// Clear the actual relation values
 				if KeyTypeRelation == kv.Key.Type {
 					v.Relation.Contents = nil
 				}
 
-				// 清空汇总实际值
+				// Clear the actual rollup values
 				if KeyTypeRollup == kv.Key.Type {
 					v.Rollup.Contents = nil
 				}
@@ -258,7 +260,7 @@ func upgradeSpec1(av *AttributeView) {
 				}
 			}
 
-			// 补全值的创建时间和更新时间
+			// Fill in the value's created and updated time
 			if "" == v.ID {
 				logging.LogWarnf("value id is empty")
 				v.ID = ast.NewNodeID()
@@ -282,7 +284,7 @@ func upgradeSpec1(av *AttributeView) {
 		}
 	}
 
-	// 补全过滤规则 Value
+	// Fill in the filter rule's Value
 	for _, view := range av.Views {
 		if nil != view.Table {
 			for _, f := range view.Table.Filters {

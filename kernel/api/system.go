@@ -214,7 +214,7 @@ func getEmojiConf(c *gin.Context) {
 				}
 
 				if customEmoji.IsDir() {
-					// 子级
+					// Sub-level
 					subCustomEmojis, err := os.ReadDir(filepath.Join(customConfDir, name))
 					if err != nil {
 						logging.LogErrorf("read custom emojis failed: %s", err)
@@ -624,8 +624,9 @@ func getConf(c *gin.Context) {
 		maskedConf = model.FilterConfByPublishIgnore(publishIgnore, maskedConf)
 	}
 
-	// 浏览器环境下不返回工作空间绝对路径，避免泄露用户名等敏感信息
-	// 原生客户端（桌面 Electron、移动端）UA 以 "SiYuan/" 开头，照常返回真实路径
+	// Don't return the workspace's absolute path in a browser environment, to avoid leaking sensitive info such as
+	// the username.
+	// Native clients (desktop Electron, mobile) have a UA starting with "SiYuan/" and get the real path as usual.
 	// REF: https://github.com/siyuan-note/siyuan/issues/17410
 	if util.IsBrowserRequest(c) {
 		maskedConf.System.WorkspaceDir = ""
@@ -805,7 +806,7 @@ func bootProgress(c *gin.Context) {
 	ret.Data = map[string]any{"progress": progress, "details": details}
 }
 
-// bootProgressSSE 以 Server-Sent Events 推送启动进度，仅在进度发生变化时写一帧。
+// bootProgressSSE pushes boot progress via Server-Sent Events, writing a frame only when the progress changes.
 func bootProgressSSE(c *gin.Context) {
 	c.Header("Content-Type", "text/event-stream")
 	c.Header("Cache-Control", "no-cache")
@@ -817,7 +818,7 @@ func bootProgressSSE(c *gin.Context) {
 		return
 	}
 
-	// 连接后立即推送当前进度，避免等待第一个 tick
+	// Push the current progress immediately after connecting, instead of waiting for the first tick
 	progress, details := util.GetBootProgressDetails()
 	lastProgress, lastDetails := progress, details
 	if err := writeBootProgressSSE(c, flusher, progress, details); err != nil {
@@ -833,7 +834,7 @@ func bootProgressSSE(c *gin.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			// 客户端断开连接
+			// Client disconnected
 			return
 		case <-ticker.C:
 			progress, details = util.GetBootProgressDetails()
@@ -1142,7 +1143,7 @@ func exit(c *gin.Context) {
 		force = forceArg.(bool)
 	}
 
-	execInstallPkgArg := arg["execInstallPkg"] // 0：默认检查新版本，1：不返回安装包，2：返回安装包路径并退出
+	execInstallPkgArg := arg["execInstallPkg"] // 0: default, check for a new version, 1: don't return the install package, 2: return the install package path and exit
 	execInstallPkg := 0
 	if nil != execInstallPkgArg {
 		execInstallPkg = int(execInstallPkgArg.(float64))
@@ -1163,9 +1164,9 @@ func exit(c *gin.Context) {
 	ret.Data = data
 	switch exitCode {
 	case 0:
-	case 1: // 同步执行失败
+	case 1: // Sync execution failed
 		ret.Msg = model.Conf.Language(96) + "<div class=\"fn__space\"></div><button class=\"b3-button b3-button--white\">" + model.Conf.Language(97) + "</button>"
-	case 2: // 提示新安装包
+	case 2: // Prompt about the new install package
 		ret.Msg = model.Conf.Language(61)
 	}
 }

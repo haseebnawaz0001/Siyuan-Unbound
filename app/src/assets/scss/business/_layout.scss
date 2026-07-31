@@ -116,7 +116,7 @@
     height: 6px;
     width: 100%;
     position: relative;
-    z-index: 4; // 需大于 #sidebarContainer https://github.com/siyuan-note/siyuan/issues/11759
+    z-index: 4; // Must be greater than #sidebarContainer https://github.com/siyuan-note/siyuan/issues/11759
     flex-shrink: 0;
     touch-action: none;
 

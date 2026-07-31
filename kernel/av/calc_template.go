@@ -29,9 +29,11 @@ import (
 	"github.com/siyuan-note/siyuan/kernel/util"
 )
 
-// buildRollupTemplateContext 构造模板统计可用的数据上下文。
-// values 为整列 rollup 单元格解析出的数字数组；strs 为各单元格的字符串形式；raw 为原始 Value 数组。
-// 额外暴露预算聚合量 sum/avg/min/max/median/count/nonEmptyCount，便于简单公式直接引用。
+// buildRollupTemplateContext builds the data context available to template calculations.
+// values is the array of numbers parsed from the whole column of rollup cells; strs is the string form of each
+// cell; raw is the array of original Value objects.
+// It also exposes precomputed aggregates sum/avg/min/max/median/count/nonEmptyCount so simple formulas can
+// reference them directly.
 func buildRollupTemplateContext(values []float64, strs []string, raw []*Value) map[string]any {
 	ctx := map[string]any{
 		"values":  values,
@@ -78,9 +80,10 @@ func buildRollupTemplateContext(values []float64, strs []string, raw []*Value) m
 	return ctx
 }
 
-// evalRollupTemplate 使用 text/template + sprig 渲染自定义模板统计内容。
-// 返回渲染后的字符串；若该字符串可解析为数字则 isNumber 为 true 且 asNumber 为该数值。
-// 解析或执行失败时返回 err，由调用方决定如何提示用户。
+// evalRollupTemplate renders custom template calculation content using text/template + sprig.
+// It returns the rendered string; if the string can be parsed as a number, isNumber is true and asNumber holds
+// that value.
+// If parsing or execution fails, err is returned and it is up to the caller to decide how to notify the user.
 func evalRollupTemplate(templateContent string, ctx map[string]any) (rendered string, asNumber float64, isNumber bool, err error) {
 	if "" == templateContent {
 		return
@@ -105,7 +108,8 @@ func evalRollupTemplate(templateContent string, ctx map[string]any) (rendered st
 		return
 	}
 
-	// 渲染结果若可解析为数字，则按数字处理（前端会按列数字格式显示）
+	// If the rendered result can be parsed as a number, treat it as a number (the frontend will display it
+	// with the column's number format)
 	trimmed := strings.TrimSpace(rendered)
 	if "" != trimmed {
 		if num, parseErr := strconv.ParseFloat(trimmed, 64); nil == parseErr {
@@ -116,9 +120,11 @@ func evalRollupTemplate(templateContent string, ctx map[string]any) (rendered st
 	return
 }
 
-// collectFieldValues 通用收集整列行值，用于任意字段类型的模板统计。
-// 单值类型：每行收集一个值；多值类型（MSelect/MAsset）：每个子值单独收集，与原生 CountValues 语义一致。
-// 空值判断用 IsBlank()（类型感知，正确处理 Checkbox/Created 等边界）。
+// collectFieldValues generically collects the whole column of row values, for template calculations on any
+// field type.
+// Single-value types: one value is collected per row; multi-value types (MSelect/MAsset): each sub-value is
+// collected separately, consistent with the semantics of the native CountValues.
+// Emptiness is determined with IsBlank() (type-aware, correctly handling edge cases like Checkbox/Created).
 func collectFieldValues(collection Collection, fieldIndex int) (nums []float64, strs []string, raw []*Value) {
 	for _, item := range collection.GetItems() {
 		values := item.GetValues()
@@ -152,8 +158,9 @@ func collectFieldValues(collection Collection, fieldIndex int) (nums []float64, 
 	return
 }
 
-// calcFieldByTemplate 对任意字段类型执行模板统计（通用入口，非 Rollup）。
-// 与 calcFieldRollup 中的 Template 分支不同，此处按整列行值收集，不遍历 Rollup.Contents。
+// calcFieldByTemplate performs a template calculation on any field type (a generic entry point, not Rollup).
+// Unlike the Template branch in calcFieldRollup, this collects values from the whole column of rows and does
+// not iterate over Rollup.Contents.
 func calcFieldByTemplate(collection Collection, field Field, fieldIndex int) {
 	nums, strs, raw := collectFieldValues(collection, fieldIndex)
 	if 0 == len(nums) {
@@ -173,13 +180,14 @@ func calcFieldByTemplate(collection Collection, field Field, fieldIndex int) {
 	}
 }
 
-// pushRollupTemplateErr 将模板统计的解析/执行错误以 toast 形式推送给前端，
-// 复用模板字段解析失败时的本地化提示文案（util.Langs[util.Lang][44]）。
+// pushRollupTemplateErr pushes a template calculation parse/execution error to the frontend as a toast,
+// reusing the localized message for template field parse failures (util.Langs[util.Lang][44]).
 func pushRollupTemplateErr(err error) {
 	util.PushErrMsg(fmt.Sprintf(util.Langs[util.Lang][44], util.EscapeHTML(err.Error())), 30000)
 }
 
-// templateFuncMap 在 sprig 函数集基础上，补充表格计算专用的条件计数函数 countif。
+// templateFuncMap adds the countif conditional-count function used by table calculations on top of the sprig
+// function set.
 func templateFuncMap() template.FuncMap {
 	tplFuncs := sprig.TxtFuncMap()
 	tplFuncs["countif"] = util.CountIf

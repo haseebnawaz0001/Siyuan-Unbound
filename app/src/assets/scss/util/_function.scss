@@ -11,7 +11,9 @@
 
   &__ellipsis {
     @include mixin.text-clamp(1);
-    display: block; // 集市挂件名称过长遮挡星标 https://github.com/siyuan-note/siyuan/issues/4782
+    // Overly long widget names in the marketplace cover the star icon
+    // https://github.com/siyuan-note/siyuan/issues/4782
+    display: block;
   }
 
   &__space {
@@ -128,7 +130,7 @@
     width: 100%;
     bottom: 0;
     align-content: center;
-    z-index: 3; // 需大于 database table view
+    z-index: 3; // Must be greater than the database table view
     align-items: center;
   }
 

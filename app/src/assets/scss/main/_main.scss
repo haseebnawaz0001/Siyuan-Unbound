@@ -48,7 +48,7 @@ body {
   }
 
   & > .protyle-breadcrumb,
-  & > .block__icons { // 关系图、card
+  & > .block__icons { // Relation graph, card
     padding-left: var(--b3-toolbar-left-mac);
   }
 
@@ -75,7 +75,7 @@ html[data-frontend="browser-desktop"] {
   height: 32px;
   line-height: 32px;
   padding: 0 5px 0 var(--b3-toolbar-left-mac);
-  overflow: hidden; // 最小化后右上角显示不全
+  overflow: hidden; // Top-right corner isn't fully shown after minimizing
 
   &--browser {
     padding-left: calc(env(titlebar-area-x, 0px) + 5px);

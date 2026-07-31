@@ -59,7 +59,7 @@ type blockCacheEntry struct {
 	block *Block
 }
 
-// blockCacheKey 为加密笔记本使用 box 维度缓存键；普通笔记本保持原有全局键，避免影响既有查询路径。
+// blockCacheKey uses a per-box cache key for encrypted notebooks; regular notebooks keep the original global key, to avoid affecting existing query paths.
 func blockCacheKey(id, boxID string) string {
 	if IsEncryptedBoxFn != nil && IsEncryptedBoxFn(boxID) {
 		return boxID + "\x00" + id
@@ -167,7 +167,7 @@ func GetRefsCacheByDefIDInBox(defID, boxID string) (ret []*Ref) {
 	if 1 > len(ret) {
 		allRefs := QueryRefsByDefID(defID, false)
 		for _, ref := range allRefs {
-			// 按 box 过滤：boxID 非空时只选同 box 的 Ref，boxID 为空时全部保留
+			// Filter by box: when boxID is non-empty, only keep Refs from the same box; when empty, keep all
 			if boxID == "" || ref.Box == boxID {
 				ret = append(ret, ref)
 				putRefCache(boxID, ref)

@@ -462,7 +462,7 @@ func performSync(c *gin.Context) {
 		return
 	}
 
-	// Android 端前后台切换时自动触发同步 https://github.com/siyuan-note/siyuan/issues/7122
+	// Automatically trigger a sync when the Android client switches between foreground and background https://github.com/siyuan-note/siyuan/issues/7122
 	var mobileSwitch bool
 	if !util.ParseJsonArgs(arg, ret, util.BindJsonArg("mobileSwitch", &mobileSwitch, false, false)) {
 		return
@@ -478,7 +478,7 @@ func performSync(c *gin.Context) {
 		return
 	}
 
-	// 云端同步模式支持 `完全手动同步` 模式 https://github.com/siyuan-note/siyuan/issues/7295
+	// Cloud sync mode supports a "fully manual sync" mode https://github.com/siyuan-note/siyuan/issues/7295
 	var upload bool
 	if !util.ParseJsonArgs(arg, ret, util.BindJsonArg("upload", &upload, true, false)) {
 		return

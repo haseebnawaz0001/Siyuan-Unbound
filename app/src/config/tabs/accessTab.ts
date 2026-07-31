@@ -367,7 +367,7 @@ const registerEncryptedNotebookGroup = (tab: SettingTabBuilder) => {
             window.siyuan.languages.changeMasterPassword,
         ],
         html: () =>
-            // 开关行：结构与标准 group.switch 一致（label + config-item + b3-switch fn__flex-center）
+            // Switch row, structured exactly like a standard group.switch (label + config-item + b3-switch fn__flex-center)
             `<label class="fn__flex b3-label config-item">
 	    ${genConfigItemMainHtml(window.siyuan.languages.enableEncryptedNotebook, window.siyuan.languages.encryptedNotebookTip + "<br><span class=\"ft__error\">" + window.siyuan.languages.encryptedNotebookRiskTip + "</span><br>" + window.siyuan.languages.featurePreview)}
     <span class="fn__space"></span>
@@ -420,8 +420,9 @@ const mountEncryptedNotebook = (root: HTMLElement) => {
             const enabled = response.data.enabled;
             switchElement.checked = enabled;
             window.siyuan.config.notebookCrypto.enabled = enabled;
-            // 修改主密码/导出密钥仅在启用时可见；导入密钥仅在未启用时可见（详见设计 §4.1，
-            // 已启用时导入会用导入备份的 MasterSalt/KEKVerifier 覆盖当前配置，孤立现有 WrappedDEK）
+            // Changing the master password and exporting the key are only shown while enabled, importing a key only while
+            // disabled (see design §4.1: importing while enabled would overwrite the current MasterSalt/KEKVerifier with the
+            // ones from the backup and orphan the existing WrappedDEK)
             enabledActionsElement.classList.toggle("fn__none", !enabled);
             importCryptoBackupBtnElement.classList.toggle("fn__none", enabled);
             actionsElement.classList.remove("fn__none");
@@ -446,7 +447,7 @@ const mountEncryptedNotebook = (root: HTMLElement) => {
     });
 
     actionsElement.querySelector("#importCryptoBackupBtn")?.addEventListener("click", () => {
-        // 用隐藏 file input 选备份文件，multipart 上传导入
+        // Pick the backup file through a hidden file input and import it with a multipart upload
         const fileInput = document.createElement("input");
         fileInput.type = "file";
         fileInput.accept = ".json,application/json";
@@ -455,7 +456,8 @@ const mountEncryptedNotebook = (root: HTMLElement) => {
             if (!file) {
                 return;
             }
-            // 导入前需输入主密码校验（备份文件不含密码，校验用导入备份对应的主密码）
+            // The master password has to be entered before importing, the backup file does not contain it and the password
+            // that belongs to the imported backup is the one being verified
             const passwordDialog = new Dialog({
                 title: window.siyuan.languages.masterPassword,
                 content: `<div class="b3-dialog__content">
@@ -501,25 +503,26 @@ const mountEncryptedNotebook = (root: HTMLElement) => {
 
     switchElement.addEventListener("change", () => {
         if (switchElement.checked) {
-            // 切到 ON：弹设密码框
-            // onSuccess/onCancel 都用 refresh：开关状态以后端 enabled 真相为准，
-            // 避免成功后 destroy 的 setTimeout 回调把开关错误地翻回 OFF（曾因 onCancel 直接置 false 而覆盖成功态）
+            // Switching ON: open the dialog that sets the password.
+            // Both onSuccess and onCancel refresh, so that the switch always reflects the enabled flag reported by the backend.
+            // This keeps the setTimeout callback of destroy from flipping the switch back to OFF after a success, which used to
+            // happen when onCancel set it to false directly.
             openEnableEncryptedDialog(refresh, refresh);
         } else {
-            // 切到 OFF：没有加密笔记本时允许关闭
+            // Switching OFF: only allowed when there is no encrypted notebook left
             fetchPost("/api/notebook/getEncryptedNotebookStatus", {}, (response) => {
                 if (response.data.count > 0) {
                     showMessage(window.siyuan.languages.encryptedNotebookDisableTip.replace("${x}", response.data.count), 4000);
                     switchElement.checked = true;
                 } else if (response.data.hasHistoryDependency) {
-                    // 已删除加密笔记本的历史仍依赖当前密钥备份，禁用会让其永久锁死（详见设计 §19）
+                    // The history of already deleted encrypted notebooks still depends on the current key backup, disabling would lock it forever (see design §19)
                     showMessage(window.siyuan.languages["_kernel"]["323"], 6000, "error");
                     switchElement.checked = true;
                 } else {
-                    // 用 sync 调用以便后端因任何原因拒绝时回滚开关，避免 UI 与后端状态不一致
+                    // Use the sync call so that the switch can be rolled back whenever the backend rejects the request, keeping the UI in sync with the backend
                     fetchSyncPost("/api/notebook/disableEncryptedNotebooks", {}).then((res: IWebSocketData) => {
                         if (res.code === -1) {
-                            switchElement.checked = true; // processMessage 已弹出错误，这里只回滚开关
+                            switchElement.checked = true; // processMessage already showed the error, this only rolls the switch back
                             return;
                         }
                         showMessage(window.siyuan.languages.encryptedNotebookDisabled);

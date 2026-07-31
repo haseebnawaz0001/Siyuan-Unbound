@@ -116,7 +116,7 @@ func StartFreeTrial() (err error) {
 		logging.LogErrorf("start free trial failed: %d", resp.StatusCode)
 		return ErrFailedToConnectCloudServer
 	}
-	if -2 == requestResult.Code { // 已经试用订阅过
+	if -2 == requestResult.Code { // already had a trial subscription
 		return errors.New(Conf.Language(298))
 	}
 	if 0 != requestResult.Code {
@@ -239,16 +239,16 @@ func refreshSubscriptionExpirationRemind() {
 	if IsSubscriber() && -1 != Conf.GetUser().UserSiYuanProExpireTime {
 		expired := int64(Conf.GetUser().UserSiYuanProExpireTime)
 		now := time.Now().UnixMilli()
-		if now >= expired { // 已经过期
-			if now-expired <= 1000*60*60*24*2 { // 2 天内提醒 https://github.com/siyuan-note/siyuan/issues/7816
+		if now >= expired { // already expired
+			if now-expired <= 1000*60*60*24*2 { // remind within 2 days https://github.com/siyuan-note/siyuan/issues/7816
 				task.AppendAsyncTaskWithDelay(task.PushMsg, 30*time.Second, util.PushErrMsg, Conf.Language(128), 0)
 			}
 			return
 		}
 		remains := int((expired - now) / 1000 / 60 / 60 / 24)
-		expireDay := 15 // 付费订阅提前 15 天提醒
+		expireDay := 15 // remind paid subscribers 15 days in advance
 		if 2 == Conf.GetUser().UserSiYuanSubscriptionPlan {
-			expireDay = 3 // 试用订阅提前 3 天提醒
+			expireDay = 3 // remind trial subscribers 3 days in advance
 		}
 
 		if 0 < remains && expireDay > remains {
@@ -618,7 +618,7 @@ func Login(userName, password, captcha string, cloudRegion int) (ret *gulu.Resul
 		Data: map[string]any{
 			"userName":    result["userName"],
 			"token":       result["token"],
-			"needCaptcha": result["needCaptcha"], // 值为 user id
+			"needCaptcha": result["needCaptcha"], // the value is the user id
 		},
 	}
 	if -1 == ret.Code {

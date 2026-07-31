@@ -92,7 +92,7 @@ export class Wnd {
             return;
         }
         this.headersElement.addEventListener("mousedown", (event) => {
-            // 点击鼠标滚轮关闭
+            // Click the mouse wheel to close
             if (event.button !== 1) {
                 return;
             }
@@ -111,11 +111,11 @@ export class Wnd {
                             capture: true,
                             once: true
                         });
-                        // TODO 保持原有焦点？https://github.com/siyuan-note/siyuan/pull/13395/files#r1877004077
+                        // TODO Keep the original focus? https://github.com/siyuan-note/siyuan/pull/13395/files#r1877004077
                         if (activeElement instanceof HTMLElement) {
                             activeElement.focus();
                         }
-                        // 如果在短时间内没有 paste 事件发生,移除监听
+                        // Remove the listener if no paste event occurs within a short time
                         setTimeout(() => {
                             window.removeEventListener("paste", this.#preventPast, {
                                 capture: true
@@ -182,7 +182,8 @@ export class Wnd {
                 it.classList.add("layout-tab-bars--drag");
                 return;
             }
-            // 不能使用 !window.siyuan.dragElement，因为移动页签到新窗口后，再把主窗口页签拖拽新窗口页签上时，该值为空
+            // Cannot use !window.siyuan.dragElement, because after moving a tab to a new window and then
+            // dragging a main-window tab onto the new window's tab, this value is empty
             if (!event.dataTransfer.types.includes(Constants.SIYUAN_DROP_TAB)) {
                 return;
             }
@@ -206,7 +207,7 @@ export class Wnd {
                 oldTabHeaderElement.setAttribute("data-clone", "true");
                 it.firstElementChild.append(oldTabHeaderElement);
                 return;
-            } else if (!exitDrag && !oldTabHeaderElement) { // 拖拽到新窗口
+            } else if (!exitDrag && !oldTabHeaderElement) { // Dragged to a new window
                 oldTabHeaderElement = document.createElement("li");
                 oldTabHeaderElement.style.opacity = "0.38";
                 oldTabHeaderElement.innerHTML = '<svg class="svg"><use xlink:href="#iconFile"></use></svg>';
@@ -240,7 +241,7 @@ export class Wnd {
             });
             const it = this as HTMLElement;
             if (event.dataTransfer.types.includes(Constants.SIYUAN_DROP_FILE)) {
-                // 文档树拖拽
+                // Document tree drag
                 setPanelFocus(it.parentElement);
                 event.dataTransfer.getData(Constants.SIYUAN_DROP_FILE).split(",").forEach(item => {
                     if (item) {
@@ -258,7 +259,7 @@ export class Wnd {
             let oldTab = getInstanceById(tabData.id) as Tab;
             const wnd = getInstanceById(it.parentElement.getAttribute("data-id")) as Wnd;
             /// #if !BROWSER
-            if (!oldTab) { // 从主窗口拖拽到页签新窗口
+            if (!oldTab) { // Dragged from the main window to a new tab window
                 if (wnd instanceof Wnd) {
                     JSONToCenter(app, tabData, wnd);
                     oldTab = wnd.children[wnd.children.length - 1];
@@ -282,14 +283,14 @@ export class Wnd {
             });
 
             if (!it.contains(oldTab.headElement)) {
-                // 从其他 Wnd 拖动过来
+                // Dragged over from another Wnd
                 const cloneTabElement = it.querySelector("[data-clone='true']");
                 if (!cloneTabElement) {
                     return;
                 }
                 cloneTabElement.before(oldTab.headElement);
                 cloneTabElement.remove();
-                // 对象顺序
+                // Object order
                 wnd.moveTab(oldTab, nextTabHeaderElement ? nextTabHeaderElement.getAttribute("data-id") : undefined);
                 resizeTabs();
                 return;
@@ -329,7 +330,7 @@ export class Wnd {
                 }
             }
         });
-        //  dragElement dragleave 后还会触发 dragenter https://github.com/siyuan-note/siyuan/issues/13753
+        //  dragEnter still fires after dragElement's dragleave https://github.com/siyuan-note/siyuan/issues/13753
         this.element.addEventListener("dragleave", () => {
             elementDragCounter--;
             if (elementDragCounter === 0) {
@@ -360,7 +361,7 @@ export class Wnd {
             const tabData = JSON.parse(event.dataTransfer.getData(Constants.SIYUAN_DROP_TAB));
             let oldTab = getInstanceById(tabData.id) as Tab;
             /// #if !BROWSER
-            if (!oldTab) { // 从主窗口拖拽到页签新窗口
+            if (!oldTab) { // Dragged from the main window to a new tab window
                 JSONToCenter(app, tabData, this);
                 this.children.find(item => {
                     if (item.headElement.getAttribute("data-activetime") === tabData.activeTime) {
@@ -426,18 +427,18 @@ export class Wnd {
         const x = event.clientX - rect.left;
         const y = event.clientY - rect.top;
         if (x < width / 5 && this.isPointWithinLines(x, y, {
-            // 左上角 (0.1w, 0); (0.2w, 0.15h)
+            // Top-left corner (0.1w, 0); (0.2w, 0.15h)
             k: 1.5 * height / width, b: -0.15 * height
         }, {
-            // 左下角 (0.04w, h); (0.2w, 0.8h)
+            // Bottom-left corner (0.04w, h); (0.2w, 0.8h)
             k: -1.25 * height / width, b: 1.05 * height
         })) {
             dragElement.setAttribute("style", "height:100%;width:50%;right:50%;bottom:0;left:0;top:0");
         } else if (x > width * 0.8 && this.isPointWithinLines(x, y, {
-            // 右上角 (0.9w, 0); (0.8w, 0.15h)
+            // Top-right corner (0.9w, 0); (0.8w, 0.15h)
             k: -1.5 * height / width, b: 1.35 * height
         }, {
-            // 右下角 (0.96w, h); (0.8w, 0.8h)
+            // Bottom-right corner (0.96w, h); (0.8w, 0.8h)
             k: 1.25 * height / width, b: -0.2 * height
         })) {
             dragElement.setAttribute("style", "height:100%;width:50%;right:0;bottom:0;left:50%;top:0");
@@ -477,7 +478,7 @@ export class Wnd {
                             isInitActive = true;
                         } else {
                             item.headElement.setAttribute("data-activetime", (new Date()).getTime().toString());
-                            // 更新文档浏览时间
+                            // Update the document view time
                             if (item.model instanceof Editor) {
                                 fetchPost("/api/storage/updateRecentDocViewTime", {rootID: item.model.editor.protyle.block.rootID});
                             }
@@ -489,12 +490,12 @@ export class Wnd {
             } else {
                 item.headElement?.classList.remove("item--focus");
                 if (!item.panelElement.classList.contains("fn__none")) {
-                    // 必须现判断，否则会触发 observer.observe(this.element, {attributeFilter: ["class"]}); 导致 https://ld246.com/article/1641198819303
+                    // Must check now, otherwise it triggers observer.observe(this.element, {attributeFilter: ["class"]}); causing https://ld246.com/article/1641198819303
                     item.panelElement.classList.add("fn__none");
                 }
             }
         });
-        // 在 JSONToLayout 中进行 focus
+        // Focus is handled in JSONToLayout
         if (!isInitActive) {
             setPanelFocus(this.headersElement.parentElement.parentElement, isSaveLayout);
         }
@@ -522,7 +523,7 @@ export class Wnd {
         if (currentTab && currentTab.model instanceof Editor) {
             const keepCursorId = currentTab.headElement.getAttribute("keep-cursor");
             if (keepCursorId) {
-                // 在新页签中打开，但不跳转到新页签，但切换到新页签时需调整滚动
+                // Opened in a new tab without switching to it, but the scroll needs adjusting once the new tab becomes active
                 let nodeElement: HTMLElement;
                 Array.from(currentTab.model.editor.protyle.wysiwyg.element.querySelectorAll(`[data-node-id="${keepCursorId}"]`)).find((item: HTMLElement) => {
                     if (!isInEmbedBlock(item)) {
@@ -547,7 +548,7 @@ export class Wnd {
                 }
                 currentTab.headElement.removeAttribute("keep-cursor");
             }
-            // focusin 触发前，layout__wnd--active 和 tab 已设置，需在调用里面更新
+            // layout__wnd--active and tab are already set before focusin fires, so they need to be updated inside this call
             if (update) {
                 updatePanelByEditor({
                     protyle: currentTab.model.editor.protyle,
@@ -627,7 +628,7 @@ export class Wnd {
             tab.callback(tab);
         }
 
-        // 移除 centerLayout 中的 empty
+        // Remove the empty placeholder from centerLayout
         if (this.parent.type === "center" && this.children.length === 2 && !this.children[0].headElement) {
             this.removeTab(this.children[0].id);
         } else if (this.children.length > window.siyuan.config.fileTree.maxOpenTabCount) {
@@ -661,14 +662,14 @@ export class Wnd {
             let iconHTML = undefined;
             if (iconElement) {
                 if (iconElement.firstElementChild?.tagName === "IMG") {
-                    // 图标为图片的文档
+                    // A document whose icon is an image
                     iconHTML = `<img src="${iconElement.firstElementChild.getAttribute("src")}"  class="b3-menu__icon">`;
                 } else {
-                    // 有图标的文档
+                    // A document that has an icon
                     iconHTML = `<span class="b3-menu__icon">${iconElement.innerHTML}</span>`;
                 }
             } else if (!graphicElement) {
-                // 没有图标的文档
+                // A document with no icon
                 iconHTML = unicode2Emoji(window.siyuan.storage[Constants.LOCAL_IMAGES].file, "b3-menu__icon", true);
             }
             window.siyuan.menus.menu.append(new MenuItem({
@@ -786,7 +787,7 @@ export class Wnd {
             }
             if (item.model instanceof Editor) {
                 saveScroll(item.model.editor.protyle);
-                // 更新文档关闭时间（批量关闭页签时由 closeTabByType 批量处理，这里不单独调用）
+                // Update the document close time (when batch-closing tabs, closeTabByType handles it in bulk, so it is not called separately here)
                 if (!isBatchClose) {
                     fetchPost("/api/storage/updateRecentDocCloseTime", {rootID: item.model.editor.protyle.block.rootID});
                 }
@@ -800,7 +801,7 @@ export class Wnd {
                     recordBeforeResizeTop();
                     this.remove();
                 }
-                // 关闭分屏页签后光标消失
+                // The cursor disappears after closing a split tab
                 const editors = getAllModels().editor;
                 if (editors.length === 0) {
                     clearOBG();
@@ -826,7 +827,7 @@ export class Wnd {
                     let latestHeadElement: HTMLElement;
                     Array.from(item.headElement.parentElement.children).forEach((headItem: HTMLElement) => {
                         if (headItem !== item.headElement &&
-                            headItem.style.maxWidth !== "0px"   // 不对比已移除但还在动画效果中的元素 https://github.com/siyuan-note/siyuan/issues/7878
+                            headItem.style.maxWidth !== "0px"   // Do not compare elements that have been removed but are still animating https://github.com/siyuan-note/siyuan/issues/7878
                         ) {
                             if (!latestHeadElement) {
                                 latestHeadElement = headItem;
@@ -855,7 +856,7 @@ export class Wnd {
             resizeTabs(false);
             return true;
         });
-        // 初始化移除窗口，但 centerLayout 还没有赋值 https://ld246.com/article/1658718634416
+        // Removing the window during initialization, but centerLayout has not been assigned yet https://ld246.com/article/1658718634416
         if (window.siyuan.layout.centerLayout) {
             const wnd = getWndByLayout(window.siyuan.layout.centerLayout);
             if (!wnd) {
@@ -920,14 +921,14 @@ export class Wnd {
         }
         this.element.querySelector(".layout-tab-container").append(tab.panelElement);
         if (rangeData && tab.model instanceof Editor) {
-            // DOM 移动后 range 会变化
+            // The range changes after the DOM is moved
             const range = focusByOffset(tab.model.editor.protyle.wysiwyg.element.querySelector(`[data-node-id="${rangeData.id}"]`), rangeData.start, rangeData.end);
             if (range) {
                 tab.model.editor.protyle.toolbar.range = range;
             }
         }
         if (nextId) {
-            // 只能用 find https://github.com/siyuan-note/siyuan/issues/3455
+            // Only find can be used here https://github.com/siyuan-note/siyuan/issues/3455
             this.children.find((item, index) => {
                 if (item.id === nextId) {
                     this.children.splice(index, 0, tab);
@@ -978,7 +979,7 @@ export class Wnd {
 
     public split(direction: Config.TUILayoutDirection, after = true) {
         if (this.children.length === 1 && !this.children[0].headElement) {
-            // 场景：没有打开的文档，点击标签面板打开
+            // Scenario: no document is open, and the tab panel is clicked to open one
             return this;
         }
         recordBeforeResizeTop();
@@ -986,7 +987,7 @@ export class Wnd {
         if (direction === this.parent.direction) {
             this.parent.addWnd(wnd, this.id, after);
         } else if (this.parent.children.length === 1) {
-            // layout 仅含一个时，只需更新 direction
+            // When the layout contains only one item, only the direction needs to be updated
             this.parent.direction = direction;
             if (direction === "tb") {
                 this.parent.element.classList.add("fn__flex-column");

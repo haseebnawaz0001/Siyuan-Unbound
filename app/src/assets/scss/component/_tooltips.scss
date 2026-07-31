@@ -1,5 +1,5 @@
 .tooltip {
-  user-select: none; // 同步悬浮需要点击链接，因此不能使用  pointer-events: none;
+  user-select: none; // Synced hover preview needs its links to be clickable, so pointer-events: none can't be used;
   position: fixed;
   z-index: 1000000;
   padding: 4px 8px;

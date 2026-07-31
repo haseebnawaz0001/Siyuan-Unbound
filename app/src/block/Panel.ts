@@ -34,13 +34,13 @@ export class BlockPanel {
     private observerLoad: IntersectionObserver;
     private originalRefBlockIDs: IObject;
 
-    // x,y 和 targetElement 二选一必传
+    // Either x,y or targetElement must be provided
     constructor(options: {
         app: App,
         targetElement?: HTMLElement,
         refDefs: IRefDefs[]
         isBacklink: boolean,
-        originalRefBlockIDs?: IObject,  // isBacklink 为 true 时有效
+        originalRefBlockIDs?: IObject,  // effective when isBacklink is true
         x?: number,
         y?: number,
     }) {
@@ -64,7 +64,7 @@ export class BlockPanel {
         } else {
             this.element.setAttribute("data-oid", this.refDefs[0].refID);
         }
-        // 移除同层级其他更高级的 block popover
+        // Remove other higher-level block popovers at the same tier
         this.element.setAttribute("data-level", level.toString());
         for (let i = 0; i < window.siyuan.blockPanels.length; i++) {
             const item = window.siyuan.blockPanels[i];
@@ -170,7 +170,7 @@ export class BlockPanel {
                 action.push(Constants.CB_GET_ALL);
             } else {
                 action.push(Constants.CB_GET_CONTEXT);
-                // 不需要高亮 https://github.com/siyuan-note/siyuan/issues/11160#issuecomment-2084652764
+                // No highlighting needed https://github.com/siyuan-note/siyuan/issues/11160#issuecomment-2084652764
             }
 
             if (this.isBacklink) {
@@ -186,7 +186,7 @@ export class BlockPanel {
                     scroll: true,
                     gutter: true,
                     breadcrumbDocName: true,
-                    title: response.data.rootID === this.refDefs[index].refID, // 如果块是文档，显示文档标题
+                    title: response.data.rootID === this.refDefs[index].refID, // show the document title if the block is a document
                 },
                 typewriterMode: false,
                 after: (editor) => {
@@ -211,8 +211,8 @@ export class BlockPanel {
                     if (editor.protyle.element.nextElementSibling || editor.protyle.element.previousElementSibling) {
                         editor.protyle.element.style.minHeight = Math.min(30 + editor.protyle.wysiwyg.element.clientHeight, window.innerHeight / 3) + "px";
                     }
-                    // 由于 afterCB 中高度的设定，需在之后再进行设定
-                    // 49 = 16（上图标）+16（下图标）+8（padding）+9（底部距离）
+                    // Because the height is set inside afterCB, this must be set after that
+                    // 49 = 16 (top icon) + 16 (bottom icon) + 8 (padding) + 9 (bottom margin)
                     editor.protyle.scroll.element.parentElement.setAttribute("style", `--b3-dynamicscroll-width:${Math.min(editor.protyle.contentElement.clientHeight - 49, 200)}px;`);
                 }
             });
@@ -241,10 +241,11 @@ export class BlockPanel {
         this.element.remove();
         this.element = undefined;
         this.targetElement = undefined;
-        // 移除弹出上使用右键菜单
+        // Remove the context menu used on the popover
         const menuLevel = parseInt(window.siyuan.menus.menu.element.dataset.from);
         if (menuLevel && menuLevel >= level && window.siyuan.menus.menu.element.dataset.from?.includes("popover")) {
-            // https://github.com/siyuan-note/siyuan/issues/9854 右键菜单不是从浮窗中弹出的则不进行移除
+            // https://github.com/siyuan-note/siyuan/issues/9854 don't remove it if the context menu wasn't opened
+            // from a popover
             window.siyuan.menus.menu.remove();
         }
     }
@@ -310,7 +311,8 @@ export class BlockPanel {
                     let targetRect;
                     if (this.targetElement && this.targetElement.classList.contains("protyle-wysiwyg__embed")) {
                         targetRect = this.targetElement.getBoundingClientRect();
-                        // 嵌入块过长时，单击弹出的悬浮窗位置居下 https://ld246.com/article/1634292738717
+                        // When the embed block is too long, position the popover opened by a click toward the
+                        // bottom https://ld246.com/article/1634292738717
                         let top = targetRect.top;
                         const contentElement = hasClosestByClassName(this.targetElement, "protyle-content", true);
                         if (contentElement) {
@@ -319,8 +321,9 @@ export class BlockPanel {
                                 top = contentRectTop;
                             }
                         }
-                        // 单击嵌入块悬浮窗的位置最好是覆盖嵌入块
-                        // 防止图片撑高后悬浮窗显示不下，只能设置高度
+                        // The popover for clicking an embed block should ideally cover the embed block
+                        // To prevent the popover from not fitting after an image stretches its height, only the
+                        // height can be set
                         this.element.style.height = Math.min(window.innerHeight - topBarHeight, targetRect.height + 42) + "px";
                         setPosition(this.element, targetRect.left, Math.max(top - 42, topBarHeight), -42, 0);
                     } else if (this.targetElement) {
@@ -329,11 +332,11 @@ export class BlockPanel {
                         } else {
                             targetRect = this.targetElement.getBoundingClientRect();
                         }
-                        // 下部位置大的话就置于下部 https://ld246.com/article/1690333302147
+                        // If there's more space below, position it below https://ld246.com/article/1690333302147
                         if (window.innerHeight - targetRect.bottom - 4 > targetRect.top + 12) {
                             this.element.style.maxHeight = Math.floor(window.innerHeight - targetRect.bottom - 12) + "px";
                         }
-                        // 靠边不宜拖拽 https://github.com/siyuan-note/siyuan/issues/2937
+                        // Not suitable for dragging when close to the edge https://github.com/siyuan-note/siyuan/issues/2937
                         setPosition(this.element, targetRect.left, targetRect.bottom + 4, targetRect.height + 12, 8);
                     } else if (typeof this.x === "number" && typeof this.y === "number") {
                         setPosition(this.element, this.x, this.y);

@@ -61,7 +61,7 @@ export const openBacklink = async (options: {
                 app: options.app,
                 type: "local",
                 tab,
-                // 通过搜索打开的包含上下文，但不是缩放，因此需要传 rootID https://ld246.com/article/1666786639708
+                // Opened via search, which includes context but is not a zoom-in, so rootID must be passed https://ld246.com/article/1666786639708
                 blockId: options.useBlockId ? options.blockId : options.rootId,
                 rootId: options.rootId,
             }));

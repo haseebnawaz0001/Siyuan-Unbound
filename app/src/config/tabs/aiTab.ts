@@ -199,7 +199,7 @@ const registerAiEmbeddingGroup = (tab: SettingTabBuilder) => {
         unit: "s",
     });
 
-    // 独立的嵌入索引重建按钮，不与全局重建索引耦合
+    // Dedicated button for rebuilding the embedding index, kept separate from the global index rebuild
     group.button({
         id: "rebuildEmbeddingIndex",
         title: window.siyuan.languages.rebuildEmbeddingIndex,
@@ -218,7 +218,7 @@ const registerAiEmbeddingGroup = (tab: SettingTabBuilder) => {
         },
     });
 
-    // 嵌入索引进度条 + 统计数字（只读展示，slot 注入）
+    // Embedding index progress bar and statistics, a read-only display injected through a slot
     group.slot({
         key: "embeddingStats",
         keywords: getEmbeddingStatsKeywords(),

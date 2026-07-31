@@ -71,7 +71,7 @@ func initWorkspaceDirMobile(workspaceBaseDir string) {
 		if err != nil {
 			logging.LogErrorf("read workspace dir [%s] failed: %s", workspaceBaseDir, err)
 		} else {
-			// 旧版 iOS 端会在 workspaceBaseDir 下直接创建工作空间，这里需要将数据迁移到 workspaceBaseDir/siyuan/ 文件夹下
+			// Older iOS versions created the workspace directly under workspaceBaseDir; the data here needs to be migrated into the workspaceBaseDir/siyuan/ folder
 			var oldConf, oldData, oldTemp bool
 			for _, entry := range entries {
 				if entry.IsDir() && "conf" == entry.Name() {

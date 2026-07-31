@@ -49,16 +49,16 @@ const (
 	IsInsider = false
 )
 
-// IsReleaseVer 判断是否为正式版（不含 alpha、beta、rc 等预发布标识）。
+// IsReleaseVer determines whether ver is a formal release (no alpha, beta, rc, or other pre-release identifiers).
 func IsReleaseVer(ver string) bool {
 	v := "v" + strings.TrimPrefix(ver, "v")
 	return semver.IsValid(v) && semver.Prerelease(v) == ""
 }
 
 var (
-	RunInContainer             = false // 是否运行在容器中
-	SiYuanAccessAuthCodeBypass = false // 是否跳过空锁屏密码检查
-	AttachUI                   = false // 是否绑定桌面 UI 进程生命周期（Electron 拉起时为 true，手动 serve 为 false）
+	RunInContainer             = false // Whether running inside a container
+	SiYuanAccessAuthCodeBypass = false // Whether to skip the empty lock-screen password check
+	AttachUI                   = false // Whether to bind to the desktop UI process lifecycle (true when launched by Electron, false for manual serve)
 )
 
 func initEnvVars() {
@@ -70,12 +70,12 @@ func initEnvVars() {
 }
 
 var (
-	bootProgress = atomic.Int32{} // 启动进度，从 0 到 100
-	bootDetails  string           // 启动细节描述
-	HttpServer   *http.Server     // HTTP 伺服器实例
-	HttpServing  = false          // 是否 HTTP 伺服已经可用
+	bootProgress = atomic.Int32{} // Boot progress, from 0 to 100
+	bootDetails  string           // Boot detail description
+	HttpServer   *http.Server     // HTTP server instance
+	HttpServing  = false          // Whether HTTP serving is already available
 
-	SafeMode = false // 是否以安全模式启动：禁用代码片段、插件、自定义主题与图标
+	SafeMode = false // Whether booted in safe mode: disables snippets, plugins, custom themes and icons
 )
 
 // If a commandline parameter is empty, fallback to the env var.
@@ -123,7 +123,7 @@ func InitWorkspace(workspacePath, wdPath string) {
 func Boot() {
 	IncBootProgress(3, BootL10n(299, "Booting kernel..."))
 
-	// 由标准库 flag 解析 os.Args，再走统一的 BootWithFlags。
+	// Parse os.Args with the standard library flag package, then go through the unified BootWithFlags.
 	workspacePath := flag.String("workspace", "", "dir path of the workspace, default to ~/SiYuan/")
 	wdPath := flag.String("wd", WorkingDir, "working directory of SiYuan")
 	port := flag.String("port", "0", "port of the HTTP server")
@@ -139,7 +139,9 @@ func Boot() {
 	BootWithFlags(*workspacePath, *wdPath, *port, *readOnly, *accessAuthCode, *lang, *mode, *ssl, *attachUI, *safeMode)
 }
 
-// BootWithFlags 接收已解析好的启动参数，完成环境变量回退、全局变量赋值、工作空间初始化与加锁等启动收尾工作。Boot()（标准库 flag 解析）和 serve 子命令（cobra 解析）都走这个统一入口。
+// BootWithFlags takes already-parsed boot parameters and finishes the boot sequence: env var fallback, global
+// variable assignment, workspace initialization, and locking. Both Boot() (standard library flag parsing) and the
+// serve subcommand (cobra parsing) go through this unified entry point.
 func BootWithFlags(workspacePath, wdPath, port, readOnly, accessAuthCode, lang, mode string, ssl, attachUI, safeMode bool) {
 	SafeMode = safeMode
 	// Fallback to env vars if commandline args are not set
@@ -150,7 +152,7 @@ func BootWithFlags(workspacePath, wdPath, port, readOnly, accessAuthCode, lang, 
 	lang = *coalesceToEnvVar(&lang, "SIYUAN_LANG")
 
 	if "" != lang {
-		Lang = LangToBCP47(lang) // 兼容历史下划线值，如 zh_CN → zh-CN
+		Lang = LangToBCP47(lang) // Compatible with legacy underscore values, e.g. zh_CN -> zh-CN
 	}
 	Mode = mode
 	ServerPort = port
@@ -188,14 +190,15 @@ func BootWithFlags(workspacePath, wdPath, port, readOnly, accessAuthCode, lang, 
 
 	InitWorkspace(workspacePath, wdPath)
 
-	// 必须在 InitWorkspace 之后：此时 WorkingDir 才被 --wd 参数修正为真实工作目录（如 app\resources），否则会用进程 CWD 误判微软商店版标记文件
+	// Must run after InitWorkspace: only then has WorkingDir been corrected to the real working directory (e.g.
+	// app\resources) by the --wd flag; otherwise the process CWD would be used and misjudge the Microsoft Store marker file
 	msStoreFilePath := filepath.Join(WorkingDir, "ms-store")
 	ISMicrosoftStore = gulu.File.IsExist(msStoreFilePath)
 
 	SSL = ssl
 	logging.SetLogPath(LogPath)
 
-	// 工作空间仅允许被一个内核进程伺服
+	// A workspace can only be served by one kernel process
 	tryLockWorkspace()
 
 	bootBanner := figure.NewColorFigure("SiYuan", "isometric3", "green", true)
@@ -218,11 +221,12 @@ func SetBootDetails(details string) {
 	setBootDetails(details)
 }
 
-// BootL10n 返回启动进度文案的本地化字符串。
+// BootL10n returns the localized string for boot progress text.
 //
-// 按当前界面语言（util.Lang，来自 conf.json）查 util.Langs 中 _kernel 块的整数键，
-// 依次回退到英文、再回退到调用方传入的 fallback 英文文案。
-// 这样在首启 InitConf() 尚未加载完语言文件时也能显示原文，不会出现空串。
+// It looks up the integer key in the _kernel block of util.Langs using the current UI language (util.Lang, from
+// conf.json), then falls back to English, and finally falls back to the caller-supplied English fallback text.
+// This way the original text can still be shown during the first boot before InitConf() has finished loading the
+// language file, avoiding an empty string.
 func BootL10n(num int, fallback string) string {
 	if s := Langs[Lang][num]; "" != s {
 		return s
@@ -258,8 +262,9 @@ func GetBootProgress() int32 {
 }
 
 func SetBooted() {
-	// 先置进度为 100 再写 details，保证前端轮询/SSE 读到 progress>=100 时一定满足跳转条件，
-	// 避免 "先写 details 后写 progress" 造成的 "Finishing boot... 但进度未满" 竞态窗口
+	// Set progress to 100 before writing details, guaranteeing that once the frontend polling/SSE reads
+	// progress>=100 the redirect condition is always satisfied, avoiding the race window where "details is
+	// written before progress" produces "Finishing boot... but progress isn't full yet"
 	bootProgress.Store(100)
 	setBootDetails(BootL10n(300, "Finishing boot..."))
 	logging.LogInfof("kernel booted")
@@ -269,28 +274,28 @@ var (
 	HomeDir, _    = gulu.OS.Home()
 	WorkingDir, _ = os.Getwd()
 
-	WorkspaceDir       string        // 工作空间目录路径
-	WorkspaceName      string        // 工作空间名称
-	WorkspaceLock      *flock.Flock  // 工作空间锁
-	ConfDir            string        // 配置目录路径
-	DataDir            string        // 数据目录路径
-	RepoDir            string        // 仓库目录路径
-	HistoryDir         string        // 数据历史目录路径
-	TempDir            string        // 临时目录路径
-	QueueDir           string        // 队列目录路径
-	LogPath            string        // 配置目录下的日志文件 siyuan.log 路径
-	DBName             = "siyuan.db" // SQLite 数据库文件名
-	DBPath             string        // SQLite 数据库文件路径
-	HistoryDBPath      string        // SQLite 历史数据库文件路径
-	AssetContentDBPath string        // SQLite 资源文件内容数据库文件路径
-	BlockTreeDBPath    string        // 区块树数据库文件路径
-	AppearancePath     string        // 配置目录下的外观目录 appearance/ 路径
-	ThemesPath         string        // 配置目录下的外观目录下的 themes/ 路径
-	IconsPath          string        // 配置目录下的外观目录下的 icons/ 路径
-	SnippetsPath       string        // 数据目录下的 snippets/ 路径
-	ShortcutsPath      string        // 用户家目录下的快捷方式目录路径 home/.config/siyuan/shortcuts/
+	WorkspaceDir       string        // Workspace directory path
+	WorkspaceName      string        // Workspace name
+	WorkspaceLock      *flock.Flock  // Workspace lock
+	ConfDir            string        // Configuration directory path
+	DataDir            string        // Data directory path
+	RepoDir            string        // Repository directory path
+	HistoryDir         string        // Data history directory path
+	TempDir            string        // Temp directory path
+	QueueDir           string        // Queue directory path
+	LogPath            string        // Path to the siyuan.log file under the conf directory
+	DBName             = "siyuan.db" // SQLite database file name
+	DBPath             string        // SQLite database file path
+	HistoryDBPath      string        // SQLite history database file path
+	AssetContentDBPath string        // SQLite asset content database file path
+	BlockTreeDBPath    string        // Block tree database file path
+	AppearancePath     string        // Path to the appearance/ directory under the conf directory
+	ThemesPath         string        // Path to the themes/ directory under the appearance directory
+	IconsPath          string        // Path to the icons/ directory under the appearance directory
+	SnippetsPath       string        // Path to the snippets/ directory under the data directory
+	ShortcutsPath      string        // Path to the shortcuts directory under the user home directory, home/.config/siyuan/shortcuts/
 
-	UIProcessIDs = sync.Map{} // UI 进程 ID
+	UIProcessIDs = sync.Map{} // UI process IDs
 )
 
 func initWorkspaceDir(workspaceArg string) {
@@ -307,7 +312,7 @@ func initWorkspaceDir(workspaceArg string) {
 
 	defaultWorkspaceDir := filepath.Join(HomeDir, "SiYuan")
 	if gulu.OS.IsWindows() {
-		// 改进 Windows 端默认工作空间路径 https://github.com/siyuan-note/siyuan/issues/5622
+		// Improve the default workspace path on Windows https://github.com/siyuan-note/siyuan/issues/5622
 		if userProfile := os.Getenv("USERPROFILE"); "" != userProfile {
 			defaultWorkspaceDir = filepath.Join(userProfile, "SiYuan")
 		}
@@ -332,8 +337,10 @@ func initWorkspaceDir(workspaceArg string) {
 		WorkspaceDir = workspaceArg
 	}
 
-	// 归一化路径分隔符，使 WorkspaceDir 与 filepath.Join(WorkspaceDir, ...) 派生出的目录（HistoryDir/DataDir 等）保持一致
-	// 否则 Windows 上用正斜杠启动（--workspace="D:/foo"）时，strings.TrimPrefix(path, util.WorkspaceDir) 会因分隔符不同而失败 https://github.com/siyuan-note/siyuan/issues/17862
+	// Normalize the path separator so WorkspaceDir stays consistent with directories derived via
+	// filepath.Join(WorkspaceDir, ...) (HistoryDir/DataDir, etc). Otherwise, when starting on Windows with forward
+	// slashes (--workspace="D:/foo"), strings.TrimPrefix(path, util.WorkspaceDir) would fail due to the separator
+	// mismatch https://github.com/siyuan-note/siyuan/issues/17862
 	WorkspaceDir = filepath.Clean(WorkspaceDir)
 
 	if !gulu.File.IsDir(WorkspaceDir) {
@@ -365,7 +372,8 @@ func initWorkspaceDir(workspaceArg string) {
 		os.Exit(logging.ExitCodeInitWorkspaceErr)
 	}
 	os.RemoveAll(filepath.Join(TempDir, "repo"))
-	// export 目录只保存临时文件，启动时统一清理；插件不得依赖其中的文件跨进程存续。
+	// The export directory only holds temp files, cleared on every boot; plugins must not rely on files in it
+	// surviving across processes.
 	os.RemoveAll(filepath.Join(TempDir, "export"))
 	os.Setenv("TMPDIR", osTmpDir)
 	os.Setenv("TEMP", osTmpDir)
@@ -385,7 +393,7 @@ func DeduplicateWorkspacePaths(paths []string) []string {
 	seen := map[string]bool{}
 	var result []string
 	for _, p := range paths {
-		key := strings.ToLower(filepath.Clean(p)) // 归一化后再去重，使 D:/foo、D:\foo、D:\foo\ 等被识别为同一工作空间 https://github.com/siyuan-note/siyuan/issues/17862
+		key := strings.ToLower(filepath.Clean(p)) // Normalize before deduping so D:/foo, D:\foo, D:\foo\, etc. are recognized as the same workspace https://github.com/siyuan-note/siyuan/issues/17862
 		if seen[key] {
 			continue
 		}
@@ -432,13 +440,13 @@ func ReadWorkspacePaths() (ret []string, err error) {
 	workspaceBaseDir := filepath.Dir(HomeDir)
 	for _, d := range ret {
 		if ContainerIOS == Container && strings.Contains(d, "/Documents/") {
-			// iOS 端沙箱路径会变化，需要转换为相对路径再拼接当前沙箱中的工作空间基路径
+			// The iOS sandbox path can change, so convert it to a relative path and rejoin it with the workspace base path in the current sandbox
 			d = d[strings.Index(d, "/Documents/")+len("/Documents/"):]
 			d = filepath.Join(workspaceBaseDir, d)
 		}
 
-		d = strings.TrimRight(d, " \t\n") // 去掉工作空间路径尾部空格 https://github.com/siyuan-note/siyuan/issues/6353
-		d = filepath.Clean(d)             // 归一化路径分隔符，清理历史持久化的斜杠差异（如 D:/foo 与 D:\foo） https://github.com/siyuan-note/siyuan/issues/17862
+		d = strings.TrimRight(d, " \t\n") // Trim trailing whitespace from the workspace path https://github.com/siyuan-note/siyuan/issues/6353
+		d = filepath.Clean(d)             // Normalize the path separator, cleaning up legacy persisted slash differences (e.g. D:/foo vs D:\foo) https://github.com/siyuan-note/siyuan/issues/17862
 		if gulu.File.IsDir(d) {
 			tmp = append(tmp, d)
 		} else {
@@ -471,29 +479,29 @@ func WriteWorkspacePaths(workspacePaths []string) (err error) {
 }
 
 var (
-	ServerURL  *url.URL // 内核服务 URL
-	ServerPort = "0"    // HTTP/WebSocket 端口，0 为使用随机端口
+	ServerURL  *url.URL // Kernel service URL
+	ServerPort = "0"    // HTTP/WebSocket port, 0 means use a random port
 
 	ReadOnly       bool
 	AccessAuthCode string
 	Lang           = ""
 
 	Container        string // docker, android, ios, harmony, std
-	ISMicrosoftStore bool   // 桌面端是否是微软商店版
+	ISMicrosoftStore bool   // Whether the desktop client is the Microsoft Store edition
 )
 
 const (
-	ContainerStd     = "std"     // 桌面端
-	ContainerDocker  = "docker"  // Docker 容器端
-	ContainerAndroid = "android" // Android 端
-	ContainerIOS     = "ios"     // iOS 端
-	ContainerHarmony = "harmony" // 鸿蒙端
+	ContainerStd     = "std"     // Desktop client
+	ContainerDocker  = "docker"  // Docker container client
+	ContainerAndroid = "android" // Android client
+	ContainerIOS     = "ios"     // iOS client
+	ContainerHarmony = "harmony" // HarmonyOS client
 
-	LocalHost = "127.0.0.1" // 伺服地址
-	FixedPort = "6806"      // 固定端口
+	LocalHost = "127.0.0.1" // Serving address
+	FixedPort = "6806"      // Fixed port
 )
 
-// IsMobileContainer 表示当前内核运行在 Android、iOS 或鸿蒙客户端上。
+// IsMobileContainer reports whether the kernel is currently running on an Android, iOS, or HarmonyOS client.
 func IsMobileContainer() bool {
 	return ContainerAndroid == Container || ContainerIOS == Container || ContainerHarmony == Container
 }
@@ -547,7 +555,7 @@ func initPathDir() {
 }
 
 func initMime() {
-	// 在某版本的 Windows 10 操作系统上界面样式异常问题
+	// UI style rendering issue on some Windows 10 versions
 	// https://github.com/siyuan-note/siyuan/issues/247
 	// https://github.com/siyuan-note/siyuan/issues/3813
 	mime.AddExtensionType(".css", "text/css")
@@ -557,7 +565,7 @@ func initMime() {
 	mime.AddExtensionType(".json", "application/json")
 	mime.AddExtensionType(".woff2", "font/woff2")
 
-	// 某些系统上下载资源文件后打开是 zip https://github.com/siyuan-note/siyuan/issues/6347
+	// On some systems, downloaded asset files open as zip https://github.com/siyuan-note/siyuan/issues/6347
 	mime.AddExtensionType(".doc", "application/msword")
 	mime.AddExtensionType(".docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
 	mime.AddExtensionType(".xls", "application/vnd.ms-excel")
@@ -567,16 +575,16 @@ func initMime() {
 	mime.AddExtensionType(".dwf", "drawing/x-dwf")
 	mime.AddExtensionType(".pdf", "application/pdf")
 
-	// 某些系统上无法显示 SVG 图片 SVG images cannot be displayed on some systems https://github.com/siyuan-note/siyuan/issues/9413
+	// SVG images cannot be displayed on some systems https://github.com/siyuan-note/siyuan/issues/9413
 	mime.AddExtensionType(".svg", "image/svg+xml")
 
-	// 文档数据文件
+	// Document data file
 	mime.AddExtensionType(".sy", "application/json")
 
 	mime.AddExtensionType(".md", "text/markdown")
 	mime.AddExtensionType(".markdown", "text/markdown")
 
-	// 添加常用的图片格式
+	// Add common image formats
 	mime.AddExtensionType(".png", "image/png")
 	mime.AddExtensionType(".jpg", "image/jpeg")
 	mime.AddExtensionType(".jpeg", "image/jpeg")
@@ -591,7 +599,7 @@ func initMime() {
 func GetDataAssetsAbsPath() (ret string) {
 	ret = filepath.Join(DataDir, "assets")
 	if IsSymlinkPath(ret) {
-		// 跟随符号链接 https://github.com/siyuan-note/siyuan/issues/5480
+		// Follow symlinks https://github.com/siyuan-note/siyuan/issues/5480
 		var err error
 		ret, err = filepath.EvalSymlinks(ret)
 		if err != nil {
@@ -601,13 +609,14 @@ func GetDataAssetsAbsPath() (ret string) {
 	return
 }
 
-// EncryptedDBPath 返回加密笔记本的独立 SQLCipher db 文件路径。
-// 与 siyuan.db 同放 temp 目录，文件名带 boxID 区分多个加密笔记本。db 是可重建的索引，非原始内容。
+// EncryptedDBPath returns the path to an encrypted notebook's dedicated SQLCipher db file.
+// It is placed in the temp directory alongside siyuan.db, with the file name including the boxID to distinguish
+// between multiple encrypted notebooks. The db is a rebuildable index, not the original content.
 func EncryptedDBPath(boxID string) string {
 	return filepath.Join(TempDir, "siyuan-encrypted-"+boxID+".db")
 }
 
-// EncryptedBlockTreeDBPath 返回加密笔记本的独立 SQLCipher blocktree db 文件路径。
+// EncryptedBlockTreeDBPath returns the path to an encrypted notebook's dedicated SQLCipher blocktree db file.
 func EncryptedBlockTreeDBPath(boxID string) string {
 	return filepath.Join(TempDir, "siyuan-encrypted-"+boxID+"-blocktree.db")
 }

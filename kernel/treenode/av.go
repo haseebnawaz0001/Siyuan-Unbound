@@ -20,8 +20,9 @@ import (
 	"github.com/siyuan-note/siyuan/kernel/av"
 )
 
-// GetMirrorAttrViewBlockIDs 返回引用了该 AV 的所有块 ID（仅含块树仍存在的）。
-// 通过 av.GetBlockRels 获取镜像索引，已合并全局 + 所有已打开加密笔记本的镜像数据（加密感知）。
+// GetMirrorAttrViewBlockIDs returns all block IDs that reference this AV (only those still present in the block tree).
+// The mirror index is obtained via av.GetBlockRels, which already merges the global data with the mirror data
+// of all currently open encrypted notebooks (encryption-aware).
 func GetMirrorAttrViewBlockIDs(avID string) (ret []string) {
 	ret = []string{}
 	avBlocks := av.GetBlockRels()

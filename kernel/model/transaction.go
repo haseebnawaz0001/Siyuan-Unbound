@@ -63,12 +63,12 @@ func FlushTxQueue() {
 	}
 }
 
-// PerformTxSync 同步执行单笔事务并返回错误，供 undo/redo 重放使用。
-// 与异步入队的 PerformTransactions 不同，这里直接持有 flushLock 串行执行 performTx，
-// 失败时返回原始错误（不转成推送消息），调用方据此回滚撤销栈状态。
+// PerformTxSync synchronously executes a single transaction and returns an error, for use by undo/redo replay.
+// Unlike the asynchronously queued PerformTransactions, this holds flushLock directly and runs performTx serially;
+// on failure it returns the raw error (rather than converting it into a push message) so the caller can roll back the undo stack state accordingly.
 func PerformTxSync(tx *Transaction) (err error) {
 	defer logging.Recover()
-	// 初始化事务互斥锁（异步路径 PerformTransactions 在入队前初始化，同步路径这里补上）
+	// Initialize the transaction mutex (the async path initializes it before enqueueing in PerformTransactions; the sync path fills it in here)
 	if nil == tx.m {
 		tx.m = &sync.Mutex{}
 	}
@@ -117,7 +117,7 @@ func flushTx(tx *Transaction) {
 	if txErr := performTx(tx); nil != txErr {
 		switch txErr.code {
 		case TxErrCodeSkipTx:
-			// 操作已跳过，提示消息已在具体函数中 PushMsg，不弹状态异常
+			// The operation was already skipped; the message was pushed via PushMsg inside the specific function, so no error state is raised
 			return
 		case TxErrCodeBlockNotFound, TxErrCodePushMsg:
 			pushMsg := txErr.msg
@@ -183,7 +183,7 @@ const (
 	TxErrCodeWriteTree       = 2
 	TxErrHandleAttributeView = 3
 	TxErrCodePushMsg         = 4
-	TxErrCodeSkipTx          = 5 // 操作被跳过（如跨加密边界移动），已 PushMsg 提示，不弹状态异常
+	TxErrCodeSkipTx          = 5 // The operation was skipped (e.g. moving across an encryption boundary); a PushMsg has already been shown, so no error state is raised
 )
 
 type TxErr struct {
@@ -192,7 +192,7 @@ type TxErr struct {
 	id   string
 }
 
-// Error 实现 error 接口，供跨包（如 undo API）读取事务错误信息。
+// Error implements the error interface, so other packages (e.g. the undo API) can read the transaction error message.
 func (e *TxErr) Error() string {
 	if "" != e.id {
 		return e.msg + " [" + e.id + "]"
@@ -200,7 +200,7 @@ func (e *TxErr) Error() string {
 	return e.msg
 }
 
-// Code 返回事务错误码。
+// Code returns the transaction error code.
 func (e *TxErr) Code() int {
 	return e.code
 }
@@ -515,7 +515,7 @@ func (tx *Transaction) doMove(operation *Operation) (ret *TxErr) {
 		return &TxErr{code: TxErrCodeBlockNotFound, id: id}
 	}
 
-	// 生成文档历史 https://github.com/siyuan-note/siyuan/issues/14359
+	// Generate document history https://github.com/siyuan-note/siyuan/issues/14359
 	generateOpTypeHistory(srcTree, HistoryOpUpdate)
 
 	var headingChildren []*ast.Node
@@ -527,7 +527,7 @@ func (tx *Transaction) doMove(operation *Operation) (ret *TxErr) {
 
 	var srcEmptyList *ast.Node
 	if ast.NodeListItem == srcNode.Type && srcNode.Parent.FirstChild == srcNode && srcNode.Parent.LastChild == srcNode {
-		// 列表中唯一的列表项被移除后，该列表就为空了
+		// After removing the only list item in the list, the list becomes empty
 		srcEmptyList = srcNode.Parent
 	}
 
@@ -553,7 +553,7 @@ func (tx *Transaction) doMove(operation *Operation) (ret *TxErr) {
 		if isSameTree {
 			targetTree = srcTree
 		}
-		// 禁止跨加密边界移动块：加密笔记本是孤岛，跨 box 移动会破坏隔离（内容从 A 泄漏到 B）
+		// Forbid moving blocks across an encryption boundary: an encrypted notebook is an isolated island, and moving across boxes would break that isolation (content leaking from A to B)
 		if !isSameTree && !IsSameCryptoBoundary(srcTree.Box, targetTree.Box) {
 			util.PushMsg(Conf.Language(313), 5000)
 			return &TxErr{code: TxErrCodeSkipTx}
@@ -583,7 +583,7 @@ func (tx *Transaction) doMove(operation *Operation) (ret *TxErr) {
 		}
 
 		if 0 < len(headingChildren) {
-			// 折叠标题再编辑形成外层列表（前面加上 * ）时，前端给的 tx 序列会形成死循环，在这里解开
+			// When a folded heading is edited into an outer list (e.g. by prefixing "* "), the tx sequence from the frontend would form an infinite loop; unwind it here
 			// Nested lists cause hang after collapsing headings https://github.com/siyuan-note/siyuan/issues/15943
 			lastChild := headingChildren[len(headingChildren)-1]
 			if "1" == lastChild.IALAttr("heading-fold") && ast.NodeList == lastChild.Type &&
@@ -635,7 +635,7 @@ func (tx *Transaction) doMove(operation *Operation) (ret *TxErr) {
 	if isSameTree {
 		targetTree = srcTree
 	}
-	// 禁止跨加密边界移动块（同 doMove targetPreviousID 分支）
+	// Forbid moving blocks across an encryption boundary (same as the doMove targetPreviousID branch)
 	if !isSameTree && !IsSameCryptoBoundary(srcTree.Box, targetTree.Box) {
 		util.PushMsg(Conf.Language(313), 5000)
 		return &TxErr{code: TxErrCodeSkipTx}
@@ -657,7 +657,7 @@ func (tx *Transaction) doMove(operation *Operation) (ret *TxErr) {
 
 	processed := false
 	if ast.NodeSuperBlock == targetNode.Type {
-		// 在布局节点后插入
+		// Insert after the layout node
 		targetNode = targetNode.FirstChild.Next
 		for i := len(headingChildren) - 1; -1 < i; i-- {
 			c := headingChildren[i]
@@ -670,7 +670,7 @@ func (tx *Transaction) doMove(operation *Operation) (ret *TxErr) {
 		processed = true
 	} else if ast.NodeListItem == targetNode.Type {
 		if 3 == targetNode.ListData.Typ {
-			// 在任务列表标记节点后插入
+			// Insert after the task list marker node
 			targetNode = targetNode.FirstChild
 			for i := len(headingChildren) - 1; -1 < i; i-- {
 				c := headingChildren[i]
@@ -711,7 +711,7 @@ func (tx *Transaction) doMove(operation *Operation) (ret *TxErr) {
 func isMovingFoldHeadingIntoSelf(targetNode *ast.Node, headingChildren []*ast.Node) bool {
 	for _, headingChild := range headingChildren {
 		if headingChild.ID == targetNode.ID {
-			// 不能将折叠标题移动到自己下方节点的前或后 https://github.com/siyuan-note/siyuan/issues/7163
+			// A folded heading cannot be moved to before or after a node beneath itself https://github.com/siyuan-note/siyuan/issues/7163
 			return true
 		}
 	}
@@ -732,7 +732,7 @@ func (tx *Transaction) doPrependInsert(operation *Operation) (ret *TxErr) {
 	block := treenode.GetBlockTree(operation.ParentID)
 	if nil == block {
 		logging.LogWarnf("not found block [%s]", operation.ParentID)
-		util.ReloadUI() // 比如分屏后编辑器状态不一致，这里强制重新载入界面
+		util.ReloadUI() // e.g. after splitting the view the editor state can become inconsistent; force a UI reload here
 		return
 	}
 	tree, err := tx.loadTree(block.ID)
@@ -744,8 +744,8 @@ func (tx *Transaction) doPrependInsert(operation *Operation) (ret *TxErr) {
 
 	data := strings.ReplaceAll(operation.Data.(string), editor.FrontEndCaret, "")
 	subTree := tx.luteEngine.BlockDOM2Tree(data)
-	// 兜底校验：禁止跨加密边界块引（粘贴/拖拽/API 直调可能携带跨边界引用）
-	// subTree.Box 此时尚未设置，用目标树所在 box 作为 srcBox
+	// Fallback safety check: forbid block refs that cross an encryption boundary (paste/drag/direct API calls may carry cross-boundary refs)
+	// subTree.Box has not been set yet at this point, so use the target tree's box as srcBox
 	degradeCrossBoundaryBlockRefs(subTree.Root, tree.Box)
 	insertedNode := subTree.Root.FirstChild
 	if nil == insertedNode {
@@ -777,7 +777,7 @@ func (tx *Transaction) doPrependInsert(operation *Operation) (ret *TxErr) {
 	for _, toInsert := range toInserts {
 		if isContainer {
 			if ast.NodeList == node.Type {
-				// 列表下只能挂列表项，所以这里需要分情况处理
+				// A list can only contain list items as children, so this needs special handling
 				if ast.NodeList == toInsert.Type {
 					var childLis []*ast.Node
 					for childLi := toInsert.FirstChild; nil != childLi; childLi = childLi.Next {
@@ -818,7 +818,7 @@ func (tx *Transaction) doPrependInsert(operation *Operation) (ret *TxErr) {
 	operation.ID = insertedNode.ID
 	operation.ParentID = insertedNode.Parent.ID
 
-	// 将 prependInsert 转换为 insert 推送
+	// Convert prependInsert into insert before pushing
 	operation.Action = "insert"
 	if nil != insertedNode.Previous {
 		operation.PreviousID = insertedNode.Previous.ID
@@ -831,7 +831,7 @@ func (tx *Transaction) doAppendInsert(operation *Operation) (ret *TxErr) {
 	block := treenode.GetBlockTree(operation.ParentID)
 	if nil == block {
 		logging.LogWarnf("not found block [%s]", operation.ParentID)
-		util.ReloadUI() // 比如分屏后编辑器状态不一致，这里强制重新载入界面
+		util.ReloadUI() // e.g. after splitting the view the editor state can become inconsistent; force a UI reload here
 		return
 	}
 	tree, err := tx.loadTree(block.ID)
@@ -843,8 +843,8 @@ func (tx *Transaction) doAppendInsert(operation *Operation) (ret *TxErr) {
 
 	data := strings.ReplaceAll(operation.Data.(string), editor.FrontEndCaret, "")
 	subTree := tx.luteEngine.BlockDOM2Tree(data)
-	// 兜底校验：禁止跨加密边界块引（粘贴/拖拽/API 直调可能携带跨边界引用）
-	// subTree.Box 此时尚未设置，用目标树所在 box 作为 srcBox
+	// Fallback safety check: forbid block refs that cross an encryption boundary (paste/drag/direct API calls may carry cross-boundary refs)
+	// subTree.Box has not been set yet at this point, so use the target tree's box as srcBox
 	degradeCrossBoundaryBlockRefs(subTree.Root, tree.Box)
 	insertedNode := subTree.Root.FirstChild
 	if nil == insertedNode {
@@ -884,7 +884,7 @@ func (tx *Transaction) doAppendInsert(operation *Operation) (ret *TxErr) {
 	for _, toInsert := range toInserts {
 		if isContainer {
 			if ast.NodeList == node.Type {
-				// 列表下只能挂列表项，所以这里需要分情况处理 https://github.com/siyuan-note/siyuan/issues/9955
+				// A list can only contain list items as children, so this needs special handling https://github.com/siyuan-note/siyuan/issues/9955
 				if ast.NodeList == toInsert.Type {
 					var childLis []*ast.Node
 					for childLi := toInsert.FirstChild; nil != childLi; childLi = childLi.Next {
@@ -928,7 +928,7 @@ func (tx *Transaction) doAppendInsert(operation *Operation) (ret *TxErr) {
 	operation.ID = insertedNode.ID
 	operation.ParentID = insertedNode.Parent.ID
 
-	// 将 appendInsert 转换为 insert 推送
+	// Convert appendInsert into insert before pushing
 	operation.Action = "insert"
 	if nil != insertedNode.Previous {
 		operation.PreviousID = insertedNode.Previous.ID
@@ -966,7 +966,7 @@ func (tx *Transaction) doAppend(operation *Operation) (ret *TxErr) {
 		targetNewList = &ast.Node{ID: targetNewListID, Type: ast.NodeList, ListData: &ast.ListData{Typ: srcNode.ListData.Typ}}
 		targetNewList.SetIALAttr("id", targetNewListID)
 		if srcNode.Parent.FirstChild == srcNode && srcNode.Parent.LastChild == srcNode {
-			// 列表中唯一的列表项被移除后，该列表就为空了
+			// After removing the only list item in the list, the list becomes empty
 			srcEmptyList = srcNode.Parent
 		}
 	}
@@ -986,7 +986,7 @@ func (tx *Transaction) doAppend(operation *Operation) (ret *TxErr) {
 	if isSameTree {
 		targetTree = srcTree
 	}
-	// 禁止跨加密边界插入块（同 doMove 守卫）
+	// Forbid inserting blocks across an encryption boundary (same guard as doMove)
 	if !isSameTree && !IsSameCryptoBoundary(srcTree.Box, targetTree.Box) {
 		util.PushMsg(Conf.Language(313), 5000)
 		return &TxErr{code: TxErrCodeSkipTx}
@@ -1044,7 +1044,7 @@ func (tx *Transaction) doDelete(operation *Operation) (ret *TxErr) {
 	tree, err := tx.loadTree(id)
 	if err != nil {
 		if errors.Is(err, ErrBlockNotFound) {
-			// move 以后这里会空，算作正常情况
+			// After a move this can be empty here, which is treated as normal
 			return
 		}
 
@@ -1057,7 +1057,7 @@ func (tx *Transaction) doDelete(operation *Operation) (ret *TxErr) {
 	if nil == deletedNode {
 		return
 	}
-	// 同步清理被删除容器块的索引节点及其子节点，否则删除列表/超级块等容器块后其子节点依然存在，ExistBlockTree 仍返回 true
+	// Synchronously clean up the index entries for the deleted container block and its children; otherwise, after deleting a container block such as a list or super block, its children would still exist and ExistBlockTree would still return true
 	// Improve editor state synchronization when deleting blocks https://github.com/siyuan-note/siyuan/issues/17742
 	deletedIDs := deletedNode.BlockIDs()
 	treenode.RemoveBlockTreesByIDs(tree.Box, deletedIDs)
@@ -1068,21 +1068,21 @@ func (tx *Transaction) doDelete(operation *Operation) (ret *TxErr) {
 func (tx *Transaction) doDelete0(operation *Operation, tree *parse.Tree) (deletedNode *ast.Node) {
 	node := treenode.GetNodeInTree(tree, operation.ID)
 	if nil == node {
-		return // move 以后的情况，列表项移动导致的状态异常 https://github.com/siyuan-note/insider/issues/961
+		return // This happens after a move: an abnormal state caused by moving a list item https://github.com/siyuan-note/insider/issues/961
 	}
 
-	// 收集引用的定义块 ID
+	// Collect the IDs of the referenced definition blocks
 	refDefIDs := getRefDefIDs(node)
-	// 推送定义节点引用计数
+	// Push the ref count update for the definition node
 	for _, defID := range refDefIDs {
 		task.AppendAsyncTaskWithDelay(task.SetDefRefCount, util.SQLFlushInterval, refreshRefCount, defID)
 	}
-	// 删除被引用的块后需刷新其所属文档的引用计数，否则源文档级计数角标不会更新
+	// After deleting a referenced block, the ref count of its containing document must be refreshed; otherwise the document-level count badge on the source document won't update
 	task.AppendAsyncTaskWithDelay(task.SetDefRefCount, util.SQLFlushInterval, refreshRefCount, tree.Root.ID)
 
 	parent := node.Parent
 	if nil != node.Next && ast.NodeKramdownBlockIAL == node.Next.Type && bytes.Contains(node.Next.Tokens, []byte(node.ID)) {
-		// 列表块撤销状态异常 https://github.com/siyuan-note/siyuan/issues/3985
+		// Abnormal undo state for list blocks https://github.com/siyuan-note/siyuan/issues/3985
 		node.Next.Unlink()
 	}
 
@@ -1104,12 +1104,12 @@ func (tx *Transaction) doDelete0(operation *Operation, tree *parse.Tree) (delete
 
 	delete(tx.nodes, node.ID)
 
-	// 如果是断开列表时的删除列表项事务，则不需要删除数据库绑定块，因为断开列表事务后面会再次插入相同 ID 的列表项
+	// If this is a delete-list-item transaction from unwrapping a list, there's no need to remove the database-bound block, because the unwrap-list transaction will re-insert a list item with the same ID afterward
 	// List item disconnection no longer affects database binding blocks https://github.com/siyuan-note/siyuan/issues/12235
 	needSyncDel2AvBlock := true
 	if ast.NodeListItem == node.Type {
 		for _, op := range tx.DoOperations {
-			// 不可能出现相同 ID 先插入再删除的情况，只可能出现先删除再插入的情况，所以这里只需要查找插入操作
+			// It's impossible for the same ID to be inserted and then deleted; only delete-then-insert can happen, so we only need to look for the insert operation here
 			if "insert" == op.Action {
 				data := strings.ReplaceAll(op.Data.(string), editor.FrontEndCaret, "")
 				subTree := tx.luteEngine.BlockDOM2Tree(data)
@@ -1162,7 +1162,7 @@ func (tx *Transaction) syncDelete2Block(node *ast.Node, nodeTree *parse.Tree) (c
 		}
 
 		if isMirror {
-			// 删除镜像数据库节点后不需要解绑块，因为其他镜像节点还在使用
+			// After deleting a mirrored database node there's no need to unbind the block, because other mirror nodes are still using it
 			return ast.WalkContinue
 		}
 
@@ -1296,7 +1296,7 @@ func (tx *Transaction) doInsert(operation *Operation) (ret *TxErr) {
 		}
 	}
 	if nil == bt {
-		// 全局 blocktree 找不到时，遍历已打开的加密笔记本查找
+		// When it can't be found in the global block tree, search through the opened encrypted notebooks
 		for _, encBoxID := range treenode.GetOpenedEncryptedBoxIDs() {
 			encBTs := treenode.GetBlockTreesInBox([]string{operation.ParentID, operation.PreviousID, operation.NextID}, encBoxID)
 			for _, b := range encBTs {
@@ -1312,7 +1312,7 @@ func (tx *Transaction) doInsert(operation *Operation) (ret *TxErr) {
 	}
 	if nil == bt {
 		logging.LogWarnf("not found block tree [%s, %s, %s]", operation.ParentID, operation.PreviousID, operation.NextID)
-		util.ReloadUI() // 比如分屏后编辑器状态不一致，这里强制重新载入界面
+		util.ReloadUI() // e.g. after splitting the view the editor state can become inconsistent; force a UI reload here
 		return
 	}
 
@@ -1336,7 +1336,7 @@ func (tx *Transaction) doInsert0(operation *Operation, tree *parse.Tree) (ret *T
 	subTree := tx.luteEngine.BlockDOM2Tree(data)
 	subTree.Box, subTree.Path = tree.Box, tree.Path
 	tx.processGlobalAssets(subTree)
-	// 兜底校验：禁止跨加密边界块引（粘贴/拖拽/API 直调可能携带跨边界引用）
+	// Fallback safety check: forbid block refs that cross an encryption boundary (paste/drag/direct API calls may carry cross-boundary refs)
 	degradeCrossBoundaryBlockRefs(subTree.Root, subTree.Box)
 
 	insertedNode := subTree.Root.FirstChild
@@ -1410,16 +1410,16 @@ func (tx *Transaction) doInsert0(operation *Operation, tree *parse.Tree) (ret *T
 			return &TxErr{code: TxErrCodeBlockNotFound, id: operation.ParentID}
 		}
 		if ast.NodeSuperBlock == node.Type {
-			// 在布局节点后插入
+			// Insert after the layout node
 			node.FirstChild.Next.InsertAfter(insertedNode)
 		} else {
 			if ast.NodeList == insertedNode.Type && nil != insertedNode.FirstChild && operation.ID == insertedNode.FirstChild.ID && operation.ID != insertedNode.ID {
-				// 将一个列表项移动到另一个列表的第一项时 https://github.com/siyuan-note/siyuan/issues/2341
+				// When moving a list item to become the first item of another list https://github.com/siyuan-note/siyuan/issues/2341
 				insertedNode = insertedNode.FirstChild
 			}
 
 			if ast.NodeListItem == node.Type && 3 == node.ListData.Typ {
-				// 在任务列表标记节点后插入
+				// Insert after the task list marker node
 				node.FirstChild.InsertAfter(insertedNode)
 				for _, remain := range remains {
 					node.FirstChild.InsertAfter(remain)
@@ -1445,30 +1445,30 @@ func (tx *Transaction) doInsert0(operation *Operation, tree *parse.Tree) (ret *T
 	treenode.CreatedUpdated(insertedNode)
 	tx.nodes[insertedNode.ID] = insertedNode
 
-	// 收集引用的定义块 ID
+	// Collect the IDs of the referenced definition blocks
 	refDefIDs := getRefDefIDs(insertedNode)
-	// 推送定义节点引用计数
+	// Push the ref count update for the definition node
 	for _, defID := range refDefIDs {
 		task.AppendAsyncTaskWithDelay(task.SetDefRefCount, util.SQLFlushInterval, refreshRefCount, defID)
 	}
-	// 新插入块中的引用均为本次新增，刷新其最近引用时间用于块引"最近引用"排序
+	// The refs in the newly inserted block are all newly added here, so refresh their last-referenced time for the block-ref "recently referenced" ordering
 	TouchRefUsed(refDefIDs)
-	// 粘贴被引用的块后需刷新目标文档的引用计数，否则目标文档级计数角标不会更新
+	// After pasting a referenced block, the target document's ref count must be refreshed; otherwise the document-level count badge on the target document won't update
 	task.AppendAsyncTaskWithDelay(task.SetDefRefCount, util.SQLFlushInterval, refreshRefCount, tree.Root.ID)
 
 	upsertAvBlockRel(insertedNode)
 
-	// 复制为副本时移除数据库绑定状态 https://github.com/siyuan-note/siyuan/issues/12294
+	// Remove the database-binding state when copying as a duplicate https://github.com/siyuan-note/siyuan/issues/12294
 	insertedNode.RemoveIALAttr(av.NodeAttrNameAvs)
 	insertedNode.RemoveIALAttr(av.NodeAttrViewNames)
 	insertedNode.RemoveIALAttrsByPrefix(av.NodeAttrViewStaticText)
 
-	// 复制为副本时移除闪卡相关属性 https://github.com/siyuan-note/siyuan/issues/13987
+	// Remove flashcard-related attributes when copying as a duplicate https://github.com/siyuan-note/siyuan/issues/13987
 	insertedNode.RemoveIALAttr(NodeAttrRiffDecks)
 
 	if ast.NodeAttributeView == insertedNode.Type {
-		// 插入数据库块时需要重新绑定其中已经存在的块
-		// 比如剪切操作时，会先进行 delete 数据库解绑块，这里需要重新绑定 https://github.com/siyuan-note/siyuan/issues/13031
+		// When inserting a database block, the blocks that already exist within it need to be re-bound
+		// For example, during a cut operation a delete first unbinds the database block, so it needs to be re-bound here https://github.com/siyuan-note/siyuan/issues/13031
 		attrView, parseErr := av.ParseAttributeView(insertedNode.AttributeViewID)
 		if nil == parseErr {
 			trees, toBindNodes := tx.getAttrViewBoundNodes(attrView)
@@ -1477,7 +1477,7 @@ func (tx *Transaction) doInsert0(operation *Operation, tree *parse.Tree) (ret *T
 				bindBlockAv0(tx, insertedNode.AttributeViewID, toBindNode, t)
 			}
 
-			// 设置视图 https://github.com/siyuan-note/siyuan/issues/15279
+			// Set the view https://github.com/siyuan-note/siyuan/issues/15279
 			v := attrView.GetView(attrView.ViewID)
 			if nil != v {
 				insertedNode.AttributeViewType = string(v.LayoutType)
@@ -1510,7 +1510,7 @@ func (tx *Transaction) processGlobalAssets(tree *parse.Tree) {
 		return
 	}
 
-	// 本地资源文件需要移动到用户手动建立的 assets 下 https://github.com/siyuan-note/siyuan/issues/2410
+	// Local asset files need to be moved under the assets directory the user manually created https://github.com/siyuan-note/siyuan/issues/2410
 	ast.Walk(tree.Root, func(n *ast.Node, entering bool) ast.WalkStatus {
 		if !entering {
 			return ast.WalkContinue
@@ -1525,11 +1525,11 @@ func (tx *Transaction) processGlobalAssets(tree *parse.Tree) {
 			}
 
 			if !strings.HasPrefix(assetPath, filepath.Join(util.DataDir, "assets")) {
-				// 非全局 assets 则跳过
+				// Skip if it's not in the global assets directory
 				return ast.WalkContinue
 			}
 
-			// 只有全局 assets 才移动到相对 assets
+			// Only move to the relative assets directory if it's in the global assets directory
 			targetP := filepath.Join(tx.assetsDir, filepath.Base(assetPath))
 			if e = filelock.Rename(assetPath, targetP); e != nil {
 				logging.LogErrorf("copy path of asset from [%s] to [%s] failed: %s", assetPath, targetP, e)
@@ -1570,11 +1570,11 @@ func (tx *Transaction) doUpdate(operation *Operation) (ret *TxErr) {
 		return &TxErr{code: TxErrCodeBlockNotFound, msg: ErrBlockNotFound.Error(), id: id}
 	}
 
-	// 收集引用的定义块 ID
+	// Collect the IDs of the referenced definition blocks
 	oldDefIDs := getRefDefIDs(oldNode)
 	var newDefIDs []string
 
-	// 兜底校验：禁止跨加密边界块引（加密笔记本↔ 普通 box，或不同加密笔记本之间）
+	// Fallback safety check: forbid block refs that cross an encryption boundary (between an encrypted notebook and a regular box, or between different encrypted notebooks)
 	degradeCrossBoundaryBlockRefs(subTree.Root, subTree.Box)
 
 	var unlinks []*ast.Node
@@ -1586,20 +1586,20 @@ func (tx *Transaction) doUpdate(operation *Operation) (ret *TxErr) {
 		if ast.NodeTextMark == n.Type {
 			if n.IsTextMarkType("inline-math") {
 				if "" == strings.TrimSpace(n.TextMarkInlineMathContent) {
-					// 剔除空白的行级公式
+					// Remove blank inline formulas
 					unlinks = append(unlinks, n)
 				}
 			} else if n.IsTextMarkType("block-ref") {
 				if "" == n.TextMarkBlockRefID {
-					// 已被 degradeCrossBoundaryBlockRefs 降级为纯文本，跳过引用处理
+					// Already degraded to plain text by degradeCrossBoundaryBlockRefs, so skip ref processing
 					return ast.WalkContinue
 				}
 
 				sql.CacheRef(subTree, n)
 
 				if "d" == n.TextMarkBlockRefSubtype {
-					// 偶发编辑文档标题后引用处的动态锚文本不更新 https://github.com/siyuan-note/siyuan/issues/5891
-					// 使用缓存的动态锚文本强制覆盖当前块中的引用节点动态锚文本
+					// Occasionally, after editing a document title, the dynamic anchor text at the ref site doesn't update https://github.com/siyuan-note/siyuan/issues/5891
+					// Force-overwrite the dynamic anchor text of the ref node in the current block with the cached dynamic anchor text
 					if dRefText := treenode.GetDynamicRefText(n.TextMarkBlockRefID, tree.Box); "" != dRefText {
 						n.TextMarkTextContent = dRefText
 					}
@@ -1618,14 +1618,14 @@ func (tx *Transaction) doUpdate(operation *Operation) (ret *TxErr) {
 	newDefIDs = gulu.Str.RemoveDuplicatedElem(newDefIDs)
 	refDefIDs := oldDefIDs
 
-	if !slices.Equal(oldDefIDs, newDefIDs) { // 如果引用发生了变化，则推送定义节点引用计数
+	if !slices.Equal(oldDefIDs, newDefIDs) { // if the refs changed, push the ref count update for the definition node
 		refDefIDs = append(refDefIDs, newDefIDs...)
 		refDefIDs = gulu.Str.RemoveDuplicatedElem(refDefIDs)
 		for _, defID := range refDefIDs {
 			task.AppendAsyncTaskWithDelay(task.SetDefRefCount, util.SQLFlushInterval, refreshRefCount, defID)
 		}
 
-		// 本次新增引用的目标块，刷新其最近引用时间用于块引"最近引用"排序
+		// For target blocks newly referenced this time, refresh their last-referenced time for the block-ref "recently referenced" ordering
 		var newRefDefIDs []string
 		for _, defID := range newDefIDs {
 			if !gulu.Str.Contains(defID, oldDefIDs) {
@@ -1645,7 +1645,7 @@ func (tx *Transaction) doUpdate(operation *Operation) (ret *TxErr) {
 	}
 
 	if oldNode.IsContainerBlock() {
-		// 更新容器块的话需要考虑其子块中可能存在的折叠标题，需要把这些折叠标题的下方块移动到新节点下面
+		// When updating a container block, account for any folded headings among its children, and move the blocks beneath those folded headings under the new node
 		treenode.MoveFoldHeading(updatedNode, oldNode)
 	}
 
@@ -1653,7 +1653,7 @@ func (tx *Transaction) doUpdate(operation *Operation) (ret *TxErr) {
 
 	if ast.NodeHTMLBlock == updatedNode.Type {
 		content := string(updatedNode.Tokens)
-		// 剔除连续的空行（包括空行内包含空格的情况） https://github.com/siyuan-note/siyuan/issues/15377
+		// Remove consecutive blank lines (including blank lines that contain only spaces) https://github.com/siyuan-note/siyuan/issues/15377
 		var newLines []string
 		lines := strings.SplitSeq(content, "\n")
 		for line := range lines {
@@ -1669,11 +1669,11 @@ func (tx *Transaction) doUpdate(operation *Operation) (ret *TxErr) {
 		syncDelete2AvBlock(n, tree, false, tx)
 	}
 
-	// 将不属于折叠标题的块移动到折叠标题下方，需要展开折叠标题
+	// When a block that doesn't belong under a folded heading is moved beneath one, the folded heading needs to be unfolded
 	needUnfoldParentHeading := 0 < oldNode.HeadingLevel && (0 == updatedNode.HeadingLevel || oldNode.HeadingLevel < updatedNode.HeadingLevel)
 
 	oldParentFoldedHeading := treenode.GetParentFoldedHeading(oldNode)
-	// 将原先折叠标题下的块提升为与折叠标题同级或更高一级的标题时，需要在折叠标题后插入该提升后的标题块（只需要推送界面插入）
+	// When a block previously under a folded heading is promoted to a heading at the same level as, or higher than, the folded heading, the promoted heading block needs to be inserted after the folded heading (only a UI insert needs to be pushed)
 	needInsertAfterParentHeading := nil != oldParentFoldedHeading && 0 != updatedNode.HeadingLevel && updatedNode.HeadingLevel <= oldParentFoldedHeading.HeadingLevel
 
 	oldNode.InsertAfter(updatedNode)
@@ -1714,7 +1714,7 @@ func (tx *Transaction) doUpdate(operation *Operation) (ret *TxErr) {
 	}
 
 	if avNames := getAvNames(updatedNode.IALAttr(av.NodeAttrNameAvs)); "" != avNames {
-		// updateBlock 会清空数据库角标 https://github.com/siyuan-note/siyuan/issues/16549
+		// updateBlock clears the database badge https://github.com/siyuan-note/siyuan/issues/16549
 		go func() {
 			time.Sleep(200 * time.Millisecond)
 			oldAttrs := parse.IAL2Map(updatedNode.KramdownIAL)
@@ -1730,7 +1730,7 @@ func (tx *Transaction) doUpdate(operation *Operation) (ret *TxErr) {
 	upsertAvBlockRel(updatedNode)
 
 	if ast.NodeAttributeView == updatedNode.Type {
-		// 设置视图 https://github.com/siyuan-note/siyuan/issues/15279
+		// Set the view https://github.com/siyuan-note/siyuan/issues/15279
 		attrView, parseErr := av.ParseAttributeView(updatedNode.AttributeViewID)
 		if nil == parseErr {
 			v := attrView.GetView(attrView.ViewID)
@@ -1792,9 +1792,9 @@ func getRefDefIDs(node *ast.Node) (refDefIDs []string) {
 	return
 }
 
-// degradeCrossBoundaryBlockRefs 遍历树，把跨越加密边界的块引节点降级为纯文本。
-// 加密笔记本禁止跨边界块引（双向）：防止手工输入/拖拽/粘贴/API 直调绕过前端搜索分流。
-// 返回被降级的引用数。
+// degradeCrossBoundaryBlockRefs walks the tree and degrades any block-ref nodes that cross an encryption boundary to plain text.
+// Encrypted notebooks forbid cross-boundary block refs in both directions: this prevents manual input/drag/paste/direct API calls from bypassing the frontend search filtering.
+// Returns the number of refs that were degraded.
 func degradeCrossBoundaryBlockRefs(root *ast.Node, srcBox string) int {
 	degraded := 0
 	localBlockIDs := map[string]struct{}{}
@@ -1935,16 +1935,16 @@ func (tx *Transaction) doUpdateUpdated(operation *Operation) (ret *TxErr) {
 
 func (tx *Transaction) doCreate(operation *Operation) (ret *TxErr) {
 	tree := operation.Data.(*parse.Tree)
-	// 兜底校验：禁止跨加密边界块引（创建文档可能携带跨边界引用）
-	// 必须在 getRefDefIDs 之前，避免跨边界引用被收集进引用缓存
+	// Fallback safety check: forbid block refs that cross an encryption boundary (creating a document may carry cross-boundary refs)
+	// Must run before getRefDefIDs, to avoid cross-boundary refs being collected into the ref cache
 	degradeCrossBoundaryBlockRefs(tree.Root, tree.Box)
 	tx.writeTree(tree)
-	// 新建文档中的引用均为本次新增，刷新其最近引用时间用于块引"最近引用"排序
+	// The refs in a newly created document are all newly added here, so refresh their last-referenced time for the block-ref "recently referenced" ordering
 	TouchRefUsed(getRefDefIDs(tree.Root))
 	return
 }
 
-// doRestoreCreatedDoc 在首次执行时登记已创建文档，在重做时从快照恢复该文档。
+// doRestoreCreatedDoc registers the newly created document on first execution, and restores it from the snapshot on redo.
 func (tx *Transaction) doRestoreCreatedDoc(operation *Operation) (ret *TxErr) {
 	tree := operation.Tree
 	if nil == tree || nil == tree.Root || operation.ID != tree.Root.ID {
@@ -1963,7 +1963,7 @@ func (tx *Transaction) doRestoreCreatedDoc(operation *Operation) (ret *TxErr) {
 	return
 }
 
-// doRemoveCreatedDoc 将本次新增条目生成的文档登记为提交阶段删除，删除前会进入文档历史。
+// doRemoveCreatedDoc registers the document generated by this newly added entry for deletion at commit time; it goes through document history before being deleted.
 func (tx *Transaction) doRemoveCreatedDoc(operation *Operation) (ret *TxErr) {
 	if nil == operation.Tree || nil == operation.Tree.Root || operation.ID != operation.Tree.Root.ID {
 		return &TxErr{code: TxErrCodePushMsg, msg: "invalid created doc snapshot", id: operation.ID}
@@ -2021,7 +2021,7 @@ type Operation struct {
 	Action     string   `json:"action"`
 	Data       any      `json:"data"`
 	ID         string   `json:"id"`
-	RootID     string   `json:"rootID"` // 思源内部暂时没有用到 https://github.com/siyuan-note/siyuan/issues/17179#issuecomment-4051604916
+	RootID     string   `json:"rootID"` // Not currently used internally by SiYuan https://github.com/siyuan-note/siyuan/issues/17179#issuecomment-4051604916
 	ParentID   string   `json:"parentID"`
 	PreviousID string   `json:"previousID"`
 	NextID     string   `json:"nextID"`
@@ -2029,28 +2029,28 @@ type Operation struct {
 	BlockIDs   []string `json:"blockIDs"`
 	BlockID    string   `json:"blockID"`
 
-	DeckID string      `json:"deckID"` // 用于添加/删除闪卡
-	Tree   *parse.Tree `json:"-"`      // 仅用于内核事务重放，不发送到前端
+	DeckID string      `json:"deckID"` // Used for adding/removing flashcards
+	Tree   *parse.Tree `json:"-"`      // Used only for kernel transaction replay; not sent to the frontend
 
-	AvID              string           `json:"avID"`              // 属性视图 ID
-	SrcIDs            []string         `json:"srcIDs"`            // 用于从属性视图中删除行
-	Srcs              []map[string]any `json:"srcs"`              // 用于添加属性视图行（包括绑定块）{id, content, isDetached}
-	IsDetached        bool             `json:"isDetached"`        // 用于标识是否未绑定块，仅存在于属性视图中
-	Name              string           `json:"name"`              // 属性视图列名
-	Typ               string           `json:"type"`              // 属性视图列类型
-	Format            string           `json:"format"`            // 属性视图列格式化
-	KeyID             string           `json:"keyID"`             // 属性视图字段 ID
-	RowID             string           `json:"rowID"`             // 属性视图行 ID
-	IsTwoWay          bool             `json:"isTwoWay"`          // 属性视图关联列是否是双向关系
-	BackRelationKeyID string           `json:"backRelationKeyID"` // 属性视图关联列回链关联列的 ID
-	RemoveDest        bool             `json:"removeDest"`        // 属性视图删除关联目标
-	Layout            av.LayoutType    `json:"layout"`            // 属性视图布局类型
-	GroupID           string           `json:"groupID"`           // 属性视图分组视图 ID
-	TargetGroupID     string           `json:"targetGroupID"`     // 属性视图目标分组视图 ID
-	ViewID            string           `json:"viewID"`            // 属性视图视图 ID
-	IgnoreDefaultFill bool             `json:"ignoreDefaultFill"` // 是否忽略默认填充
+	AvID              string           `json:"avID"`              // Attribute view ID
+	SrcIDs            []string         `json:"srcIDs"`            // Used to remove rows from the attribute view
+	Srcs              []map[string]any `json:"srcs"`              // Used to add attribute view rows (including bound blocks) {id, content, isDetached}
+	IsDetached        bool             `json:"isDetached"`        // Indicates whether this is an unbound block; only meaningful within an attribute view
+	Name              string           `json:"name"`              // Attribute view column name
+	Typ               string           `json:"type"`              // Attribute view column type
+	Format            string           `json:"format"`            // Attribute view column format
+	KeyID             string           `json:"keyID"`             // Attribute view field ID
+	RowID             string           `json:"rowID"`             // Attribute view row ID
+	IsTwoWay          bool             `json:"isTwoWay"`          // Whether the attribute view relation column is a two-way relation
+	BackRelationKeyID string           `json:"backRelationKeyID"` // ID of the back-relation column linked by the attribute view relation column
+	RemoveDest        bool             `json:"removeDest"`        // Remove the attribute view's relation target
+	Layout            av.LayoutType    `json:"layout"`            // Attribute view layout type
+	GroupID           string           `json:"groupID"`           // Attribute view group view ID
+	TargetGroupID     string           `json:"targetGroupID"`     // Attribute view target group view ID
+	ViewID            string           `json:"viewID"`            // Attribute view view ID
+	IgnoreDefaultFill bool             `json:"ignoreDefaultFill"` // Whether to ignore the default fill
 
-	Context map[string]any `json:"context"` // 上下文信息
+	Context map[string]any `json:"context"` // Context information
 }
 
 type Transaction struct {
@@ -2058,24 +2058,24 @@ type Transaction struct {
 	DoOperations   []*Operation `json:"doOperations"`
 	UndoOperations []*Operation `json:"undoOperations"`
 
-	trees          map[string]*parse.Tree // 事务中变更的树
-	nodes          map[string]*ast.Node   // 事务中变更的节点
-	relatedAvIDs   []string               // 事务中变更的属性视图 ID
-	changedRootIDs []string               // 变更的树 ID 列表（包含了变更定义块后影响的动态锚文本所在的树）
-	boxIcons       map[string]string      // 事务提交后需要同步的笔记本图标
+	trees          map[string]*parse.Tree // Trees changed within the transaction
+	nodes          map[string]*ast.Node   // Nodes changed within the transaction
+	relatedAvIDs   []string               // Attribute view IDs changed within the transaction
+	changedRootIDs []string               // List of changed tree IDs (includes trees containing dynamic anchor text affected by changed definition blocks)
+	boxIcons       map[string]string      // Notebook icons that need to be synced after the transaction commits
 
-	isGlobalAssetsInit  bool   // 是否初始化过全局资源判断
-	isGlobalAssets      bool   // 是否属于全局资源
-	assetsDir           string // 资源目录路径
+	isGlobalAssetsInit  bool   // Whether the global-assets determination has been initialized
+	isGlobalAssets      bool   // Whether this belongs to the global assets directory
+	assetsDir           string // Path to the assets directory
 	removedCreatedDocs  []*parse.Tree
 	restoredCreatedDocs []*parse.Tree
 
-	fromAPI  bool // 是否来自 /api/transactions HTTP 入口（用于撤销日志捕获判别）
-	isReplay bool // 是否为 undo/redo 重放构造的事务（重放不再进入撤销日志）
+	fromAPI  bool // Whether this came from the /api/transactions HTTP endpoint (used to determine undo log capture)
+	isReplay bool // Whether this transaction was constructed by undo/redo replay (replayed transactions are not recorded again in the undo log)
 
 	luteEngine *lute.Lute
 	m          *sync.Mutex
-	state      atomic.Int32 // 0: 初始化，1：未提交，:2: 已提交，3: 已回滚
+	state      atomic.Int32 // 0: initialized, 1: not yet committed, 2: committed, 3: rolled back
 }
 
 func (tx *Transaction) GetChangedRootIDs() (ret []string) {
@@ -2090,18 +2090,18 @@ func (tx *Transaction) GetChangedRootIDs() (ret []string) {
 	return
 }
 
-// MarkFromAPI 标记事务来自 /api/transactions HTTP 入口，供全局撤销日志捕获判别。
+// MarkFromAPI marks the transaction as coming from the /api/transactions HTTP endpoint, for the global undo log capture check.
 func (tx *Transaction) MarkFromAPI() {
 	tx.fromAPI = true
 }
 
-// MarkReplay 标记事务为 undo/redo 重放构造，重放不再进入撤销日志。
+// MarkReplay marks the transaction as constructed by undo/redo replay; replayed transactions are not recorded again in the undo log.
 func (tx *Transaction) MarkReplay() {
 	tx.isReplay = true
 }
 
-// GetMutatedRootIDs 返回真正被写盘修改结构的树 rootID，不含 refreshDynamicRefTexts 刷新的引用树。
-// 用于跨文档撤销判定：单文档编辑返回 1 个 rootID，跨文档移动返回多个，引用文本刷新不计入。
+// GetMutatedRootIDs returns the rootIDs of trees whose structure was actually written to disk, excluding reference trees refreshed by refreshDynamicRefTexts.
+// Used for cross-document undo determination: a single-document edit returns 1 rootID, a cross-document move returns multiple, and reference text refreshes don't count.
 func (tx *Transaction) GetMutatedRootIDs() (ret []string) {
 	for t := range tx.trees {
 		ret = append(ret, t)
@@ -2190,7 +2190,7 @@ func (tx *Transaction) commit() (err error) {
 
 	IncSync()
 	tx.state.Store(2)
-	// 已提交且 trees 稳定后记录到全局撤销日志（rollback 不记录）
+	// Record to the global undo log once committed and trees are stable (rollback does not record)
 	GlobalUndoLog.Record(tx)
 	tx.m.Unlock()
 	return
@@ -2225,7 +2225,7 @@ func (tx *Transaction) loadTree(id string) (ret *parse.Tree, err error) {
 	var rootID, box, p string
 	bt := treenode.GetBlockTree(id)
 	if nil == bt {
-		// 全局 blocktree 找不到时，遍历已打开的加密笔记本查找
+		// When it can't be found in the global block tree, search through the opened encrypted notebooks
 		for _, encBoxID := range treenode.GetOpenedEncryptedBoxIDs() {
 			if encBT := treenode.GetBlockTreeInBox(id, encBoxID); nil != encBT {
 				bt = encBT
@@ -2264,7 +2264,7 @@ func getRefsCacheByDefNode(updateNode *ast.Node) (ret []*sql.Ref, changedNodes [
 	ret = sql.GetRefsCacheByDefIDInBox(updateNode.ID, updateNode.Box)
 	if nil != updateNode.Parent && ast.NodeDocument != updateNode.Parent.Type &&
 		updateNode.Parent.IsContainerBlock() && updateNode == treenode.FirstLeafBlock(updateNode.Parent) {
-		// 如果是容器块下第一个叶子块，则需要向上查找引用
+		// If this is the first leaf block under a container block, refs need to be looked up upward
 		for parent := updateNode.Parent; nil != parent; parent = parent.Parent {
 			if ast.NodeDocument == parent.Type {
 				break
@@ -2280,7 +2280,7 @@ func getRefsCacheByDefNode(updateNode *ast.Node) (ret []*sql.Ref, changedNodes [
 		}
 	}
 	if ast.NodeDocument != updateNode.Type && updateNode.IsContainerBlock() {
-		// 如果是容器块，则需要向下查找引用
+		// If this is a container block, refs need to be looked up downward
 		ast.Walk(updateNode, func(n *ast.Node, entering bool) ast.WalkStatus {
 			if !entering || !n.IsBlock() {
 				return ast.WalkContinue
@@ -2295,7 +2295,7 @@ func getRefsCacheByDefNode(updateNode *ast.Node) (ret []*sql.Ref, changedNodes [
 		})
 	}
 	if ast.NodeHeading == updateNode.Type && "1" == updateNode.IALAttr("fold") {
-		// 如果是折叠标题，则需要向下查找引用
+		// If this is a folded heading, refs need to be looked up downward
 		children := treenode.HeadingChildren(updateNode)
 		for _, child := range children {
 			childRefs := sql.GetRefsCacheByDefIDInBox(child.ID, updateNode.Box)

@@ -75,8 +75,9 @@ func GetAssetImgSizeInBox(assetPath, boxID string) (width, height int) {
 	return
 }
 
-// ReadAssetBytesInBox 读取指定 box 内的资源文件字节。若 box 为加密笔记本则自动解密返回明文。
-// relativePath 形如 "assets/xxx.png"，可带 ?box= 查询参数。
+// ReadAssetBytesInBox reads the bytes of an asset file inside the given box. If the box is an encrypted notebook, it
+// is automatically decrypted and the plaintext is returned.
+// relativePath looks like "assets/xxx.png" and may carry a ?box= query parameter.
 func ReadAssetBytesInBox(boxID, relativePath string) ([]byte, error) {
 	absPath, err := GetAssetAbsPathInBox(relativePath, boxID)
 	if err != nil {
@@ -86,7 +87,8 @@ func ReadAssetBytesInBox(boxID, relativePath string) ([]byte, error) {
 	if readErr != nil {
 		return nil, readErr
 	}
-	// 从解析到的绝对路径反推有效 boxID，不轻信传入参数（路径可能通过 ?box= 指定了不同 box）
+	// Derive the effective boxID from the resolved absolute path instead of trusting the passed-in parameter (the
+	// path may specify a different box via ?box=)
 	effectiveBoxID := ExtractBoxIDFromAssetsPath(absPath)
 	if effectiveBoxID != "" && IsEncryptedBox(effectiveBoxID) {
 		HoldBoxReadLock(effectiveBoxID)
@@ -106,11 +108,13 @@ func ReadAssetBytesInBox(boxID, relativePath string) ([]byte, error) {
 	return data, nil
 }
 
-// GetAssetPathByHash 按 hash 查已存在的 asset 路径用于去重。boxID 非空且为加密笔记本时返回空——
-// 加密笔记本不参与全局去重（避免复用普通明文 asset）；普通 box 走全局 cache/SQL（加密笔记本数据不在全局表）。
+// GetAssetPathByHash looks up an existing asset path by hash for deduplication. If boxID is non-empty and is an
+// encrypted notebook, it returns empty -- encrypted notebooks do not participate in global deduplication (to avoid
+// reusing a plain, unencrypted asset); a regular box goes through the global cache/SQL (encrypted notebook data is
+// not in the global tables).
 func GetAssetPathByHash(hash, boxID string) string {
 	if boxID != "" && IsEncryptedBox(boxID) {
-		return "" // 加密 box：跳过全局去重，强制新写（防跨边界复用明文 asset）
+		return "" // Encrypted box: skip global deduplication and force a fresh write (prevents reusing a plaintext asset across the encryption boundary)
 	}
 	assetHash := cache.GetAssetHash(hash)
 	if nil == assetHash {
@@ -131,7 +135,7 @@ func HandleAssetsRemoveEvent(assetAbsPath string) {
 	if gulu.File.IsDir(assetAbsPath) {
 		return
 	}
-	// 跳过隐藏文件，如 WPS 的临时文件、Mac 的 .DS_Store
+	// Skip hidden files, such as WPS temp files or Mac's .DS_Store
 	if filelock.IsHidden(assetAbsPath) {
 		return
 	}
@@ -142,7 +146,7 @@ func HandleAssetsRemoveEvent(assetAbsPath string) {
 		return
 	}
 
-	// 加密笔记本的 asset 是密文，跳过全局索引和 hash 缓存操作
+	// An encrypted notebook's asset is ciphertext, so skip the global index and hash cache operations
 	if IsEncryptedAssetPath(assetAbsPath) {
 		removeAssetThumbnail(assetAbsPath)
 		return
@@ -176,7 +180,7 @@ func HandleAssetsChangeEvent(assetAbsPath string) {
 		return
 	}
 
-	// 加密笔记本的 asset 是密文，跳过全局内容索引和 hash 缓存（避免密文污染搜索索引）
+	// An encrypted notebook's asset is ciphertext, so skip the global content index and hash cache (to avoid ciphertext polluting the search index)
 	if IsEncryptedAssetPath(assetAbsPath) {
 		removeAssetThumbnail(assetAbsPath)
 		return
@@ -225,22 +229,22 @@ func GenerateAssetsThumbnail(sourceImgPath, resizedImgPath string) (err error) {
 		return
 	}
 
-	// 获取原图宽高
+	// Get the original image's width and height
 	originalWidth := img.Bounds().Dx()
 	originalHeight := img.Bounds().Dy()
 
-	// 固定最大宽度为 520，计算缩放比例
+	// Fix the max width at 520 and compute the scale ratio
 	maxWidth := 520
 	scale := float64(maxWidth) / float64(originalWidth)
 
-	// 按比例计算新的宽高
+	// Compute the new width and height proportionally
 	newWidth := maxWidth
 	newHeight := int(float64(originalHeight) * scale)
 
-	// 缩放图片
+	// Resize the image
 	resizedImg := imaging.Resize(img, newWidth, newHeight, imaging.Lanczos)
 
-	// 保存缩放后的图片
+	// Save the resized image
 	err = os.MkdirAll(filepath.Dir(resizedImgPath), 0755)
 	if err != nil {
 		return
@@ -266,7 +270,7 @@ func DocImageAssets(rootID string) (ret []string, err error) {
 		if ast.NodeImage == n.Type {
 			linkDest := n.ChildByType(ast.NodeLinkDest)
 			dest := linkDest.Tokens
-			if 1 > len(dest) { // 双击打开图片不对 https://github.com/siyuan-note/siyuan/issues/5876
+			if 1 > len(dest) { // Double-clicking to open the image was incorrect https://github.com/siyuan-note/siyuan/issues/5876
 				return ast.WalkContinue
 			}
 			ret = append(ret, gulu.Str.FromBytes(dest))
@@ -347,7 +351,8 @@ func (err *imageExecutionUnknownError) Unwrap() error {
 	return err.err
 }
 
-// IsImageExecutionUnknown 判断图片提供商调用是否已经开始，调用方不得自动重试这类错误。
+// IsImageExecutionUnknown reports whether the image provider call may already have started; callers must not
+// automatically retry this kind of error.
 func IsImageExecutionUnknown(err error) bool {
 	var target *imageExecutionUnknownError
 	return errors.As(err, &target)
@@ -360,7 +365,7 @@ func markImageExecutionUnknown(err error) error {
 	return &imageExecutionUnknownError{err: err}
 }
 
-// ListDocumentImages 返回文档引用的本地图片，供智能体工具和编辑器功能复用。
+// ListDocumentImages returns the local images referenced by a document, for reuse by agent tools and editor features.
 func ListDocumentImages(documentID string) (DocumentImageList, error) {
 	bt, err := resolveMultimodalDocument(documentID)
 	if err != nil {
@@ -382,7 +387,7 @@ func ListDocumentImages(documentID string) (DocumentImageList, error) {
 	return DocumentImageList{DocumentID: bt.RootID, Images: refs}, nil
 }
 
-// AnalyzeDocumentImage 使用全局图片理解配置分析文档引用的资源图片。
+// AnalyzeDocumentImage analyzes an asset image referenced by a document using the global image understanding configuration.
 func AnalyzeDocumentImage(ctx context.Context, request AnalyzeDocumentImageRequest) (AnalyzeDocumentImageResult, error) {
 	if strings.TrimSpace(request.AssetPath) == "" {
 		return AnalyzeDocumentImageResult{}, errors.New("assetPath is required for analyze")
@@ -413,7 +418,8 @@ func AnalyzeDocumentImage(ctx context.Context, request AnalyzeDocumentImageReque
 	}, nil
 }
 
-// AnalyzeImage 使用全局图片理解配置分析图片字节，可供文档资源、聊天附件和其他图片入口复用。
+// AnalyzeImage analyzes image bytes using the global image understanding configuration; it can be reused by document
+// assets, chat attachments, and other image entry points.
 func AnalyzeImage(ctx context.Context, data []byte, question, detail string) (AnalyzeImageResult, error) {
 	if Conf == nil || Conf.AI == nil {
 		return AnalyzeImageResult{}, errors.New("AI configuration is unavailable")
@@ -435,7 +441,8 @@ func AnalyzeImage(ctx context.Context, data []byte, question, detail string) (An
 	return AnalyzeImageResult{Analysis: analysis, Width: prepared.Width, Height: prepared.Height}, nil
 }
 
-// GenerateImage 使用全局图片生成配置创建图片字节，可供文档资源、编辑器和其他图片入口复用。
+// GenerateImage creates image bytes using the global image generation configuration; it can be reused by document
+// assets, the editor, and other image entry points.
 func GenerateImage(ctx context.Context, request GenerateImageRequest) (GenerateImageResult, error) {
 	if Conf == nil || Conf.AI == nil {
 		return GenerateImageResult{}, errors.New("AI configuration is unavailable")
@@ -470,7 +477,7 @@ func GenerateImage(ctx context.Context, request GenerateImageRequest) (GenerateI
 	}, nil
 }
 
-// GenerateDocumentImage 使用通用图片生成能力创建文档资源。
+// GenerateDocumentImage creates a document asset using the general-purpose image generation capability.
 func GenerateDocumentImage(ctx context.Context, request GenerateDocumentImageRequest) (GenerateDocumentImageResult, error) {
 	bt, err := resolveMultimodalDocument(request.DocumentID)
 	if err != nil {
@@ -581,7 +588,7 @@ func netAssets2LocalAssets0(tree *parse.Tree, onlyImg bool, originalURL string, 
 	var size int64
 	msgId := gulu.Rand.String(7)
 
-	browserClient := util.NewCustomReqClient() // 自定义了 TLS 指纹，增加下载成功率
+	browserClient := util.NewCustomReqClient() // Uses a custom TLS fingerprint to improve download success rate
 
 	forbiddenCount := 0
 	destNodes := getRemoteAssetsLinkDestsInTree(tree, onlyImg)
@@ -593,7 +600,7 @@ func netAssets2LocalAssets0(tree *parse.Tree, onlyImg bool, originalURL string, 
 		}
 
 		for _, dest := range dests {
-			if u := util.FileURLToLocalPath(dest); u != "" { // 处理本地文件链接
+			if u := util.FileURLToLocalPath(dest); u != "" { // Handle local file links
 				if !gulu.File.IsExist(u) {
 					logging.LogErrorf("local file asset [%s] not exist", u)
 					continue
@@ -620,7 +627,8 @@ func netAssets2LocalAssets0(tree *parse.Tree, onlyImg bool, originalURL string, 
 				name = "network-asset-" + name
 				var writePath string
 				if IsEncryptedBox(tree.Box) {
-					// 加密 box：脱敏文件名 + 加密内容（writeAssetFile 内部按路径反查 box 加密）+ 写映射
+					// Encrypted box: obfuscate the filename + encrypt the content (writeAssetFile looks up the box's
+					// encryption by path internally) + write the mapping
 					diskName := encryptedAssetName(util.Ext(name), ast.NewNodeID())
 					writePath = filepath.Join(assetsDirPath, diskName)
 					f, openErr := os.Open(u)
@@ -634,7 +642,8 @@ func netAssets2LocalAssets0(tree *parse.Tree, onlyImg bool, originalURL string, 
 						continue
 					}
 					f.Close()
-					// 映射写失败则回滚已写的 asset 密文，避免产出"孤儿密文 asset 无映射"（详见设计文档 §7）
+					// If writing the mapping fails, roll back the asset ciphertext that was already written, to avoid
+					// producing an "orphaned ciphertext asset with no mapping" (see design doc section 7)
 					if mapErr := writeAssetNameMapping(tree.Box, diskName, name); mapErr != nil {
 						logging.LogErrorf("write asset name mapping for [%s] failed: %s", name, mapErr)
 						_ = filelock.Remove(writePath)
@@ -669,13 +678,13 @@ func netAssets2LocalAssets0(tree *parse.Tree, onlyImg bool, originalURL string, 
 
 				u := dest
 				if strings.Contains(u, "qpic.cn") {
-					// 改进 `网络图片转换为本地图片` 微信图片拉取 https://github.com/siyuan-note/siyuan/issues/5052
+					// Improve WeChat image fetching for `Convert network images to local` https://github.com/siyuan-note/siyuan/issues/5052
 					if strings.Contains(u, "http://") {
 						u = strings.Replace(u, "http://", "https://", 1)
 					}
 
-					// 改进 `网络图片转换为本地图片` 微信图片拉取 https://github.com/siyuan-note/siyuan/issues/6431
-					// 下面这部分需要注释掉，否则会导致响应 400
+					// Improve WeChat image fetching for `Convert network images to local` https://github.com/siyuan-note/siyuan/issues/6431
+					// The section below needs to stay commented out, otherwise it causes a 400 response
 					//if strings.HasSuffix(u, "/0") {
 					//	u = strings.Replace(u, "/0", "/640", 1)
 					//} else if strings.Contains(u, "/0?") {
@@ -698,7 +707,7 @@ func netAssets2LocalAssets0(tree *parse.Tree, onlyImg bool, originalURL string, 
 				request := browserClient.R()
 				request.SetRetryCount(1).SetRetryFixedInterval(3 * time.Second)
 				if "" != originalURL {
-					request.SetHeader("Referer", originalURL) // 改进浏览器剪藏扩展转换本地图片成功率 https://github.com/siyuan-note/siyuan/issues/7464
+					request.SetHeader("Referer", originalURL) // Improve success rate of converting local images via the browser clipping extension https://github.com/siyuan-note/siyuan/issues/7464
 				}
 				resp, reqErr := request.Get(u)
 				if nil != reqErr {
@@ -709,7 +718,7 @@ func netAssets2LocalAssets0(tree *parse.Tree, onlyImg bool, originalURL string, 
 					forbiddenCount++
 				}
 				if strings.Contains(strings.ToLower(resp.GetContentType()), "text/html") {
-					// 忽略超链接网页 `Convert network assets to local` no longer process webpage https://github.com/siyuan-note/siyuan/issues/9965
+					// Ignore hyperlinked web pages. `Convert network assets to local` no longer processes webpages https://github.com/siyuan-note/siyuan/issues/9965
 					continue
 				}
 				if 200 != resp.StatusCode {
@@ -758,7 +767,7 @@ func netAssets2LocalAssets0(tree *parse.Tree, onlyImg bool, originalURL string, 
 					}
 				}
 				if IsEncryptedBox(tree.Box) {
-					// 加密 box：脱敏文件名 + 加密内容 + 写映射
+					// Encrypted box: obfuscate the filename + encrypt the content + write the mapping
 					name = "network-asset-" + name
 					diskName := encryptedAssetName(util.Ext(name), ast.NewNodeID())
 					writePath := filepath.Join(assetsDirPath, diskName)
@@ -766,7 +775,8 @@ func netAssets2LocalAssets0(tree *parse.Tree, onlyImg bool, originalURL string, 
 						logging.LogErrorf("write encrypted network asset [%s] failed: %s", writePath, err)
 						continue
 					}
-					// 映射写失败则回滚已写的 asset 密文，避免产出"孤儿密文 asset 无映射"（详见设计文档 §7）
+					// If writing the mapping fails, roll back the asset ciphertext that was already written, to avoid
+					// producing an "orphaned ciphertext asset with no mapping" (see design doc section 7)
 					if mapErr := writeAssetNameMapping(tree.Box, diskName, name); mapErr != nil {
 						logging.LogErrorf("write asset name mapping for [%s] failed: %s", name, mapErr)
 						_ = filelock.Remove(writePath)
@@ -820,8 +830,8 @@ func netAssets2LocalAssets0(tree *parse.Tree, onlyImg bool, originalURL string, 
 	return
 }
 
-// DownloadNetAssets2LocalAssets 将语法树中的网络资源下载到本地并改写链接，
-// 不持久化文档树，由调用方负责后续保存与渲染。
+// DownloadNetAssets2LocalAssets downloads network resources in the syntax tree to local storage and rewrites the
+// links; it does not persist the document tree, leaving subsequent saving and rendering to the caller.
 func DownloadNetAssets2LocalAssets(tree *parse.Tree, onlyImg bool, originalURL string, assetsDirPath string) {
 	netAssets2LocalAssets0(tree, onlyImg, originalURL, assetsDirPath, false)
 }
@@ -837,7 +847,7 @@ func SearchAssetsByName(keyword string, exts []string) (ret []*cache.Asset) {
 	filterByExt := 0 < len(exts)
 	matchedAssets := cache.FilterAssets(func(path string, asset *cache.Asset) bool {
 
-		// 扩展名过滤
+		// Filter by extension
 		if filterByExt {
 			ext := filepath.Ext(asset.HName)
 			includeExt := false
@@ -852,14 +862,14 @@ func SearchAssetsByName(keyword string, exts []string) (ret []*cache.Asset) {
 			}
 		}
 
-		// 关键字匹配
+		// Keyword matching
 		lowerHName := strings.ToLower(asset.HName)
 		lowerPath := strings.ToLower(asset.Path)
 		var hitNameCount, hitPathCount int
 		for i, k := range keywords {
 			lowerKeyword := strings.ToLower(k)
 			if 0 == i {
-				// 第一个是完全匹配，权重最高
+				// The first one is an exact match and carries the highest weight
 				if strings.Contains(lowerHName, lowerKeyword) {
 					hitNameCount += 64
 				}
@@ -875,17 +885,17 @@ func SearchAssetsByName(keyword string, exts []string) (ret []*cache.Asset) {
 			}
 		}
 
-		// 只返回有匹配的资源
+		// Only return assets that have a match
 		if 1 > hitNameCount+hitPathCount {
 			return false
 		}
 
-		// 记录命中次数用于排序
+		// Record the hit count for sorting
 		pathHitCount[asset.Path] = hitNameCount + hitPathCount
 		return true
 	})
 
-	// 添加高亮
+	// Add highlighting
 	for _, asset := range matchedAssets {
 		hitCount := pathHitCount[asset.Path]
 		hName := asset.HName
@@ -919,7 +929,8 @@ func GetAssetAbsPath(relativePath string) (string, error) {
 	return GetAssetAbsPathWithOpt(relativePath, false)
 }
 
-// AssetPathWithoutQuery 返回去掉查询参数后的资源路径，用于复制到导出目录等磁盘路径场景。
+// AssetPathWithoutQuery returns the asset path with the query parameters stripped, for use in disk path scenarios
+// such as copying to an export directory.
 func AssetPathWithoutQuery(relativePath string) string {
 	relativePath = strings.TrimSpace(relativePath)
 	if idx := strings.Index(relativePath, "?"); idx >= 0 {
@@ -937,7 +948,7 @@ func assetPathAndBox(relativePath, defaultBoxID string) (cleanPath, boxID string
 		if values, parseErr := url.ParseQuery(query); parseErr == nil {
 			if queryBoxID := strings.TrimSpace(values.Get("box")); queryBoxID != "" {
 				if defaultBoxID != "" && defaultBoxID != queryBoxID {
-					// 调用方指定了 boxID 但 URL 里是另一个 box：拒绝，防止解析到错误 box
+					// The caller specified a boxID but the URL has a different box: reject, to avoid resolving to the wrong box
 					err = fmt.Errorf("box mismatch: caller specified [%s] but URL has [%s]", defaultBoxID, queryBoxID)
 					return
 				}
@@ -949,9 +960,10 @@ func assetPathAndBox(relativePath, defaultBoxID string) (cleanPath, boxID string
 	return
 }
 
-// GetAssetAbsPathInBox 在指定 box 内解析资源绝对路径，不进行全局遍历。
-// relativePath 必须以 assets/ 前缀开头，boxID 为空且路径没有 box 查询参数时只解析普通/全局资源，不遍历加密 box。
-// 加密 box 直接从 <boxID>/assets/ 查找，不依赖后缀匹配。
+// GetAssetAbsPathInBox resolves an asset's absolute path within the given box, without a global traversal.
+// relativePath must start with the assets/ prefix; when boxID is empty and the path has no box query parameter, only
+// regular/global assets are resolved, without traversing encrypted boxes.
+// An encrypted box is looked up directly under <boxID>/assets/, without relying on suffix matching.
 func GetAssetAbsPathInBox(relativePath, boxID string) (string, error) {
 	var err error
 	relativePath, boxID, err = assetPathAndBox(relativePath, boxID)
@@ -978,12 +990,12 @@ func GetAssetAbsPathInBox(relativePath, boxID string) (string, error) {
 		if !gulu.File.IsSubPath(util.WorkspaceDir, p) {
 			return "", fmt.Errorf("[%s] is not sub path of workspace", p)
 		}
-		// 解析符号链接/目录联接，防止软链接跳出资产根目录
+		// Resolve symlinks/junctions to prevent a symlink from escaping the assets root
 		if realP, evalErr := filepath.EvalSymlinks(p); evalErr == nil && realP != p {
 			if !gulu.File.IsSubPath(util.WorkspaceDir, realP) {
 				return "", fmt.Errorf("symlink [%s] resolves outside workspace: [%s]", p, realP)
 			}
-			// 验证解析后的路径仍在 <boxID>/assets/ 或全局 data/assets/ 下
+			// Verify the resolved path is still under <boxID>/assets/ or the global data/assets/
 			expectedPrefix := filepath.Join(util.DataDir, "assets")
 			if boxID != "" {
 				expectedPrefix = filepath.Join(util.DataDir, boxID, "assets")
@@ -994,15 +1006,17 @@ func GetAssetAbsPathInBox(relativePath, boxID string) (string, error) {
 		}
 		return p, nil
 	}
-	// 非加密 box 的资源可能回退到全局 data/assets（兼容旧笔记本结构）
+	// A non-encrypted box's asset may fall back to the global data/assets (for compatibility with older notebook structures)
 	if !IsEncryptedBox(boxID) {
 		return GetAssetAbsPathWithOpt(relativePath, false)
 	}
 	return "", fmt.Errorf(Conf.Language(12), relativePath)
 }
 
-// GetAssetAbsPathWithOpt 与 GetAssetAbsPath 一致，但可通过 includeEncrypted 控制是否遍历加密 box。
-// serveAssets 传 true（下游 serveEncryptedAsset 会按锁定状态 fail-closed），其他调用方传 false（安全跳过）。
+// GetAssetAbsPathWithOpt behaves the same as GetAssetAbsPath, but includeEncrypted controls whether encrypted boxes
+// are traversed.
+// serveAssets passes true (the downstream serveEncryptedAsset fails closed based on lock state); other callers pass
+// false (safely skipped).
 func GetAssetAbsPathWithOpt(relativePath string, includeEncrypted bool) (string, error) {
 	relativePath = strings.TrimSpace(relativePath)
 	if idx := strings.Index(relativePath, "?"); idx >= 0 {
@@ -1022,13 +1036,13 @@ func GetAssetAbsPathWithOpt(relativePath string, includeEncrypted bool) (string,
 
 func getAssetAbsPath(relativePath string, includeEncrypted bool) (absPath string, err error) {
 	relativePath = filepath.ToSlash(relativePath)
-	// 在 data 文件夹下搜索，主要是 data/assets 文件夹
+	// Search under the data folder, primarily the data/assets folder
 	p := filepath.Join(util.DataDir, relativePath)
 	if gulu.File.IsExist(p) {
 		if !gulu.File.IsSubPath(util.WorkspaceDir, p) {
 			return "", fmt.Errorf("[%s] is not sub path of workspace", p)
 		}
-		// 解析符号链接，验证真实路径仍在 data/assets/ 下
+		// Resolve the symlink and verify the real path is still under data/assets/
 		if realP, evalErr := filepath.EvalSymlinks(p); evalErr == nil && realP != p {
 			assetsRoot := util.GetDataAssetsAbsPath()
 			realAssetsRoot, rootEvalErr := filepath.EvalSymlinks(assetsRoot)
@@ -1038,13 +1052,14 @@ func getAssetAbsPath(relativePath string, includeEncrypted bool) (absPath string
 			if !gulu.File.IsSubPath(realAssetsRoot, realP) {
 				return "", fmt.Errorf("symlink [%s] resolves outside data/assets: [%s]", p, realP)
 			}
-			// 安全校验使用解析后的路径，返回原路径以便下游与 DataDir 保持同一路径形式
+			// The security check uses the resolved path, but return the original path so downstream code keeps the
+			// same path form as DataDir
 			return p, nil
 		}
 		return p, nil
 	}
 
-	// 在文档同级 assets 文件夹下搜索
+	// Search under the assets folder that sits alongside the document
 	if !strings.HasPrefix(relativePath, "assets/") {
 		return "", nil
 	}
@@ -1054,7 +1069,7 @@ func getAssetAbsPath(relativePath string, includeEncrypted bool) (absPath string
 	}
 	for _, notebook := range notebooks {
 		if !includeEncrypted && IsEncryptedBox(notebook.ID) {
-			continue // 加密笔记本的资源不参与全局路径解析（孤岛，资源不跨边界）
+			continue // An encrypted notebook's assets do not participate in global path resolution (they are isolated; assets never cross the encryption boundary)
 		}
 		notebookAbsPath := filepath.Join(util.DataDir, notebook.ID)
 		filelock.Walk(notebookAbsPath, func(path string, d fs.DirEntry, err error) error {
@@ -1131,7 +1146,7 @@ const (
 	bizTypeExport2Liandi = "export-liandi"
 )
 
-// uploadAssets2Cloud 将资源文件上传到云端图床。
+// uploadAssets2Cloud uploads asset files to the cloud image hosting service.
 func uploadAssets2Cloud(assetPaths []string, bizType string, ignorePushMsg bool) (count int, err error) {
 	var uploadAbsAssets []string
 	for _, assetPath := range assetPaths {
@@ -1170,10 +1185,10 @@ func uploadAssets2Cloud(assetPaths []string, bizType string, ignorePushMsg bool)
 		limitSize = 10 * 1024 * 1024 // 10MB
 	}
 
-	// metaType 为服务端 Filemeta.FILEMETA_TYPE，这里只有两个值：
+	// metaType corresponds to the server-side Filemeta.FILEMETA_TYPE; only two values are used here:
 	//
-	//	5: SiYuan，表示为 SiYuan 上传图床
-	//	4: Client，表示作为客户端分享发布帖子时上传的文件
+	//	5: SiYuan, meaning uploaded to SiYuan's image hosting
+	//	4: Client, meaning a file uploaded by the client when sharing a published post
 	var metaType = "5"
 	if bizTypeUploadAssets == bizType {
 		metaType = "5"
@@ -1330,8 +1345,9 @@ func RemoveUnusedAsset(p string) (ret string) {
 		return absPath
 	}
 
-	// 加密笔记本的资源不参与未引用清理（与批量版 RemoveUnusedAssets 经 UnusedAssets 的排除一致），
-	// 否则未解锁时 admin 可删加密 box 的资源，破坏可用性且留下悬空的文件名映射。
+	// An encrypted notebook's assets do not participate in unused-asset cleanup (consistent with the exclusion the
+	// batch version RemoveUnusedAssets applies via UnusedAssets); otherwise, while locked, an admin could delete an
+	// encrypted box's assets, breaking usability and leaving a dangling filename mapping.
 	if IsEncryptedAssetPath(absPath) {
 		return absPath
 	}
@@ -1380,7 +1396,7 @@ func RenameAsset(oldPath, newName string) (newPath string, err error) {
 
 	oldCleanPath := AssetPathWithoutQuery(oldPath)
 
-	// 加密笔记本的资源文件名已脱敏，重命名会破坏映射关系，禁止
+	// An encrypted notebook's asset filenames are already obfuscated; renaming would break the mapping, so it is disallowed
 	if absPath, absErr := GetAssetAbsPathInBox(oldPath, ""); absErr == nil {
 		if IsEncryptedAssetPath(absPath) {
 			err = errors.New("renaming assets in encrypted notebooks is not supported")
@@ -1450,7 +1466,7 @@ func RenameAsset(oldPath, newName string) (newPath string, err error) {
 
 	luteEngine := util.NewLute()
 	for _, notebook := range notebooks {
-		// 加密笔记本的资源重命名已在入口处拦截，这里跳过加密 box
+		// Renaming an encrypted notebook's assets is already blocked at the entry point, so skip encrypted boxes here
 		if IsEncryptedBox(notebook.ID) {
 			continue
 		}
@@ -1529,7 +1545,7 @@ func RenameAsset(oldPath, newName string) (newPath string, err error) {
 	}
 
 	if ocrText := util.GetAssetText(oldPath); "" != ocrText {
-		// 图片重命名后 ocr-texts.json 需要更新 https://github.com/siyuan-note/siyuan/issues/12974
+		// ocr-texts.json needs to be updated after an image is renamed https://github.com/siyuan-note/siyuan/issues/12974
 		util.SetAssetText(newPath, ocrText)
 	}
 
@@ -1552,8 +1568,9 @@ func UnusedAssets(sorted bool) (ret []*UnusedItem) {
 	if err != nil {
 		return
 	}
-	// 排除加密笔记本的资源：加密笔记本锁定时 loadTree 失败会误判引用关系，
-	// 且加密笔记本是孤岛，资源不参与全局未引用清理
+	// Exclude an encrypted notebook's assets: while an encrypted notebook is locked, loadTree fails and would
+	// misjudge the reference relationship, and an encrypted notebook is isolated anyway, so its assets do not
+	// participate in global unused-asset cleanup
 	for dest, absPath := range assetsPathMap {
 		if boxID := ExtractBoxIDFromAssetsPath(absPath); boxID != "" && IsEncryptedBox(boxID) {
 			delete(assetsPathMap, dest)
@@ -1567,11 +1584,11 @@ func UnusedAssets(sorted bool) (ret []*UnusedItem) {
 	luteEngine := util.NewLute()
 	for _, notebook := range notebooks {
 		if IsEncryptedBox(notebook.ID) {
-			continue // 加密笔记本的资源不参与未引用清理（孤岛，资源不跨边界）
+			continue // An encrypted notebook's assets do not participate in unused-asset cleanup (they are isolated; assets never cross the encryption boundary)
 		}
 		dests := map[string]bool{}
 
-		// 分页加载，优化清理未引用资源内存占用 https://github.com/siyuan-note/siyuan/issues/5200
+		// Load in pages to optimize memory usage when cleaning up unused assets https://github.com/siyuan-note/siyuan/issues/5200
 		pages := pagedPaths(filepath.Join(util.DataDir, notebook.ID), 32)
 		for _, paths := range pages {
 			var trees []*parse.Tree
@@ -1588,7 +1605,7 @@ func UnusedAssets(sorted bool) (ret []*UnusedItem) {
 				}
 
 				if titleImgPath := treenode.GetDocTitleImgPath(tree.Root); "" != titleImgPath {
-					// 题头图计入
+					// Count the title image too
 					if !util.IsAssetLinkDest([]byte(titleImgPath), false) {
 						continue
 					}
@@ -1604,7 +1621,7 @@ func UnusedAssets(sorted bool) (ret []*UnusedItem) {
 			}
 
 			if idx := strings.Index(dest, "?"); 0 < idx {
-				// `pdf?page` 资源文件链接会被判定为未引用资源 https://github.com/siyuan-note/siyuan/issues/5649
+				// A `pdf?page` asset link would otherwise be judged as an unused asset https://github.com/siyuan-note/siyuan/issues/5649
 				dest = dest[:idx]
 			}
 
@@ -1618,7 +1635,7 @@ func UnusedAssets(sorted bool) (ret []*UnusedItem) {
 			}
 		}
 
-		// 排除文件夹链接
+		// Exclude folder links
 		var toRemoves []string
 		for asset := range assetsPathMap {
 			for _, linkDestFolder := range linkDestFolderPaths {
@@ -1648,19 +1665,20 @@ func UnusedAssets(sorted bool) (ret []*UnusedItem) {
 	var toRemoves []string
 	for asset := range assetsPathMap {
 		if strings.HasSuffix(asset, "ocr-texts.json") {
-			// 排除 OCR 结果文本
+			// Exclude OCR result text
 			toRemoves = append(toRemoves, asset)
 			continue
 		}
 
 		if strings.HasSuffix(asset, "android-notification-texts.txt") {
-			// 排除 Android 通知文本
+			// Exclude Android notification text
 			toRemoves = append(toRemoves, asset)
 			continue
 		}
 	}
 
-	// 排除数据库中引用的资源文件。加密笔记本的资源不参与未引用清理（孤岛，资源不跨边界）
+	// Exclude asset files referenced from the database. An encrypted notebook's assets do not participate in
+	// unused-asset cleanup (they are isolated; assets never cross the encryption boundary)
 	storageAvDir := filepath.Join(util.DataDir, "storage", "av")
 	if gulu.File.IsDir(storageAvDir) {
 		entries, readErr := os.ReadDir(storageAvDir)
@@ -1773,7 +1791,7 @@ func MissingAssets() (ret []*UnusedItem) {
 				})
 
 				if titleImgPath := treenode.GetDocTitleImgPath(tree.Root); "" != titleImgPath {
-					// 题头图计入
+					// Count the title image too
 					if !util.IsAssetLinkDest([]byte(titleImgPath), false) {
 						continue
 					}
@@ -1835,7 +1853,7 @@ func normalizeMissingAssetLinkDest(dest string) string {
 	}
 	if strings.Contains(strings.ToLower(dest), ".pdf/") {
 		if idx := strings.LastIndex(dest, "/"); -1 < idx && ast.IsNodeIDPattern(dest[idx+1:]) {
-			// PDF 标注不计入 https://github.com/siyuan-note/siyuan/issues/13891
+			// PDF annotations are not counted https://github.com/siyuan-note/siyuan/issues/13891
 			return ""
 		}
 	}
@@ -1859,7 +1877,7 @@ func getAssetLinkDestsByNode(node *ast.Node, includeServePath bool) []string {
 		return nil
 	}
 
-	// 复用统一的资源链接提取逻辑，但仅处理当前节点，避免重复遍历子树。
+	// Reuse the common asset link extraction logic, but only process the current node to avoid re-traversing the subtree.
 	nodeCopy := *node
 	nodeCopy.Parent = nil
 	nodeCopy.Previous = nil
@@ -1934,7 +1952,7 @@ func getAssetsLinkDests(node *ast.Node, includeServePath bool) (ret []string) {
 	ret = []string{}
 	ast.Walk(node, func(n *ast.Node, entering bool) ast.WalkStatus {
 		if n.IsBlock() {
-			// 以 custom-data-assets 开头的块属性值可能是多个资源文件链接，需要计入
+			// A block attribute value starting with custom-data-assets may contain multiple asset file links, so it needs to be counted
 			// Ignore assets associated with the `custom-data-assets` block attribute when cleaning unreferenced assets https://github.com/siyuan-note/siyuan/issues/12574
 			for _, kv := range n.KramdownIAL {
 				k := kv[0]
@@ -1948,7 +1966,7 @@ func getAssetsLinkDests(node *ast.Node, includeServePath bool) (ret []string) {
 			}
 		}
 
-		// 修改以下代码时需要同时修改 database 构造行级元素实现，增加必要的类型
+		// When changing the code below, also update the database's inline element construction implementation and add the necessary types
 		if !entering || (ast.NodeLinkDest != n.Type && ast.NodeHTMLBlock != n.Type && ast.NodeInlineHTML != n.Type &&
 			ast.NodeIFrame != n.Type && ast.NodeWidget != n.Type && ast.NodeAudio != n.Type && ast.NodeVideo != n.Type &&
 			ast.NodeAttributeView != n.Type && !n.IsTextMarkType("a") && !n.IsTextMarkType("file-annotation-ref")) {
@@ -2018,7 +2036,7 @@ func getAssetsLinkDests(node *ast.Node, includeServePath bool) (ret []string) {
 			if ast.NodeWidget == n.Type {
 				dataAssets := n.IALAttr("custom-data-assets")
 				if "" == dataAssets {
-					// 兼容两种属性名 custom-data-assets 和 data-assets https://github.com/siyuan-note/siyuan/issues/4122#issuecomment-1154796568
+					// Support both attribute names custom-data-assets and data-assets for compatibility https://github.com/siyuan-note/siyuan/issues/4122#issuecomment-1154796568
 					dataAssets = n.IALAttr("data-assets")
 				}
 				if !util.IsAssetLinkDest([]byte(dataAssets), includeServePath) {
@@ -2037,7 +2055,7 @@ func getAssetsLinkDests(node *ast.Node, includeServePath bool) (ret []string) {
 	})
 	ret = gulu.Str.RemoveDuplicatedElem(ret)
 	for i, dest := range ret {
-		// 对于 macOS 的 rtfd 文件夹格式需要特殊处理，为其加上结尾 /
+		// macOS's rtfd folder format needs special handling: append a trailing /
 		if strings.HasSuffix(dest, ".rtfd") {
 			ret[i] = dest + "/"
 		}
@@ -2208,7 +2226,7 @@ func getRemoteAssetsLinkDestsInTree(tree *parse.Tree, onlyImg bool) (nodes []*as
 	return
 }
 
-// allAssetAbsPaths 返回 asset 相对路径（assets/xxx）到绝对路径（F:\SiYuan\data\assets\xxx）的映射。
+// allAssetAbsPaths returns a map from an asset's relative path (assets/xxx) to its absolute path (F:\SiYuan\data\assets\xxx).
 func allAssetAbsPaths() (assetsAbsPathMap map[string]string, err error) {
 	notebooks, err := ListNotebooks()
 	if err != nil {
@@ -2216,7 +2234,7 @@ func allAssetAbsPaths() (assetsAbsPathMap map[string]string, err error) {
 	}
 
 	assetsAbsPathMap = map[string]string{}
-	// 笔记本 assets（跳过加密 box，加密资产不参与全局去重/清理）
+	// Notebook assets (skip encrypted boxes; encrypted assets do not participate in global deduplication/cleanup)
 	for _, notebook := range notebooks {
 		if IsEncryptedBox(notebook.ID) {
 			continue
@@ -2234,7 +2252,7 @@ func allAssetAbsPaths() (assetsAbsPathMap map[string]string, err error) {
 			}
 
 			if filelock.IsHidden(path) {
-				// 清理资源文件时忽略隐藏文件 Ignore hidden files when cleaning unused assets https://github.com/siyuan-note/siyuan/issues/12172
+				// Ignore hidden files when cleaning unused assets https://github.com/siyuan-note/siyuan/issues/12172
 				return nil
 			}
 
@@ -2263,7 +2281,7 @@ func allAssetAbsPaths() (assetsAbsPathMap map[string]string, err error) {
 		})
 	}
 
-	// 全局 assets
+	// Global assets
 	dataAssetsAbsPath := util.GetDataAssetsAbsPath()
 	filelock.Walk(dataAssetsAbsPath, func(assetPath string, d fs.DirEntry, err error) error {
 		if dataAssetsAbsPath == assetPath {
@@ -2278,7 +2296,7 @@ func allAssetAbsPaths() (assetsAbsPathMap map[string]string, err error) {
 		}
 
 		if filelock.IsHidden(assetPath) {
-			// 清理资源文件时忽略隐藏文件 Ignore hidden files when cleaning unused assets https://github.com/siyuan-note/siyuan/issues/12172
+			// Ignore hidden files when cleaning unused assets https://github.com/siyuan-note/siyuan/issues/12172
 			return nil
 		}
 
@@ -2293,13 +2311,13 @@ func allAssetAbsPaths() (assetsAbsPathMap map[string]string, err error) {
 	return
 }
 
-// copyBoxAssetsToDataAssets 将笔记本路径下所有（包括子文档）的 assets 复制一份到 data/assets 中。
+// copyBoxAssetsToDataAssets copies all assets under a notebook's path (including subdocuments) into data/assets.
 func copyBoxAssetsToDataAssets(boxID string) {
 	boxLocalPath := filepath.Join(util.DataDir, boxID)
 	copyAssetsToDataAssets(boxLocalPath)
 }
 
-// copyDocAssetsToDataAssets 将文档路径下所有（包括子文档）的 assets 复制一份到 data/assets 中。
+// copyDocAssetsToDataAssets copies all assets under a document's path (including subdocuments) into data/assets.
 func copyDocAssetsToDataAssets(boxID, parentDocPath string) {
 	boxLocalPath := filepath.Join(util.DataDir, boxID)
 	parentDocDirAbsPath := filepath.Dir(filepath.Join(boxLocalPath, parentDocPath))

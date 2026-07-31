@@ -142,15 +142,17 @@ export const initUI = (protyle: IProtyle) => {
     }, {passive: true});
     protyle.contentElement.addEventListener("click", (event: MouseEvent & { target: HTMLElement }) => {
         hideElements(["hint", "util"], protyle);
-        // wysiwyg 元素下方点击无效果 https://github.com/siyuan-note/siyuan/issues/12009
+        // Clicking below the wysiwyg element has no effect https://github.com/siyuan-note/siyuan/issues/12009
         if (protyle.disabled ||
-            // 选中块时，禁止添加空块 https://github.com/siyuan-note/siyuan/issues/13905
+            // Disable adding an empty block when a block is selected https://github.com/siyuan-note/siyuan/issues/13905
             protyle.contentElement.querySelector(".protyle-wysiwyg--select") ||
             (!event.target.classList.contains("protyle-content") && !event.target.classList.contains("protyle-wysiwyg"))) {
             return;
         }
-        // https://github.com/siyuan-note/siyuan/issues/14190 选中最后一个块末尾点击底部时，range 会有值，需使用 setTimeout，最新测试无需 setTimeout 了，且会影响移动端键盘弹起故移除
-        // 选中文本禁止添加空块 https://github.com/siyuan-note/siyuan/issues/13905
+        // https://github.com/siyuan-note/siyuan/issues/14190 clicking the bottom after selecting the end of the last
+        // block used to give range a value, requiring setTimeout; latest testing shows setTimeout is no longer
+        // needed, and it affects the mobile keyboard popping up, so it was removed
+        // Disable adding an empty block when text is selected https://github.com/siyuan-note/siyuan/issues/13905
         if (window.getSelection().rangeCount > 0) {
             const currentRange = window.getSelection().getRangeAt(0);
             if (currentRange.toString() !== "" && protyle.wysiwyg.element.contains(currentRange.startContainer)) {
@@ -188,7 +190,7 @@ export const initUI = (protyle: IProtyle) => {
                 range.selectNodeContents(emptyEditElement);
                 range.collapse(true);
                 focusByRange(range);
-                // 需等待 range 更新再次进行渲染
+                // Wait for range to update before rendering again
                 if (protyle.options.render.breadcrumb) {
                     setTimeout(() => {
                         protyle.breadcrumb.render(protyle);
@@ -231,7 +233,8 @@ export const initUI = (protyle: IProtyle) => {
         const nodeElement = hasClosestBlock(event.target);
         if (protyle.options.render.gutter && nodeElement) {
             if (nodeElement && (nodeElement.classList.contains("list") || nodeElement.classList.contains("li"))) {
-                // 光标在列表下部应显示右侧的元素，而不是列表本身。放在 windowEvent 中的 mousemove 下处理
+                // When the cursor is below a list, show the element to the right instead of the list itself; this
+                // is handled in the mousemove listener in windowEvent
                 return;
             }
             const embedElement = isInEmbedBlock(nodeElement);
@@ -276,7 +279,7 @@ export const initUI = (protyle: IProtyle) => {
             return;
         }
 
-        // 面包屑
+        // Breadcrumb
         if (protyle.selectElement.classList.contains("fn__none")) {
             const svgElement = hasClosestByAttribute(event.target, "data-node-id", null);
             if (svgElement && svgElement.parentElement.classList.contains("protyle-breadcrumb__bar")) {
@@ -332,7 +335,7 @@ export const setPadding = (protyle: IProtyle) => {
         protyle.background.element.querySelector(".protyle-background__ia").setAttribute("style", `margin-left:${paddingLeft}px;margin-right:${paddingRight}px`);
     }
     if (protyle.options.render.title) {
-        // pc 端 文档名 attr 过长和添加标签等按钮重合
+        // On PC, an overly long document name attr overlaps with buttons like add tag
         protyle.title.element.style.margin = `16px ${paddingRight}px 0 ${paddingLeft}px`;
     }
     if (protyle.databaseAttributePanel) {
@@ -366,7 +369,7 @@ export const getPadding = (protyle: IProtyle) => {
         let padding = (protyle.element.clientWidth - Constants.SIZE_EDITOR_WIDTH) / 2;
         if (isFullWidth === "false" && padding > 96) {
             if (padding > Constants.SIZE_EDITOR_WIDTH) {
-                // 超宽屏调整 https://ld246.com/article/1668266637363
+                // Adjust for ultra-wide screens https://ld246.com/article/1668266637363
                 padding = protyle.element.clientWidth * .382 / 1.382;
             }
             padding = Math.ceil(padding);

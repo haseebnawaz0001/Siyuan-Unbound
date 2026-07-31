@@ -11,23 +11,23 @@ import { plantumlRender } from "../protyle/render/plantumlRender";
 import { avRender } from "../protyle/render/av/render";
 
 export class ProtyleMethod {
-    /** 对 graphviz 进行渲染 */
+    /** Render graphviz */
     public static graphvizRender = graphvizRender;
-    /** 为 element 中的代码块进行高亮渲染 */
+    /** Render syntax highlighting for code blocks in an element */
     public static highlightRender = highlightRender;
-    /** 对数学公式进行渲染 */
+    /** Render math formulas */
     public static mathRender = mathRender;
-    /** 流程图/时序图/甘特图渲染 */
+    /** Render flowcharts/sequence diagrams/Gantt charts */
     public static mermaidRender = mermaidRender;
-    /** flowchart.js 渲染 */
+    /** flowchart.js rendering */
     public static flowchartRender = flowchartRender;
-    /** 图表渲染 */
+    /** Render charts */
     public static chartRender = chartRender;
-    /** 五线谱渲染 */
+    /** Render sheet music */
     public static abcRender = abcRender;
-    /** 脑图渲染 */
+    /** Render mind maps */
     public static mindmapRender = mindmapRender;
-    /** UML 渲染 */
+    /** Render UML */
     public static plantumlRender = plantumlRender;
     public static avRender = avRender;
     public static htmlRender = htmlRender;

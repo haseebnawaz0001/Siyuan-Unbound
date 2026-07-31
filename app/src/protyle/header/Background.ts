@@ -223,7 +223,7 @@ export class Background {
                         event.preventDefault();
                         event.stopPropagation();
                     }
-                    // 点击题头图菜单无法消失
+                    // The header image menu doesn't disappear on click
                     window.siyuan.menus.menu.remove();
                     break;
                 } else if (type === "position" && !protyle.disabled) {
@@ -266,7 +266,7 @@ export class Background {
                     event.stopPropagation();
                     break;
                 } else if (type === "show-random" && !protyle.disabled) {
-                    // 内置题头图对话框：优先展示封面图片，加载失败时回退到 CSS 图案
+                    // Built-in header image dialog: prefer showing cover images, fall back to a CSS pattern on load failure
                     const dialog = new Dialog({
                         title: window.siyuan.languages.builtIn,
                         content: `<div class="b3-cards" style="padding:16px;justify-content:center;align-items:center;min-height:200px">
@@ -335,7 +335,7 @@ export class Background {
 
                         renderContent();
 
-                        // 点击事件委托
+                        // Click event delegation
                         dialog.element.querySelector(".b3-dialog__body")!.addEventListener("click", (event) => {
                             const target = event.target as HTMLElement;
                             const chip = target.closest(".b3-chip") as HTMLElement;
@@ -370,7 +370,7 @@ export class Background {
                     event.stopPropagation();
                     break;
                 } else if (type === "random" && !protyle.disabled) {
-                    // 随机题头图：优先使用图片封面，加载失败时回退到 CSS 图案
+                    // Random header image: prefer using an image cover, fall back to a CSS pattern on load failure
                     fetchCoverData().then((coverData) => {
                         if (coverData && coverData.allCovers.length > 0) {
                             const randomCover = coverData.allCovers[getRandom(0, coverData.allCovers.length - 1)];
@@ -525,7 +525,7 @@ export class Background {
             const isCloseBtn = !!target.closest(".b3-chip__close");
             let chipElement = target.closest(".b3-chip") as HTMLElement;
 
-            // 自动定位最近的标签逻辑
+            // Logic to auto-locate the nearest tag
             if (!chipElement && target.closest(".b3-chips__doctag")) {
                 const rects = Array.from(this.element.querySelectorAll(".b3-chip")).map(el => ({
                     el: el as HTMLElement,
@@ -543,12 +543,13 @@ export class Background {
 
             event.preventDefault();
 
-            // --- 核心变量初始化 ---
+            // --- Core variable initialization ---
             const startX = event.clientX;
             const startY = event.clientY;
             const initialRect = chipElement.getBoundingClientRect();
 
-            // 计算鼠标点击位置相对于元素左上角的偏移，这是“跟手”的关键
+            // Compute the offset of the mouse click position relative to the element's top-left
+            // corner; this is the key to making it "track the cursor"
             const offsetX = startX - initialRect.left;
             const offsetY = startY - initialRect.top;
 
@@ -559,17 +560,18 @@ export class Background {
                 const deltaX = moveEvent.clientX - startX;
                 const deltaY = moveEvent.clientY - startY;
 
-                // 阈值判断：移动超过 5 像素才视为拖拽，防止手抖误操作
+                // Threshold check: only treated as a drag once moved more than 5 pixels, to prevent
+                // accidental triggers from a shaky hand
                 if (!isDragging) {
                     if (Math.abs(deltaX) < Constants.SIZE_DRAG_THRESHOLD &&
                         Math.abs(deltaY) < Constants.SIZE_DRAG_THRESHOLD) return;
                     isDragging = true;
 
-                    // 创建克隆体
+                    // Create the clone
                     dragClone = chipElement.cloneNode(true) as HTMLElement;
                     dragClone.classList.add("b3-chip--dragclone");
 
-                    // 初始样式设置
+                    // Set the initial style
                     Object.assign(dragClone.style, {
                         position: "fixed",
                         left: `${moveEvent.clientX - offsetX}px`,
@@ -585,7 +587,7 @@ export class Background {
                     });
 
                     document.body.appendChild(dragClone);
-                    chipElement.classList.add("b3-chip--dragging"); // 占位符设为透明/灰色
+                    chipElement.classList.add("b3-chip--dragging"); // Set the placeholder to transparent/gray
                     document.body.style.cursor = "grabbing";
                     event.preventDefault();
                 }
@@ -594,13 +596,13 @@ export class Background {
                     dragClone.style.left = `${moveEvent.clientX - offsetX}px`;
                     dragClone.style.top = `${moveEvent.clientY - offsetY}px`;
 
-                    // 排序碰撞检测
+                    // Sort collision detection
                     const pointTarget = document.elementFromPoint(moveEvent.clientX, moveEvent.clientY);
                     const targetChip = pointTarget?.closest(".b3-chip") as HTMLElement;
 
                     if (targetChip && targetChip !== chipElement && this.tagsElement.contains(targetChip)) {
                         const rect = targetChip.getBoundingClientRect();
-                        // 根据鼠标位置决定插入在目标的前面还是后面
+                        // Decide whether to insert before or after the target based on the mouse position
                         if (moveEvent.clientX > rect.left + rect.width / 2) {
                             targetChip.after(chipElement);
                         } else {
@@ -617,7 +619,7 @@ export class Background {
 
                 if (isDragging) {
                     this.dragOccurred = true;
-                    // 阻止拖拽结束后可能触发的点击事件（搜索或打开链接）
+                    // Prevent a click event that could be triggered after the drag ends (search or opening a link)
                     upEvent.preventDefault();
                     upEvent.stopPropagation();
 
@@ -627,7 +629,7 @@ export class Background {
                     }
                     chipElement.classList.remove("b3-chip--dragging");
 
-                    // 持久化排序结果
+                    // Persist the sort result
                     const tags = this.getTags();
                     const tagsString = tags.toString();
                     if (tagsString !== this.ial.tags) {
@@ -638,7 +640,7 @@ export class Background {
                         });
                     }
                 } else if (isCloseBtn) {
-                    // 如果没拖拽且点在关闭按钮上
+                    // If no drag occurred and the click landed on the close button
                     target.closest(".b3-chip__close").dispatchEvent(new MouseEvent("click", {bubbles: true}));
                 }
             };
@@ -671,7 +673,7 @@ export class Background {
         const icon = ial.icon;
         const tags = ial.tags;
         this.ial = ial;
-        // 为主题提供样式基础
+        // Provide a styling base for the theme
         this.element.setAttribute("data-node-id", rootId);
         if (tags) {
             let html = "";
@@ -703,7 +705,7 @@ export class Background {
         }
 
         if (img) {
-            // 历史数据解析：background-image: url(\"assets/沙发背景墙11-20220418171700-w6vilzt.jpeg\"); background-position: center -254px; background-size: cover; background-repeat: no-repeat; min-height: 30vh
+            // Parsing legacy data, e.g.: background-image: url(\"assets/sofa-background-wall11-20220418171700-w6vilzt.jpeg\"); background-position: center -254px; background-size: cover; background-repeat: no-repeat; min-height: 30vh
             this.imgElement.setAttribute("style", Lute.UnEscapeHTMLStr(img));
             if (img.indexOf("url(") > -1) {
                 const position = this.imgElement.style.backgroundPosition || this.imgElement.style.objectPosition;
@@ -720,7 +722,7 @@ export class Background {
             this.imgElement.parentElement.classList.remove("fn__none");
             this.iconElement.style.marginTop = "";
             /// #if MOBILE
-            // 移动端键盘弹起和点击加号需保持滚动高度一致
+            // The scroll height must stay consistent between the mobile keyboard popping up and tapping the plus button
             this.imgElement.style.height = "200px";
             /// #endif
         } else {

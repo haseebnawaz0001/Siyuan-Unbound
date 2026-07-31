@@ -16,25 +16,29 @@
 
 //go:build darwin && !ios
 
-// 本文件实现 macOS NSPasteboard 写入文件路径列表：通过 writeObjects: 写入 NSURL 数组
-//（NSPasteboardTypeFileURL / public.file-url），使 Finder 等应用可识别并粘贴为文件。
+// This file implements writing a list of file paths to macOS's NSPasteboard: it writes an array of NSURL via
+// writeObjects: (NSPasteboardTypeFileURL / public.file-url), so apps like Finder can recognize and paste them as
+// files.
 //
-// 逻辑依据 Apple 官方「复制到剪贴板」三步：
-// 1) 获取 general pasteboard；2) clearContents 清空；3) writeObjects: 写入符合 NSPasteboardWriting 的对象。
-// NSURL 为系统内置支持类型，写入 file URL 后系统会自动提供 public.file-url、
-// NSFilenamesPboardType、public.utf8-plain-text 等表示，兼容 Finder 与旧版 API。
+// The logic follows Apple's official "Copying to a Pasteboard" three steps:
+// 1) get the general pasteboard; 2) clearContents to clear it; 3) writeObjects: to write objects conforming to
+// NSPasteboardWriting.
+// NSURL is a built-in supported type; once a file URL is written, the system automatically provides
+// representations like public.file-url, NSFilenamesPboardType, and public.utf8-plain-text, staying compatible
+// with Finder and legacy APIs.
 //
-// 官方文档与参考：
+// Official docs and references:
 //   - Pasteboard Programming Guide (macOS)
 //     https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/PasteboardGuide106/Introduction/Introduction.html
-//   - Copying to a Pasteboard（三步流程与 writeObjects:）
+//   - Copying to a Pasteboard (the three-step flow and writeObjects:)
 //     https://developer.apple.com/library/archive/documentation/Cocoa/Conceptual/PasteboardGuide106/Articles/pbCopying.html
 //   - NSPasteboard
 //     https://developer.apple.com/documentation/appkit/nspasteboard
-//   - NSPasteboardWriting（NSURL、NSString 等已实现）
+//   - NSPasteboardWriting (NSURL, NSString, etc. already implement it)
 //     https://developer.apple.com/documentation/appkit/nspasteboardwriting
 //
-// 下文 /* ... */ 内为 CGO 内联的 Objective-C 代码，由 cgo 提取并编译，并非被注释掉的代码。
+// The /* ... */ block below contains CGO-inlined Objective-C code, extracted and compiled by cgo -- it is not
+// commented-out code.
 
 package util
 
@@ -44,10 +48,12 @@ package util
 #import <AppKit/AppKit.h>
 #import <Foundation/Foundation.h>
 
-// writeFilePathsToPasteboard 将路径列表写入通用剪贴板，遵循 Copying to a Pasteboard 三步：
-// 1) generalPasteboard；2) clearContents；3) writeObjects: 传入 NSURL 数组。
-// NSURL 符合 NSPasteboardWriting，写入后系统自动提供 public.file-url、NSFilenamesPboardType 等。
-// paths 为 UTF-8 路径字符串数组，count 为数量。
+// writeFilePathsToPasteboard writes the path list to the general pasteboard, following the "Copying to a
+// Pasteboard" three steps:
+// 1) generalPasteboard; 2) clearContents; 3) writeObjects: passing in an NSURL array.
+// NSURL conforms to NSPasteboardWriting; once written, the system automatically provides public.file-url,
+// NSFilenamesPboardType, etc.
+// paths is a UTF-8 path string array, count is its length.
 static int writeFilePathsToPasteboard(const char** paths, int count) {
 	if (count <= 0) return 0;
 	NSMutableArray *arr = [NSMutableArray arrayWithCapacity:(NSUInteger)count];
@@ -57,13 +63,13 @@ static int writeFilePathsToPasteboard(const char** paths, int count) {
 		NSURL *url = [NSURL fileURLWithPath:path];
 		if (url) [arr addObject:url];
 	}
-	// 若无一有效路径（如全为非法 UTF-8 或无法转为 NSURL），返回 -2 以便 Go 侧报错
+	// If there is no valid path at all (e.g. all invalid UTF-8 or unable to convert to NSURL), return -2 so the Go side can report an error
 	if ([arr count] == 0) return -2;
-	// 步骤 1：获取通用剪贴板（cut/copy/paste 用）
+	// Step 1: get the general pasteboard (used for cut/copy/paste)
 	NSPasteboard *pb = [NSPasteboard generalPasteboard];
-	// 步骤 2：清空已有内容，再只写入本次文件路径
+	// Step 2: clear existing content, then write only this batch of file paths
 	[pb clearContents];
-	// 步骤 3：writeObjects: 要求对象符合 NSPasteboardWriting，NSURL 已支持
+	// Step 3: writeObjects: requires objects conforming to NSPasteboardWriting, which NSURL already supports
 	BOOL ok = [pb writeObjects:arr];
 	return ok ? 0 : -1;
 }
@@ -75,13 +81,13 @@ import (
 	"unsafe"
 )
 
-// WriteFilePaths 将文件路径列表写入系统剪贴板（general pasteboard），
-// 使 Finder 等可粘贴为文件。实现见 Pasteboard Guide — Copying to a Pasteboard。
+// WriteFilePaths writes a list of file paths to the system clipboard (general pasteboard), so they can be pasted
+// as files in Finder and similar apps. See the Pasteboard Guide -- Copying to a Pasteboard for the implementation.
 func WriteFilePaths(paths []string) error {
 	if len(paths) == 0 {
 		return nil
 	}
-	// 分配 C 的 char* 数组，便于传入 Objective-C
+	// Allocate a C char* array to pass into Objective-C
 	cPaths := make([]*C.char, len(paths))
 	for i, p := range paths {
 		cPaths[i] = C.CString(p)
@@ -91,7 +97,7 @@ func WriteFilePaths(paths []string) error {
 			C.free(unsafe.Pointer(c))
 		}
 	}()
-	// 取首元素地址作为 const char** 传入
+	// Take the address of the first element to pass in as const char**
 	ret := C.writeFilePathsToPasteboard((**C.char)(unsafe.Pointer(&cPaths[0])), C.int(len(paths)))
 	switch ret {
 	case 0:

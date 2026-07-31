@@ -154,7 +154,8 @@ func EnsureOnboarding() (ret *conf.Onboarding, notebookCreated bool, err error) 
 	return cloneOnboarding(onboarding), notebookCreated, nil
 }
 
-// TriggerOnboardingIfEmpty 在最后一个笔记本被删除后重置状态，并通知已连接的界面立即重新进入引导。
+// TriggerOnboardingIfEmpty resets the state after the last notebook is deleted, and notifies connected
+// clients to immediately re-enter onboarding.
 func TriggerOnboardingIfEmpty() {
 	onboardingLock.Lock()
 	defer onboardingLock.Unlock()

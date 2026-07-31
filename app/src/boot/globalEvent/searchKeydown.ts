@@ -81,7 +81,7 @@ export const searchKeydown = (app: App, event: KeyboardEvent) => {
     }
     const assetLocal = window.siyuan.storage[Constants.LOCAL_SEARCHASSET] as ISearchAssetOption;
     if (!window.siyuan.menus.menu.element.classList.contains("fn__none")) {
-        // 不能返回 true，否则历史菜单无法使用快捷键
+        // Cannot return true, otherwise the history menu won't be able to use hotkeys
         return false;
     }
     let currentList: HTMLElement = listElement.querySelector(".b3-list-item--focus");

@@ -20,7 +20,7 @@ package util
 
 import "errors"
 
-// 当前仅在 Windows、macOS 上实现，其他平台返回错误
+// Currently only implemented on Windows and macOS; other platforms return an error
 func WriteFilePaths(paths []string) error {
 	return errors.New("writing file paths to clipboard is not supported on this platform")
 }

@@ -310,10 +310,10 @@ export const showKeyboardToolbarUtil = (oldScrollTop: number) => {
     }
     setTimeout(() => {
         toolbarElement.style.height = keyboardHeight + "px";
-    }, Constants.TIMEOUT_TRANSITION); // 防止抖动
+    }, Constants.TIMEOUT_TRANSITION); // Prevent jitter
     setTimeout(() => {
         showUtil = false;
-    }, 1000);   // 防止光标改变后斜杆菜单消失
+    }, 1000);   // Prevent the slash menu from disappearing after the cursor changes
 };
 
 const hideKeyboardToolbarUtil = () => {
@@ -364,7 +364,8 @@ const renderKeyboardToolbar = () => {
         const protyle = getCurrentEditor().protyle;
         protyle.toolbar.range = range;
         if (!dynamicElements[0].classList.contains("fn__none")) {
-            // 撤销权威栈在 kernel，本地按 rootID 读镜像设按钮态（零 fetch）
+            // The authoritative undo stack lives in the kernel; locally read the mirror by rootID to set the
+            // button state (zero fetch)
             const undoState = protyle.block?.rootID ? getMirror(protyle.block.rootID) : {
                 canUndo: false,
                 canRedo: false
@@ -419,7 +420,7 @@ const renderKeyboardToolbar = () => {
                 }
             });
         }
-    }, 620); // 需等待 range 更新
+    }, 620); // Need to wait for the range to update
 };
 
 export const showKeyboardToolbar = () => {
@@ -543,7 +544,7 @@ export const initKeyboardToolbar = () => {
     }
     if (!isInEdge()) {
         window.addEventListener("resize", () => {
-            // 获取键盘高度
+            // Get the keyboard height
             window.siyuan.mobile.size.isLandscape = window.matchMedia && window.matchMedia("(orientation: landscape)").matches;
             if (window.siyuan.mobile.size.isLandscape) {
                 if (!window.siyuan.mobile.size.landscape) {
@@ -660,11 +661,12 @@ export const initKeyboardToolbar = () => {
             if (dataValue === Constants.ZWSP + 3) {
                 return;
             }
-            protyle.hint.fill(dataValue, protyle, false);   // 点击后 range 会改变
+            protyle.hint.fill(dataValue, protyle, false);   // The range changes after clicking
             event.preventDefault();
             event.stopPropagation();
             if (dataValue === "((" || dataValue === "{{") {
-                // (( / {{ 的候选列表无输入框，需保持键盘不收起，否则无法继续输入筛选 https://github.com/siyuan-note/siyuan/issues/17877
+                // The (( / {{ candidate list has no input field, so the keyboard must stay open, otherwise
+                // filtering input can't continue https://github.com/siyuan-note/siyuan/issues/17877
                 callMobileAppShowKeyboard();
                 if (isInHarmony() || isInAndroid()) {
                     setTimeout(() => focusByRange(protyle.toolbar.range), Constants.TIMEOUT_TRANSITION);

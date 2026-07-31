@@ -26,7 +26,7 @@ import (
 //go:embed models.json
 var modelsJSON embed.FS
 
-// modelMetaEntry 对应 models.json 中单个模型的值对象，目前仅含 contextLength。
+// modelMetaEntry corresponds to a single model's value object in models.json; currently only contains contextLength.
 type modelMetaEntry struct {
 	ContextLength int `json:"contextLength"`
 }
@@ -36,8 +36,9 @@ var (
 	modelContextLimit map[string]int
 )
 
-// loadModelContext 惰性解析嵌入的 models.json，构建「模型名 → 上下文窗口」映射。
-// models.json 顶层含一个保留的 _meta 元数据对象，解析时跳过它（其值结构与模型条目不同）。
+// loadModelContext lazily parses the embedded models.json, building a "model name -> context window" map.
+// models.json has a reserved top-level _meta metadata object, which is skipped during parsing (its value
+// structure differs from a model entry).
 func loadModelContext() map[string]int {
 	modelContextOnce.Do(func() {
 		raw, err := modelsJSON.ReadFile("models.json")
@@ -58,7 +59,8 @@ func loadModelContext() map[string]int {
 				continue
 			}
 			if entry.ContextLength > 0 {
-				// key 转小写存储，使匹配大小写不敏感（用户填写 Baichuan4-Turbo / baichuan4-turbo 均可命中）。
+				// Store the key lowercased so matching is case-insensitive (whether the user enters
+				// Baichuan4-Turbo or baichuan4-turbo, both hit).
 				result[strings.ToLower(name)] = entry.ContextLength
 			}
 		}
@@ -67,10 +69,11 @@ func loadModelContext() map[string]int {
 	return modelContextLimit
 }
 
-// GetModelContextLimit 返回模型的上下文窗口大小（单位：token）。未知模型返回 0。
-// 匹配大小写不敏感（表 key 与查询参数均转小写）。
-// 匹配顺序：先按完整模型名精确查找；再按「末段」（去掉 provider 前缀）查找，
-// 兼容用户填写带前缀的 id（如 z-ai/glm-4.6）。表本身以末段为 key，故末段匹配即直接命中。
+// GetModelContextLimit returns the model's context window size (in tokens). Returns 0 for an unknown model.
+// Matching is case-insensitive (both the table keys and the query parameter are lowercased).
+// Match order: first an exact lookup by the full model name; then by the "last segment" (with the provider
+// prefix stripped), to support users who enter an id with a prefix (such as z-ai/glm-4.6). The table itself
+// is keyed by the last segment, so a last-segment match hits directly.
 func GetModelContextLimit(model string) int {
 	if model == "" {
 		return 0

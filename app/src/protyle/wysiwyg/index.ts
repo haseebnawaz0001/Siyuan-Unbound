@@ -152,8 +152,8 @@ export class WYSIWYG {
         this.element.className = "protyle-wysiwyg";
         this.element.setAttribute("spellcheck", "false");
         if (isMobile()) {
-            // iPhone，iPad 端输入 contenteditable 为 true 时会在块中间插入 span
-            // Android 端空块输入法弹出会收起 https://ld246.com/article/1689713888289
+            // On iPhone/iPad, setting contenteditable to true inserts a span in the middle of the block while typing
+            // On Android, an empty block collapses when the IME popup appears https://ld246.com/article/1689713888289
             this.element.setAttribute("contenteditable", "false");
         } else {
             this.element.setAttribute("contenteditable", "true");
@@ -196,7 +196,7 @@ export class WYSIWYG {
         });
     }
 
-    // text block-ref file-annotation-ref a 结尾处打字应为普通文本
+    // Typing right after a text/block-ref/file-annotation-ref/a element should produce plain text
     private escapeInline(protyle: IProtyle, range: Range, event: InputEvent) {
         if (!event.data && event.inputType !== "insertLineBreak") {
             return;
@@ -219,7 +219,7 @@ export class WYSIWYG {
 
         let dataLength = inputData.length;
         if (inputData === "<" || inputData === ">") {
-            // 使用 inlineElement.innerHTML 会出现 https://ld246.com/article/1627185027423 中的第2个问题
+            // Using inlineElement.innerHTML causes the second issue described in https://ld246.com/article/1627185027423
             dataLength = 4;
         } else if (inputData === "&") {
             // https://github.com/siyuan-note/siyuan/issues/12239
@@ -239,7 +239,7 @@ export class WYSIWYG {
             range.collapse(false);
             return;
         }
-        if (// 表格行内公式之前无法插入文字 https://github.com/siyuan-note/siyuan/issues/3908
+        if (// Can't insert text right before an inline formula in a table https://github.com/siyuan-note/siyuan/issues/3908
             inlineElement.tagName === "SPAN" &&
             inlineElement.textContent !== inputData &&
             !currentTypes.includes("search-mark") &&    // https://github.com/siyuan-note/siyuan/issues/7586
@@ -254,7 +254,7 @@ export class WYSIWYG {
             const position = getSelectionOffset(inlineElement, protyle.wysiwyg.element, range);
             const html = inlineElement.innerHTML;
             if (position.start === inlineElement.textContent.length) {
-                // 使用 inlineElement.textContent **$a$b** 中数学公式消失
+                // Using inlineElement.textContent causes the math formula in **$a$b** to disappear
                 inlineElement.innerHTML = html.substr(0, html.length - dataLength);
                 const textNode = document.createTextNode(inputData);
                 inlineElement.after(textNode);
@@ -312,7 +312,8 @@ export class WYSIWYG {
             const selectImgElement = nodeElement.querySelector(".img--select");
             const selectAVElement = nodeElement.querySelector(".av__row--select, .av__cell--select");
             const selectTableElement = nodeElement.querySelector(".table__select")?.clientWidth > 0;
-            // 表格内跨多单元格的文本选区：range.cloneContents() 会产出残缺的 td/tr 片段，需要重建合法 table
+            // A text selection spanning multiple table cells: range.cloneContents() produces broken td/tr
+            // fragments, so a valid table needs to be rebuilt
             let selectTableRange = false;
             let tableRangeElement: HTMLElement = null;
             let tableRangeStartCell: HTMLElement = null;
@@ -344,7 +345,7 @@ export class WYSIWYG {
             if (selectElements.length > 0) {
                 const isRefText = selectElements[0].getAttribute("data-reftext") === "true";
                 if (selectElements[0].getAttribute("data-type") === "NodeListItem" &&
-                    selectElements[0].parentElement.classList.contains("list") &&   // 反链复制列表项 https://github.com/siyuan-note/siyuan/issues/6555
+                    selectElements[0].parentElement.classList.contains("list") &&   // copying a list item from the backlink panel https://github.com/siyuan-note/siyuan/issues/6555
                     selectElements[0].parentElement.childElementCount - 1 === selectElements.length) {
                     const hasNoLiElement = selectElements.find(item => {
                         if (!selectElements[0].parentElement.contains(item)) {
@@ -358,7 +359,8 @@ export class WYSIWYG {
                 let listHTML = "";
                 for (let i = 0; i < selectElements.length; i++) {
                     const item = selectElements[i] as HTMLElement;
-                    // 复制列表项中的块会变为复制列表项，因此不能使用 getTopAloneElement https://github.com/siyuan-note/siyuan/issues/8925
+                    // Copying a block inside a list item would turn it into a copied list item, so
+                    // getTopAloneElement can't be used here https://github.com/siyuan-note/siyuan/issues/8925
                     if (isRefText) {
                         html += getTextStar(item) + "\n\n";
                     } else {
@@ -440,8 +442,9 @@ export class WYSIWYG {
                 const scrollTop = nodeElement.querySelector("table").scrollTop;
                 const tableSelectElement = nodeElement.querySelector(".table__select") as HTMLElement;
                 const tableElement = nodeElement.querySelector("table");
-                // 通过框选几何范围确定 startCell/endCell，复用 getTableRangeHTML 的网格映射逻辑
-                //（它会正确保留 thead/tbody、补齐 fn__none 占位、重新计算 colspan/rowspan）
+                // Determine startCell/endCell from the rubber-band selection's geometry, reusing
+                // getTableRangeHTML's grid-mapping logic
+                // (it correctly preserves thead/tbody, fills in fn__none placeholders, and recalculates colspan/rowspan)
                 let startCell: HTMLElement = null;
                 let endCell: HTMLElement = null;
                 const allCells = Array.from(tableElement.querySelectorAll("th, td")) as HTMLElement[];
@@ -463,8 +466,10 @@ export class WYSIWYG {
                 }
                 textPlain = protyle.lute.HTML2Md(html);
             } else if (selectTableRange) {
-                // 表格内跨多单元格的文本选区：按网格映射重建合法 table，重新计算 colspan/rowspan。
-                // 后续统一构建 NodeTable BlockDOM，不经过 markdown 往返（GFM 表格只有单行表头）
+                // A text selection spanning multiple table cells: rebuild a valid table via grid mapping and
+                // recalculate colspan/rowspan.
+                // The NodeTable BlockDOM is then built directly, without a markdown round trip (GFM tables only
+                // support a single header row)
                 const tableElement = tableRangeElement.querySelector("table");
                 html = getTableRangeHTML(tableElement, tableRangeStartCell, tableRangeEndCell);
                 textPlain = protyle.lute.HTML2Md(html);
@@ -478,16 +483,16 @@ export class WYSIWYG {
                 if ((selectTypes.length > 0 && spanElement && spanElement.textContent.replace(Constants.ZWSP, "") === range.toString()) ||
                     matchHeading) {
                     if (matchHeading) {
-                        // 复制标题 https://github.com/siyuan-note/insider/issues/297
+                        // Copying a heading https://github.com/siyuan-note/insider/issues/297
                         tempElement.append(headingElement.cloneNode(true));
                         // https://github.com/siyuan-note/siyuan/issues/13232
                         headingElement.removeAttribute("fold");
                     } else if (!["DIV", "TD", "TH", "TR"].includes(range.startContainer.parentElement.tagName)) {
-                        // 复制行内元素 https://github.com/siyuan-note/insider/issues/191
+                        // Copying an inline element https://github.com/siyuan-note/insider/issues/191
                         tempElement.append(range.startContainer.parentElement.cloneNode(true));
                         this.emojiToMd(tempElement);
                     } else {
-                        // 直接复制块 https://github.com/siyuan-note/insider/issues/318
+                        // Copying a block directly https://github.com/siyuan-note/insider/issues/318
                         tempElement.append(range.cloneContents());
                         this.emojiToMd(tempElement);
                     }
@@ -495,12 +500,12 @@ export class WYSIWYG {
                     textPlain = range.toString();
                 } else if (selectImgElement) {
                     html = selectImgElement.outerHTML;
-                    // 和图片菜单中的复制保持一致
+                    // Keep this consistent with the copy action in the image menu
                     textPlain = protyle.lute.BlockDOM2StdMd(html).replace(/%20/g, " ");
                 } else if (selectTypes.length > 0 && range.startContainer.nodeType === 3 &&
                     range.startContainer.parentElement.tagName === "SPAN" &&
                     range.startContainer.parentElement === range.endContainer.parentElement) {
-                    // 复制粗体等字体中的一部分
+                    // Copying part of a styled span such as bold text
                     const attributes = range.startContainer.parentElement.attributes;
                     const spanElement = document.createElement("span");
                     for (let i = 0; i < attributes.length; i++) {
@@ -508,7 +513,7 @@ export class WYSIWYG {
                     }
                     if (spanElement.getAttribute("data-type").indexOf("block-ref") > -1 &&
                         spanElement.getAttribute("data-subtype") === "d") {
-                        // 需变为静态锚文本
+                        // Needs to become static anchor text
                         spanElement.setAttribute("data-subtype", "s");
                     }
                     spanElement.textContent = range.toString();
@@ -519,12 +524,12 @@ export class WYSIWYG {
                     this.emojiToMd(tempElement);
                     const inlineMathElement = hasClosestByAttribute(range.commonAncestorContainer, "data-type", "inline-math");
                     if (inlineMathElement) {
-                        // 表格内复制数学公式 https://ld246.com/article/1631708573504
+                        // Copying a math formula inside a table https://ld246.com/article/1631708573504
                         html = inlineMathElement.outerHTML;
                     } else {
                         html = tempElement.innerHTML;
                     }
-                    // 不能使用 commonAncestorContainer https://ld246.com/article/1643282894693
+                    // commonAncestorContainer can't be used here https://ld246.com/article/1643282894693
                     textPlain = tempElement.textContent;
                     if (hasClosestByAttribute(range.startContainer, "data-type", "NodeCodeBlock")) {
                         if (isEndOfBlock(range)) {
@@ -565,12 +570,16 @@ export class WYSIWYG {
 
             if (!isInCodeBlock) {
                 enableLuteMarkdownSyntax(protyle);
-                // 表格选区（框选或跨多单元格文本选区）直接构建 BlockDOM，不走 HTML2BlockDOM 的 markdown 往返
-                //（GFM 表格只有单行表头，markdown 往返会丢失多行 thead 和单元格 th 属性）
+                // A table selection (rubber-band or multi-cell text selection) builds the BlockDOM directly,
+                // bypassing HTML2BlockDOM's markdown round trip
+                // (GFM tables only support a single header row; a markdown round trip would lose a multi-row
+                // thead and cell th attributes)
                 let textSiyuan: string;
                 if (selectTableElement || selectTableRange) {
-                    // 表格选区：html 已是合法 <table>...</table>（含 thead/tbody/fn__none 占位），
-                    // 构建最小化 NodeTable BlockDOM，不经过 markdown 往返（GFM 表格只有单行表头，往返会丢失多行 thead）
+                    // Table selection: html is already a valid <table>...</table> (including thead/tbody and
+                    // fn__none placeholders), so build a minimal NodeTable BlockDOM without a markdown round
+                    // trip (GFM tables only support a single header row, and a round trip would lose a
+                    // multi-row thead)
                     const newId = Lute.NewNodeID();
                     textSiyuan = `<div data-node-id="${newId}" data-type="NodeTable" class="table"><div contenteditable="true" spellcheck="false">${html}<div class="protyle-action__table"><div class="table__resize"></div><div class="table__select"></div></div></div><div class="protyle-attr" contenteditable="false">\u200b</div></div>`;
                     html = textSiyuan;
@@ -579,7 +588,7 @@ export class WYSIWYG {
                 }
                 event.clipboardData.setData("text/siyuan", textSiyuan);
                 restoreLuteMarkdownSyntax(protyle);
-                // 在 text/html 中插入注释节点，用于右键菜单粘贴时获取 text/siyuan 数据
+                // Insert a comment node into text/html, used to retrieve text/siyuan data when pasting via the context menu
                 const textHTML = `<!--data-siyuan='${encodeBase64(textSiyuan)}'-->` + removeZWJ((selectTableElement || selectTableRange) ? html : protyle.lute.BlockDOM2HTML(selectAVElement ? textPlain : html));
                 event.clipboardData.setData("text/html", textHTML);
                 if (needClipboardWrite) {
@@ -603,7 +612,7 @@ export class WYSIWYG {
             }
             protyle.wysiwyg.element.classList.remove("protyle-wysiwyg--hiderange");
             if (event.button === 2) {
-                // 右键
+                // Right click
                 return;
             }
             const documentSelf = document;
@@ -615,11 +624,12 @@ export class WYSIWYG {
             if (event.shiftKey) {
                 let startElement;
                 let endElement = nodeElement;
-                // Electron 更新后 shift 向上点击获取的 range 不为上一个位置的 https://github.com/siyuan-note/siyuan/issues/9334
+                // After an Electron update, the range obtained from a shift-click upward is no longer the
+                // previous position https://github.com/siyuan-note/siyuan/issues/9334
                 if (getSelection().rangeCount > 0) {
                     startElement = hasClosestBlock(getSelection().getRangeAt(0).startContainer) as HTMLElement;
                 }
-                // shift 多选
+                // Shift multi-select
                 if (!hasSelectClassElement && galleryItemElement) {
                     galleryItemElement.classList.add("av__gallery-item--select");
                     let sideElement = galleryItemElement.previousElementSibling;
@@ -650,7 +660,7 @@ export class WYSIWYG {
                             break;
                         }
                     }
-                    // 锚点卡片及范围内卡片统一选中并同步虚拟滚动选中快照
+                    // Select the anchor card together with cards within range, and sync the virtual-scroll selection snapshot
                     const shiftSelectItems = [galleryItemElement].concat(previousList as HTMLElement[]).concat(nextList as HTMLElement[]);
                     shiftSelectItems.forEach(item => {
                         item.classList.add("av__gallery-item--select");
@@ -669,7 +679,7 @@ export class WYSIWYG {
                     let startTop = startRect.top;
                     let endTop = endRect.top;
                     if (startTop === endTop) {
-                        // 横排 https://ld246.com/article/1663036247544
+                        // Side-by-side layout https://ld246.com/article/1663036247544
                         startTop = startRect.left;
                         endTop = endRect.left;
                     }
@@ -693,7 +703,8 @@ export class WYSIWYG {
                             const currentRect = currentElement.getBoundingClientRect();
                             if (startRect.top === endRect.top ? (currentRect.left <= endTop) : (currentRect.top <= endTop)) {
                                 if (hasJump) {
-                                    // 父节点的下个节点在选中范围内才可使用父节点作为选中节点
+                                    // The parent node can only be used as the selected node if the parent's
+                                    // next sibling is within the selected range
                                     if (currentElement.nextElementSibling && !currentElement.nextElementSibling.classList.contains("protyle-attr")) {
                                         const currentNextRect = currentElement.nextElementSibling.getBoundingClientRect();
                                         if (startRect.top === endRect.top ?
@@ -719,7 +730,7 @@ export class WYSIWYG {
                                     currentElement = currentElement.nextElementSibling as HTMLElement;
                                 }
                             } else if (currentElement.parentElement.classList.contains("sb")) {
-                                // 跳出超级块横向排版中的未选中元素
+                                // Skip past unselected elements in a row-layout superblock
                                 currentElement = hasClosestBlock(currentElement.parentElement) as HTMLElement;
                                 hasJump = true;
                             } else {
@@ -733,7 +744,7 @@ export class WYSIWYG {
                     if (selectElements.length === 1 && !selectElements[0].classList.contains("list") &&
                         !selectElements[0].classList.contains("bq") && !selectElements[0].classList.contains("callout") &&
                         !selectElements[0].classList.contains("sb")) {
-                        // 单个 p 不选中
+                        // Don't select a single p
                     } else {
                         const ids: string[] = [];
                         if (!hasSelectClassElement && protyle.scroll && !protyle.scroll.element.classList.contains("fn__none") && !protyle.scroll.keepLazyLoad &&
@@ -744,7 +755,7 @@ export class WYSIWYG {
                             if (!hasClosestByClassName(item, "protyle-wysiwyg--select")) {
                                 item.classList.add("protyle-wysiwyg--select");
                                 ids.push(item.getAttribute("data-node-id"));
-                                // 清除选中的子块 https://ld246.com/article/1667826582251
+                                // Clear the selection on child blocks https://ld246.com/article/1667826582251
                                 item.querySelectorAll(".protyle-wysiwyg--select").forEach(subItem => {
                                     subItem.classList.remove("protyle-wysiwyg--select");
                                 });
@@ -845,11 +856,11 @@ export class WYSIWYG {
             const mostBottom = protyleRect.bottom;
             const y = event.clientY;
             const contentRect = protyle.contentElement.getBoundingClientRect();
-            // 超级块横向布局下拖拽调整子块宽度
+            // Dragging to resize child-block widths in a row-layout superblock
             if (!protyle.disabled && target.classList.contains("sb__resize")) {
                 const sbElement = target.parentElement;
                 const previousElement = target.previousElementSibling as HTMLElement;
-                // 取手柄右侧的下一个块（跳过手柄等装饰元素）
+                // Take the next block to the right of the handle (skip over decorative elements such as the handle)
                 let nextElement = target.nextElementSibling as HTMLElement;
                 while (nextElement && !nextElement.hasAttribute("data-node-id")) {
                     nextElement = nextElement.nextElementSibling as HTMLElement;
@@ -864,11 +875,12 @@ export class WYSIWYG {
                 };
                 const x = event.clientX;
                 const sbWidth = sbElement.clientWidth;
-                // 使用 getBoundingClientRect 获取精确浮点宽度，避免 clientWidth（整数取整）作为
-                // 拖拽起始值带入累积误差
+                // Use getBoundingClientRect to get the precise floating-point width, avoiding clientWidth
+                // (which rounds to an integer) as the drag starting value and introducing cumulative error
                 const oldLeftWidth = previousElement.getBoundingClientRect().width;
                 const oldRightWidth = nextElement.getBoundingClientRect().width;
-                // 读取手柄实际占用宽度（width + margin），这才是子块间的真实间距，用于 calc 补偿避免换行
+                // Read the handle's actual occupied width (width + margin) -- this is the real gap between child
+                // blocks, used to compensate in the calc() expression and avoid wrapping
                 const handleStyle = getComputedStyle(target);
                 const gapPx = target.offsetWidth + parseFloat(handleStyle.marginLeft) + parseFloat(handleStyle.marginRight);
                 const minWidth = 20;
@@ -876,7 +888,7 @@ export class WYSIWYG {
                 previousElement.style.webkitUserModify = "read-only";
                 // @ts-ignore
                 nextElement.style.webkitUserModify = "read-only";
-                // 为所有子块创建右上角百分比提示
+                // Create a top-right percentage tooltip for every child block
                 const sbChildren = Array.from(sbElement.querySelectorAll(":scope > [data-node-id]")) as HTMLElement[];
                 const gapHalve = gapPx / 2 + 1;
                 const tips: { el: HTMLElement, child: HTMLElement }[] = [];
@@ -887,9 +899,11 @@ export class WYSIWYG {
                     child.appendChild(tip);
                     tips.push({el: tip, child});
                 });
-                // 份额池：每个子块占 100 的份额（一位小数），总和恒为 100
-                // 从子块实测宽度按比例分配，与 calc 百分比无关（calc 含 gap 补偿，坐标系不同）
-                // 最大余数法取整确保总和精确 = 100，拖拽中实时更新两侧份额
+                // Share pool: each child block gets a share out of 100 (one decimal place), and the total is
+                // always exactly 100. Shares are allocated proportionally from each child's measured width,
+                // independent of the calc() percentage (calc includes gap compensation, a different coordinate
+                // system). The largest-remainder method rounds so the total is exactly 100, and the two sides'
+                // shares are updated live during the drag.
                 const rawPcts = sbChildren.map(child => child.getBoundingClientRect().width);
                 const totalWidth = rawPcts.reduce((s, w) => s + w, 0) || 1;
                 const scaled = rawPcts.map(w => w / totalWidth * 1000);
@@ -908,17 +922,17 @@ export class WYSIWYG {
                         el.textContent = `${(shares[i] / 10).toFixed(1)}%`;
                     });
                 };
-                // 记录最终拖拽宽度，供 mouseup 精确计算百分比，避免从 clientWidth（整数取整）
-                // 反推导致每次拖拽累积误差
+                // Record the final drag width so mouseup can compute the percentage precisely, instead of
+                // deriving it from clientWidth (rounded to an integer), which would accumulate error on every drag
                 let finalLeft = oldLeftWidth;
                 let finalRight = oldRightWidth;
                 updateTips();
                 documentSelf.onmousemove = (moveEvent: MouseEvent) => {
-                    // 左右两块等量交换宽度，不影响其他子块
+                    // The left and right blocks trade width equally, without affecting other child blocks
                     const delta = moveEvent.clientX - x;
                     let newLeftWidth = oldLeftWidth + delta;
                     let newRightWidth = oldRightWidth - delta;
-                    // 限制最小宽度，避免塌陷
+                    // Enforce a minimum width to prevent collapsing
                     if (newLeftWidth < minWidth) {
                         newLeftWidth = minWidth;
                         newRightWidth = oldLeftWidth + oldRightWidth - minWidth;
@@ -933,8 +947,9 @@ export class WYSIWYG {
                     previousElement.style.flex = "none";
                     nextElement.style.width = newRightWidth + "px";
                     nextElement.style.flex = "none";
-                    // 更新份额池：左块份额 = 当前宽度 / 子块总宽度 × 1000，右块 = 1000 - 左块 - 其他块份额
-                    // 分母用子块宽度之和（不含手柄），与 mousedown 初始化一致
+                    // Update the share pool: left share = current width / total child width x 1000, right =
+                    // 1000 - left - other blocks' shares. The denominator uses the sum of child-block widths
+                    // (excluding handles), consistent with the mousedown initialization
                     const newLeftShare = Math.max(1, Math.round(newLeftWidth / totalWidth * 1000));
                     const othersSum = shares.reduce((s, p, i) => i === leftIdx || i === rightIdx ? s : s + p, 0);
                     shares[leftIdx] = newLeftShare;
@@ -944,7 +959,7 @@ export class WYSIWYG {
                 documentSelf.onmouseup = (mouseupEvent) => {
                     tips.forEach(({child, el}) => {
                         el.remove();
-                        // 还原 position（若子块原本无 position 则清除）
+                        // Restore position (clear it if the child block originally had none)
                         if (!child.getAttribute("style") || child.style.position === "relative") {
                             child.style.position = "";
                         }
@@ -958,16 +973,19 @@ export class WYSIWYG {
                     documentSelf.ondragstart = null;
                     documentSelf.onselectstart = null;
                     documentSelf.onselect = null;
-                    // 仅点击未拖拽，不产生 transaction，避免无意义的更新
+                    // A click without dragging shouldn't produce a transaction, to avoid a meaningless update
                     if (Math.abs(x - mouseupEvent.clientX) <= 0) {
                         return;
                     }
-                    // 只调整左右两块（手柄两侧），其他子块不动，避免影响未拖拽的块
-                    // 使用 mousemove 记录的精确实时宽度（finalLeft/finalRight）反推百分比，
-                    // gapHalve 已含 +1px 余量防止亚像素换行，无需再用 *99 缩放（会造成累积收缩）
+                    // Only adjust the two blocks on either side of the handle; other child blocks stay put, so
+                    // undragged blocks aren't affected.
+                    // Derive the percentage from the precise live width recorded during mousemove
+                    // (finalLeft/finalRight); gapHalve already includes a +1px margin to prevent subpixel
+                    // wrapping, so there's no need to scale by *99 again (which would cause cumulative shrinkage)
                     let leftPct = Math.round((finalLeft + gapHalve) / sbWidth * 1000) / 10;
                     let rightPct = Math.round((finalRight + gapHalve) / sbWidth * 1000) / 10;
-                    // 防溢出：两块百分比之和超过 99.5% 时等比压缩到 99%，留 1% 缓冲防换行
+                    // Overflow guard: if the two percentages sum to more than 99.5%, scale them proportionally
+                    // down to 99%, leaving a 1% buffer to prevent wrapping
                     const sumPct = leftPct + rightPct;
                     if (sumPct > 99.5) {
                         const scale = 99 / sumPct;
@@ -979,7 +997,7 @@ export class WYSIWYG {
                     nextElement.style.width = `calc(${rightPct}% - ${gapHalve}px)`;
                     previousElement.setAttribute("updated", updated);
                     nextElement.setAttribute("updated", updated);
-                    // 合并为单个 transaction，确保撤销时两侧宽度同时恢复
+                    // Merge into a single transaction, so undo restores both sides' widths together
                     transaction(protyle, [
                         {
                             action: "update",
@@ -1192,7 +1210,7 @@ export class WYSIWYG {
                 };
                 return false;
             }
-            // 图片、iframe、video、挂件缩放
+            // Resizing an image, iframe, video, or widget
             if (!protyle.disabled && target.classList.contains("protyle-action__drag")) {
                 if (!nodeElement) {
                     return;
@@ -1222,7 +1240,7 @@ export class WYSIWYG {
                 if (dragElement.tagName === "IMG") {
                     img3115(imgElement);
                 }
-                // 3.4.1 以前历史数据兼容
+                // Compatibility with legacy data from before 3.4.1
                 if (dragElement.tagName === "IFRAME") {
                     dragElement.style.height = "";
                     dragElement.style.width = "";
@@ -1286,7 +1304,7 @@ export class WYSIWYG {
                     }
                     event.stopPropagation();
                 }
-                // 后续拖拽操作写在多选节点中
+                // Subsequent drag operations are written into the multi-select node
             }
             // table col resize
             if (!protyle.disabled && target.classList.contains("table__resize")) {
@@ -1306,12 +1324,12 @@ export class WYSIWYG {
                 const x = event.clientX;
                 const colIndex = parseInt(target.getAttribute("data-col-index"));
                 const colElement = nodeElement.querySelectorAll("table col")[colIndex] as HTMLElement;
-                // 清空初始化 table 时的最小宽度
+                // Clear the minimum width set when the table was initialized
                 if (colElement.style.minWidth) {
                     colElement.style.width = (nodeElement.querySelectorAll("table td, table th")[colIndex] as HTMLElement).offsetWidth + "px";
                     colElement.style.minWidth = "";
                 }
-                // 移除 cell 上的宽度限制 https://github.com/siyuan-note/siyuan/issues/7795
+                // Remove the width constraint on cells https://github.com/siyuan-note/siyuan/issues/7795
                 nodeElement.querySelectorAll("tr").forEach((trItem: HTMLTableRowElement) => {
                     trItem.cells[colIndex].style.width = "";
                 });
@@ -1342,8 +1360,9 @@ export class WYSIWYG {
                 return;
             }
 
-            // 多选节点
-            // 起点落在内容区域外的 padding 上时，需用内容区内的坐标定位起始块
+            // Multi-select node
+            // When the starting point lands on padding outside the content area, use a coordinate inside the
+            // content area to locate the starting block
             let fromOutsideX: number;
             if (event.clientX > mostRight) {
                 fromOutsideX = mostRight - 10;
@@ -1351,10 +1370,12 @@ export class WYSIWYG {
                 fromOutsideX = mostLeft + 10;
             }
             const lastRect = protyle.wysiwyg.element.lastElementChild.getBoundingClientRect();
-            // 起点落在 padding 外或块间空白（target 为 wysiwyg 容器本身）时，需用 elementFromPoint 定位起始块
+            // When the starting point lands outside the padding or in the whitespace between blocks (target is
+            // the wysiwyg container itself), use elementFromPoint to locate the starting block
             if (fromOutsideX !== undefined || target.classList.contains("protyle-wysiwyg")) {
                 const startX = fromOutsideX !== undefined ? fromOutsideX : event.clientX;
-                // 块间缝隙或 wysiwyg padding 较大（如打字机模式）时，需沿 y 轴循环探测直到命中块
+                // When there's a gap between blocks or large wysiwyg padding (e.g. typewriter mode), probe
+                // repeatedly along the y-axis until a block is hit
                 nodeElement = hasClosestBlock(document.elementFromPoint(startX, event.clientY)) as HTMLElement;
                 if (!nodeElement) {
                     const probe = (step: number, limit: number) => {
@@ -1374,7 +1395,9 @@ export class WYSIWYG {
                     }
                 }
             }
-            // 落点是否在块外（padding/缝隙），此时 nodeElement 为探测所得，向上划选的遍历终点应用落点 y 而非 nodeElement 边
+            // Whether the drop point is outside a block (padding/gap); in that case nodeElement was found via
+            // probing, so an upward rubber-band selection's traversal endpoint should use the drop point's y,
+            // not nodeElement's edge
             const startOutsideBlock = fromOutsideX !== undefined || target.classList.contains("protyle-wysiwyg");
             if (!nodeElement) {
                 const breadElement = hasClosestByClassName(target, "protyle-breadcrumb__item");
@@ -1389,7 +1412,8 @@ export class WYSIWYG {
                 item.style.pointerEvents = "none";
             });
             const needScroll = ["IMG", "VIDEO", "AUDIO"].includes(target.tagName) || target.classList.contains("img");
-            // 容器类元素判断（划选时 elementFromPoint 命中它们的边缘/空白需继续探测子块）
+            // Check for container-type elements (when a rubber-band selection's elementFromPoint hits their edge/
+            // whitespace, probing needs to continue into their child blocks)
             const isContainer = (el: Element) => el.classList.contains("protyle-wysiwyg") || el.classList.contains("list") ||
                 el.classList.contains("li") || el.classList.contains("sb") ||
                 el.classList.contains("callout") || el.classList.contains("bq");
@@ -1475,8 +1499,10 @@ export class WYSIWYG {
                         moveCellElement = undefined;
                     }
                 }
-                // 在包含 img， video， audio 的元素上划选后无法上下滚动 https://ld246.com/article/1681778773806
-                // 在包含 img， video， audio 的元素上拖拽无法划选 https://github.com/siyuan-note/siyuan/issues/11763
+                // Can't scroll up/down after a rubber-band selection on an element containing img/video/audio
+                // https://ld246.com/article/1681778773806
+                // Can't rubber-band select while dragging on an element containing img/video/audio
+                // https://github.com/siyuan-note/siyuan/issues/11763
                 if (needScroll) {
                     if (moveEvent.clientY < contentRect.top + Constants.SIZE_SCROLL_TB || moveEvent.clientY > contentRect.bottom - Constants.SIZE_SCROLL_TB) {
                         protyle.contentElement.scroll({
@@ -1489,7 +1515,7 @@ export class WYSIWYG {
                     return;
                 }
                 protyle.selectElement.classList.remove("fn__none");
-                // 向左选择，遇到 gutter 就不会弹出 toolbar
+                // Selecting leftward: the toolbar won't pop up once it reaches the gutter
                 hideElements(["gutter"], protyle);
                 const selectStartY = nodeElement.getBoundingClientRect().top;
                 let newTop = 0;
@@ -1497,31 +1523,31 @@ export class WYSIWYG {
                 let newWidth = 0;
                 let newHeight = 0;
                 if (moveEvent.clientX < event.clientX) {
-                    // 向左：左边缘跟随鼠标，右边缘固定为起点
+                    // Leftward: the left edge follows the mouse, the right edge stays fixed at the start point
                     newLeft = Math.max(moveEvent.clientX, wysiwygRect.left);
                     newWidth = Math.min(event.clientX, wysiwygRect.right) - newLeft;
                 } else {
-                    // 向右：左边缘固定为起点，右边缘跟随鼠标
+                    // Rightward: the left edge stays fixed at the start point, the right edge follows the mouse
                     newLeft = Math.max(event.clientX, wysiwygRect.left);
                     newWidth = Math.min(moveEvent.clientX, wysiwygRect.right) - newLeft;
                 }
 
                 if (moveEvent.clientY > y) {
                     if (moveEvent.clientY > mostBottom) {
-                        // 向下越界
+                        // Went out of bounds downward
                         newTop = y;
                         newHeight = mostBottom - y;
                     } else {
-                        // 向下
+                        // Downward
                         newTop = y;
                         newHeight = moveEvent.clientY - y;
                     }
                 } else {
                     if (moveEvent.clientY < mostTop) {
-                        // 向上越界
+                        // Went out of bounds upward
                         newTop = mostTop;
                     } else {
-                        // 向上
+                        // Upward
                         newTop = moveEvent.clientY;
                     }
                     newHeight = y - newTop;
@@ -1534,21 +1560,25 @@ export class WYSIWYG {
                 if (mouseElement && mouseElement === newMouseElement && !mouseElement.classList.contains("protyle-wysiwyg") &&
                     !mouseElement.classList.contains("list") && !mouseElement.classList.contains("bq") &&
                     !mouseElement.classList.contains("sb") && !mouseElement.classList.contains("callout")) {
-                    // 性能优化，同一个p元素不进行选中计算
+                    // Performance optimization: skip the selection calculation for the same p element
                     return;
                 } else {
                     mouseElement = newMouseElement;
                 }
                 hideElements(["select"], protyle);
-                // 块选择判定用的右边界需落在内容区，避免矩形右边缘在 padding 内时选不中块
+                // The right boundary used for block-selection testing must land inside the content area, or a
+                // block won't be selected when the rectangle's right edge is within the padding
                 const selectRight = Math.max(newLeft + newWidth, mostLeft);
-                // 向上划选时以 nodeElement 的实时边作为遍历终点（兼容滚动 https://github.com/siyuan-note/siyuan/issues/14664）；
-                // 落点在缝隙/padding 时 nodeElement 为探测所得的块，其边会超出落点 y 导致误选，故以落点 y 为终点
+                // For an upward rubber-band selection, use nodeElement's live edge as the traversal endpoint
+                // (this stays correct across scrolling https://github.com/siyuan-note/siyuan/issues/14664);
+                // when the drop point is in a gap/padding, nodeElement was found via probing and its edge would
+                // extend past the drop point's y, causing an incorrect selection, so use the drop point's y instead
                 const startBlockRect = nodeElement.getBoundingClientRect();
                 const selectBottom = moveEvent.clientY <= selectStartY
                     ? (startOutsideBlock ? y : startBlockRect.bottom)
                     : (newTop + newHeight);
-                // newLeft 落在 padding 内时 elementFromPoint 会命中 wysiwyg 容器，需钳制到内容区
+                // When newLeft lands within the padding, elementFromPoint would hit the wysiwyg container, so
+                // clamp it into the content area
                 const detectX = Math.max(mostLeft, Math.min(newLeft, mostRight));
                 let firstElement;
                 if (moveEvent.clientY > selectStartY) {
@@ -1559,14 +1589,17 @@ export class WYSIWYG {
                 if (!firstElement) {
                     return;
                 }
-                // 向上划选且落点在 padding/缝隙时，elementFromPoint 易命中 wysiwyg 容器或容器类元素，
-                // 需沿 y 轴循环向下探测以定位到实际块，避免回退到文档首块导致误选上部所有块
+                // For an upward rubber-band selection where the drop point is in padding/a gap, elementFromPoint
+                // easily hits the wysiwyg container or a container-type element, so probe repeatedly downward
+                // along the y-axis to locate the actual block, avoiding a fallback to the document's first
+                // block that would incorrectly select everything above
                 if (moveEvent.clientY <= selectStartY && isContainer(firstElement)) {
                     let probeY = newTop;
                     while (probeY < selectBottom) {
                         probeY += 8;
                         const probeElement = document.elementFromPoint(detectX, probeY);
-                        // 命中非容器元素或容器块（list/sb 等 hasClosestBlock 可识别）即采用
+                        // Accept it once a non-container element or a container block (list/sb etc, recognizable
+                        // via hasClosestBlock) is hit
                         if (probeElement && (!isContainer(probeElement) || hasClosestBlock(probeElement))) {
                             firstElement = probeElement;
                             break;
@@ -1592,7 +1625,7 @@ export class WYSIWYG {
                 let currentElement: Element | boolean = firstBlockElement;
 
                 if (currentElement) {
-                    // 从下往上划选遇到嵌入块时，选中整个嵌入块
+                    // When a bottom-to-top rubber-band selection hits an embed block, select the whole embed block
                     const embedElement = isInEmbedBlock(currentElement);
                     if (embedElement) {
                         currentElement = embedElement;
@@ -1605,7 +1638,8 @@ export class WYSIWYG {
                         const currentRect = currentElement.getBoundingClientRect();
                         if (currentRect.height > 0 && currentRect.top < selectBottom && currentRect.left < selectRight) {
                             if (hasJump) {
-                                // 父节点的下个节点在选中范围内才可使用父节点作为选中节点
+                                // The parent node can only be used as the selected node if the parent's
+                                // next sibling is within the selected range
                                 if (currentElement.nextElementSibling && !currentElement.nextElementSibling.classList.contains("protyle-attr")) {
                                     const nextRect = currentElement.nextElementSibling.getBoundingClientRect();
                                     if (nextRect.top < selectBottom && nextRect.left < selectRight) {
@@ -1635,7 +1669,7 @@ export class WYSIWYG {
                                 }
                             }
                         } else if (currentElement.parentElement.classList.contains("sb")) {
-                            // 跳出超级块横向排版中的未选中元素
+                            // Skip past unselected elements in a row-layout superblock
                             currentElement = hasClosestBlock(currentElement.parentElement);
                             hasJump = true;
                         } else if (currentRect.height === 0 && currentRect.width === 0 && currentElement.parentElement.getAttribute("fold") === "1") {
@@ -1652,7 +1686,8 @@ export class WYSIWYG {
                 if (selectElements.length === 1 && !selectElements[0].classList.contains("list") &&
                     !selectElements[0].classList.contains("bq") && !selectElements[0].classList.contains("callout") &&
                     !selectElements[0].classList.contains("sb")) {
-                    // 只有一个 p 时不选中，用 data 属性标记未选中状态（矩形视觉保持可见）
+                    // Don't select when there's only one p; mark the unselected state with a data attribute
+                    // (the rectangle stays visible)
                     protyle.selectElement.setAttribute("data-empty", "true");
                     protyle.wysiwyg.element.classList.remove("protyle-wysiwyg--hiderange");
                 } else {
@@ -1672,8 +1707,10 @@ export class WYSIWYG {
                 documentSelf.ondragstart = null;
                 documentSelf.onselectstart = null;
                 documentSelf.onselect = null;
-                // 多选表格单元格后，选择菜单中的居左，然后 shift+左 选中的文字无法显示选中背景，因此需移除
-                // 多选块后 shift+左 选中的文字无法显示选中背景，因此需移除
+                // After multi-selecting table cells, choosing "align left" from the menu and then shift+left
+                // selecting text fails to show the selection background, so this needs to be removed
+                // After multi-selecting blocks, shift+left selecting text fails to show the selection
+                // background, so this needs to be removed
                 protyle.wysiwyg.element.classList.remove("protyle-wysiwyg--hiderange");
                 this.element.querySelectorAll("iframe").forEach(item => {
                     item.style.pointerEvents = "";
@@ -1706,7 +1743,7 @@ export class WYSIWYG {
                                         let isTBody = false;
                                         tableBlockElement.querySelectorAll("th, td").forEach((item: HTMLTableCellElement, index: number) => {
                                             if (item.classList.contains("fn__none")) {
-                                                // 合并的元素中间有 fn__none 的元素
+                                                // There's an fn__none element in the middle of the merged elements
                                                 if (item.previousElementSibling && item.previousElementSibling === selectCellElements[selectCellElements.length - 1]) {
                                                     selectCellElements.push(item);
                                                     if (!isTHead && item.parentElement.parentElement.tagName === "THEAD") {
@@ -1800,7 +1837,7 @@ export class WYSIWYG {
                                             }
                                         }
 
-                                        // 合并背景色不会修改，需要等计算完毕
+                                        // The merged background color doesn't get updated immediately; wait for the calculation to finish
                                         setTimeout(() => {
                                             if (tableBlockElement) {
                                                 selectCellElements[0].innerHTML = (html.replace(/<br>$/, "") || "<br>") + "<wbr>";
@@ -2025,14 +2062,14 @@ export class WYSIWYG {
                     ids.push(item.getAttribute("data-node-id"));
                 });
                 countBlockWord(ids);
-                // 划选后不能存在跨块的 range https://github.com/siyuan-note/siyuan/issues/4473
+                // No range spanning multiple blocks may exist after a rubber-band selection https://github.com/siyuan-note/siyuan/issues/4473
                 if (getSelection().rangeCount > 0) {
                     const range = getSelection().getRangeAt(0);
                     if (range.toString() === "" ||
                         window.siyuan.shiftIsPressed  // https://ld246.com/article/1650096678723
                     ) {
                         if (event.detail > 2) {
-                            // table 前或最后一个 cell 三击状态不对
+                            // Triple-click state is wrong before a table or on the last cell
                             let cursorElement = hasClosestBlock(range.startContainer) as Element;
                             if (cursorElement) {
                                 if (cursorElement.nextElementSibling?.classList.contains("table")) {
@@ -2060,10 +2097,10 @@ export class WYSIWYG {
                     const startBlockElement = hasClosestBlock(range.startContainer);
                     let endBlockElement: false | HTMLElement;
                     if (mouseUpEvent.detail > 2 && range.endContainer.nodeType !== 3 && ["DIV", "TD", "TH"].includes((range.endContainer as HTMLElement).tagName) && range.endOffset === 0) {
-                        // 三击选中段落块时，rangeEnd 会在下一个块
+                        // When triple-clicking to select a paragraph block, rangeEnd ends up in the next block
                         if ((range.endContainer as HTMLElement).classList.contains("protyle-attr") && startBlockElement) {
-                            // 三击在悬浮层中会选择到 attr https://github.com/siyuan-note/siyuan/issues/4636
-                            // 需要获取可编辑元素，使用 previousElementSibling 的话会 https://github.com/siyuan-note/siyuan/issues/9714
+                            // Triple-clicking inside a hover layer can select the attr element https://github.com/siyuan-note/siyuan/issues/4636
+                            // Need to get the contenteditable element; using previousElementSibling would cause https://github.com/siyuan-note/siyuan/issues/9714
                             setLastNodeRange(getContenteditableElement(startBlockElement), range, false);
                         } else if (["TD", "TH"].includes((range.endContainer as HTMLElement).tagName)) {
                             const cellElement = hasClosestByTag(range.startContainer, "TH") || hasClosestByTag(range.startContainer, "TD");
@@ -2090,7 +2127,7 @@ export class WYSIWYG {
     }
 
     private bindEvent(protyle: IProtyle) {
-        // 删除块时，av 头尾需重新计算位置
+        // When a block is deleted, the av header/footer positions need to be recalculated
         protyle.observer = new ResizeObserver(() => {
             protyle.wysiwyg.element.querySelectorAll(".av").forEach((item: HTMLElement) => {
                 if (item.querySelector(".av__scroll")) {
@@ -2129,7 +2166,7 @@ export class WYSIWYG {
                 event.preventDefault();
                 return;
             }
-            // https://github.com/siyuan-note/siyuan/issues/17800 不能删除
+            // https://github.com/siyuan-note/siyuan/issues/17800 cannot be deleted
             const embedElement = isInEmbedBlock(nodeElement);
             if (embedElement && !embedElement.classList.contains("protyle-wysiwyg--select")) {
                 event.stopPropagation();
@@ -2141,7 +2178,8 @@ export class WYSIWYG {
             const selectImgElement = nodeElement.querySelector(".img--select");
             const selectAVElement = nodeElement.querySelector(".av__row--select, .av__cell--select");
             const selectTableElement = nodeElement.querySelector(".table__select")?.clientWidth > 0;
-            // 表格内跨多单元格的文本选区：range.cloneContents() 会产出残缺的 td/tr 片段，需要重建合法 table
+            // A text selection spanning multiple table cells: range.cloneContents() produces broken td/tr
+            // fragments, so a valid table needs to be rebuilt
             let selectTableRange = false;
             let tableRangeElement: HTMLElement = null;
             let tableRangeStartCell: HTMLElement = null;
@@ -2172,7 +2210,7 @@ export class WYSIWYG {
             let needClipboardWrite = false;
             if (selectElements.length > 0) {
                 if (selectElements[0].getAttribute("data-type") === "NodeListItem" &&
-                    selectElements[0].parentElement.classList.contains("list") &&   // 反链复制列表项 https://github.com/siyuan-note/siyuan/issues/6555
+                    selectElements[0].parentElement.classList.contains("list") &&   // copying a list item from the backlink panel https://github.com/siyuan-note/siyuan/issues/6555
                     selectElements[0].parentElement.childElementCount - 1 === selectElements.length) {
                     const hasNoLiElement = selectElements.find(item => {
                         if (!selectElements[0].parentElement.contains(item)) {
@@ -2223,7 +2261,7 @@ export class WYSIWYG {
                 const nextElement = getNextBlock(selectElements[selectElements.length - 1]);
                 removeBlock(protyle, nodeElement, range, "remove");
                 if (nextElement) {
-                    // Ctrl+X 剪切后光标应跳到下一行行首 https://github.com/siyuan-note/siyuan/issues/5485
+                    // After Ctrl+X cuts, the caret should jump to the start of the next line https://github.com/siyuan-note/siyuan/issues/5485
                     focusBlock(nextElement);
                 }
             } else if (selectAVElement) {
@@ -2257,7 +2295,8 @@ export class WYSIWYG {
                 const oldHTML = nodeElement.outerHTML;
                 nodeElement.querySelector("wbr")?.remove();
                 nodeElement.setAttribute("updated", dayjs().format("YYYYMMDDHHmmss"));
-                // 用 getTableRangeHTML 重建合法表格（与 copy 一致），同时清空选区内单元格内容
+                // Rebuild a valid table with getTableRangeHTML (consistent with copy), and clear the content of
+                // the cells within the selection
                 if (selectCellElements.length > 0) {
                     html = getTableRangeHTML(tableElement, selectCellElements[0], selectCellElements[selectCellElements.length - 1]);
                 } else {
@@ -2273,7 +2312,7 @@ export class WYSIWYG {
                 setInsertWbrHTML(nodeElement, range, protyle);
                 const oldHTML = protyle.wysiwyg.lastHTMLs[id] || nodeElement.outerHTML;
                 const tempElement = document.createElement("div");
-                // 首次选中标题时，range.startContainer 会为空
+                // When a heading is selected for the first time, range.startContainer can be empty
                 let startContainer = range.startContainer;
                 if (startContainer.nodeType === 3 && startContainer.textContent === "") {
                     const nextSibling = hasNextSibling(range.startContainer);
@@ -2287,11 +2326,11 @@ export class WYSIWYG {
                     headElement.firstElementChild.innerHTML = "";
                 } else if (range.toString() !== "" && startContainer === range.endContainer &&
                     range.startContainer.nodeType === 3 &&
-                    // 需使用 wholeText https://github.com/siyuan-note/siyuan/issues/14339
+                    // wholeText must be used here https://github.com/siyuan-note/siyuan/issues/14339
                     range.endOffset === (range.endContainer as Text).wholeText.length &&
                     range.startOffset === 0 &&
                     !["DIV", "TD", "TH", "TR"].includes(range.startContainer.parentElement.tagName)) {
-                    // 选中整个内联元素
+                    // The entire inline element is selected
                     tempElement.append(range.startContainer.parentElement);
                     textPlain = tempElement.textContent;
                 } else if (selectImgElement) {
@@ -2299,7 +2338,7 @@ export class WYSIWYG {
                 } else if (range.startContainer.nodeType === 3 && range.startContainer.parentElement.tagName === "SPAN" &&
                     range.startContainer.parentElement.getAttribute("data-type") &&
                     range.startContainer.parentElement === range.endContainer.parentElement) {
-                    // 剪切粗体等字体中的一部分
+                    // Cutting part of a styled span such as bold text
                     const spanElement = range.startContainer.parentElement;
                     const attributes = spanElement.attributes;
                     const newSpanElement = document.createElement("span");
@@ -2308,7 +2347,7 @@ export class WYSIWYG {
                     }
                     if (spanElement.getAttribute("data-type").indexOf("block-ref") > -1 &&
                         spanElement.getAttribute("data-subtype") === "d") {
-                        // 引用被剪切后需变为静态锚文本
+                        // A reference needs to become static anchor text once cut
                         newSpanElement.setAttribute("data-subtype", "s");
                         spanElement.setAttribute("data-subtype", "s");
                     }
@@ -2322,20 +2361,23 @@ export class WYSIWYG {
                         const tableScrollTop = nodeElement.firstElementChild.scrollTop;
                         const contentScrollTop = protyle.contentElement.scrollTop;
                         if (selectTableRange) {
-                            // 表格内跨多单元格的文本选区：按网格映射重建合法 table，重新计算 colspan/rowspan。
-                            // 必须在 extractContents 删除原内容前计算，否则 getBoundingClientRect 拿不到原始位置
+                            // A text selection spanning multiple table cells: rebuild a valid table via grid
+                            // mapping and recalculate colspan/rowspan.
+                            // This must be computed before extractContents removes the original content,
+                            // otherwise getBoundingClientRect can't get the original positions
                             const tableElement = tableRangeElement.querySelector("table");
                             const newTableHTML = getTableRangeHTML(tableElement, tableRangeStartCell, tableRangeEndCell);
-                            // 放入 tempElement 以便后续 html = tempElement.innerHTML 取用（裸 table，后续统一包 BlockDOM）
+                            // Put it into tempElement so html = tempElement.innerHTML can use it later (a bare
+                            // table, to be wrapped in a BlockDOM consistently afterward)
                             tempElement.innerHTML = newTableHTML;
                             textPlain = protyle.lute.HTML2Md(newTableHTML);
-                            // 删除选区内容并修复表格 DOM
+                            // Delete the selection's content and repair the table DOM
                             const wbrElement = document.createElement("wbr");
                             range.insertNode(wbrElement);
                             range.setStartAfter(wbrElement);
                             range.extractContents();
                         } else {
-                            // 表格内多格子 cut https://github.com/siyuan-note/siyuan/issues/564
+                            // Cutting multiple cells within a table https://github.com/siyuan-note/siyuan/issues/564
                             const wbrElement = document.createElement("wbr");
                             range.insertNode(wbrElement);
                             range.setStartAfter(wbrElement);
@@ -2345,7 +2387,7 @@ export class WYSIWYG {
                         nodeElement = protyle.wysiwyg.element.querySelector(`[data-node-id="${id}"]`) as HTMLElement;
                         mathRender(nodeElement);
                         focusByWbr(nodeElement, range);
-                        // SpinBlockDOM 替换整张表格后，恢复旧表格的内外层滚动位置
+                        // After SpinBlockDOM replaces the whole table, restore the old table's inner/outer scroll positions
                         if (tableScrollLeft > 0) {
                             nodeElement.firstElementChild.scrollLeft = tableScrollLeft;
                         }
@@ -2359,7 +2401,7 @@ export class WYSIWYG {
                     } else {
                         const inlineMathElement = hasClosestByAttribute(range.commonAncestorContainer, "data-type", "inline-math");
                         if (inlineMathElement) {
-                            // 表格内剪切数学公式 https://ld246.com/article/1631708573504
+                            // Cutting a math formula inside a table https://ld246.com/article/1631708573504
                             tempElement.append(inlineMathElement);
                         } else {
                             tempElement.append(range.cloneContents());
@@ -2386,9 +2428,9 @@ export class WYSIWYG {
                             }
                             range.deleteContents();
                             if (parentElement) {
-                                // 引用文本剪切 https://ld246.com/article/1647689760545
-                                // 表格多行剪切 https://ld246.com/article/1652603836350
-                                // 自定义表情的段落剪切后表情丢失 https://ld246.com/article/1668781478724
+                                // Cutting reference text https://ld246.com/article/1647689760545
+                                // Cutting multiple table rows https://ld246.com/article/1652603836350
+                                // A custom emoji is lost after cutting a paragraph containing it https://ld246.com/article/1668781478724
                                 Array.from(parentElement.children).forEach(item => {
                                     if (item.textContent === "" && (item.nodeType === 1 && !["BR", "IMG"].includes(item.tagName))) {
                                         item.remove();
@@ -2420,14 +2462,14 @@ export class WYSIWYG {
                     highlightRender(nodeElement);
                 }
                 if (nodeElement.parentElement.parentElement && !nodeElement.classList.contains("av")) {
-                    // 选中 heading 时，使用删除的 transaction
+                    // When a heading is selected, use the delete transaction
                     setInsertWbrHTML(nodeElement, range, protyle);
                     updateTransaction(protyle, nodeElement, oldHTML);
                 }
             }
             protyle.hint.render(protyle);
             if (!selectAVElement) {
-                textPlain = textPlain || protyle.lute.BlockDOM2StdMd(html).trimEnd(); // 需要 trimEnd，否则 \n 会导致 https://github.com/siyuan-note/siyuan/issues/6218
+                textPlain = textPlain || protyle.lute.BlockDOM2StdMd(html).trimEnd(); // trimEnd is required, otherwise a trailing \n causes https://github.com/siyuan-note/siyuan/issues/6218
                 if (nodeElement.classList.contains("table")) {
                     textPlain = textPlain.replace(/<br>/g, "\n").replace(/<br\/>/g, "\n");
                     textPlain = textPlain.endsWith("\n") ? textPlain.replace(/\n$/, "") : textPlain;
@@ -2438,10 +2480,12 @@ export class WYSIWYG {
 
             if (!isInCodeBlock) {
                 enableLuteMarkdownSyntax(protyle);
-                // 表格选区（框选或跨多单元格文本选区）直接构建 BlockDOM，不走 HTML2BlockDOM 的 markdown 往返
+                // A table selection (rubber-band or multi-cell text selection) builds the BlockDOM directly,
+                // bypassing HTML2BlockDOM's markdown round trip
                 let textSiyuan: string;
                 if (selectTableElement || selectTableRange) {
-                    // 表格选区：html 已是合法 <table>...</table>，构建最小化 NodeTable BlockDOM，不走 markdown 往返
+                    // Table selection: html is already a valid <table>...</table>, so build a minimal NodeTable
+                    // BlockDOM without a markdown round trip
                     const newId = Lute.NewNodeID();
                     textSiyuan = `<div data-node-id="${newId}" data-type="NodeTable" class="table"><div contenteditable="true" spellcheck="false">${html}<div class="protyle-action__table"><div class="table__resize"></div><div class="table__select"></div></div></div><div class="protyle-attr" contenteditable="false">\u200b</div></div>`;
                     html = textSiyuan;
@@ -2450,7 +2494,7 @@ export class WYSIWYG {
                 }
                 restoreLuteMarkdownSyntax(protyle);
                 event.clipboardData.setData("text/siyuan", textSiyuan);
-                // 在 text/html 中插入注释节点，用于右键菜单粘贴时获取 text/siyuan 数据
+                // Insert a comment node into text/html, used to retrieve text/siyuan data when pasting via the context menu
                 const textHTML = `<!--data-siyuan='${encodeBase64(textSiyuan)}'-->` + removeZWJ((selectTableElement || selectTableRange) ? html : protyle.lute.BlockDOM2HTML(selectAVElement ? textPlain : html));
                 event.clipboardData.setData("text/html", textHTML);
                 if (needClipboardWrite) {
@@ -2477,7 +2521,7 @@ export class WYSIWYG {
             const y = event.clientY || event.detail.y;
             const selectElements = protyle.wysiwyg.element.querySelectorAll(".protyle-wysiwyg--select");
             if (selectElements.length > 1) {
-                // 多选块
+                // Multi-selected blocks
                 hideElements(["util"], protyle);
                 protyle.gutter.renderMenu(protyle, selectElements[0]);
                 window.siyuan.menus.menu.popup({x, y});
@@ -2552,7 +2596,7 @@ export class WYSIWYG {
                     }
                 }
             }
-            // 在 span 前面，防止单元格哪 block-ref 被修改
+            // Before the span check, to prevent a block-ref within a cell from being modified
             const avRowElement = hasClosestByClassName(target, "av__row");
             if (avRowElement && avContextmenu(protyle, avRowElement, {
                 x: event.clientX,
@@ -2605,7 +2649,7 @@ export class WYSIWYG {
                 }
                 if (types.includes("block-ref")) {
                     refMenu(protyle, target);
-                    // 阻止 popover
+                    // Prevent the popover
                     target.setAttribute("prevent-popover", "true");
                     setTimeout(() => {
                         target.removeAttribute("prevent-popover");
@@ -2624,7 +2668,7 @@ export class WYSIWYG {
                     linkMenu(protyle, target);
                     if (window.siyuan.config.editor.floatWindowMode === 0 &&
                         target.getAttribute("data-href")?.startsWith("siyuan://blocks")) {
-                        // 阻止 popover
+                        // Prevent the popover
                         target.setAttribute("prevent-popover", "true");
                         setTimeout(() => {
                             target.removeAttribute("prevent-popover");
@@ -2705,7 +2749,8 @@ export class WYSIWYG {
         this.element.addEventListener("mousewheel", (event: WheelEvent) => {
             hideTooltip();
             // https://ld246.com/article/1648865235549
-            // 不能使用上一版本的 timeStamp，否则一直滚动将导致间隔不够 https://ld246.com/article/1662852664926
+            // The previous event's timeStamp can't be reused, otherwise continuous scrolling would end up with
+            // too short an interval https://ld246.com/article/1662852664926
             if (!preventGetTopHTML && !protyle.scroll.element.classList.contains("fn__none")) {
                 if (event.deltaY < 0 && protyle.wysiwyg.element.firstElementChild.getAttribute("data-eof") !== "1" &&
                     (protyle.contentElement.clientHeight === protyle.contentElement.scrollHeight || protyle.contentElement.scrollTop === 0)) {
@@ -2796,17 +2841,22 @@ export class WYSIWYG {
             paste(protyle, event);
         });
 
-        // 输入法测试点 https://github.com/siyuan-note/siyuan/issues/3027
+        // IME test point https://github.com/siyuan-note/siyuan/issues/3027
         let isComposition = false; // for iPhone
-        // 记录组合开始时的光标位置，用于取消组合后恢复光标（输入法删空候选词触发 compositionend 时浏览器会把光标移出可编辑单元格）
+        // Record the caret position when composition starts, to restore the caret after composition is
+        // canceled (when an IME deletes an empty candidate and fires compositionend, the browser can move the
+        // caret out of the editable cell)
         let compositionRange: { cell: HTMLElement; offset: number };
         this.element.addEventListener("compositionstart", (event) => {
             isComposition = true;
-            // 微软双拼由于 focusByRange 导致无法输入文字，因此不再 keydown 中记录了，但 keyup 会记录拼音字符，因此使用 isComposition 阻止 keyup 记录。
-            // 但搜狗输入法选中后继续输入不走 keydown，isComposition 阻止了 keyup 记录，因此需在此记录。
+            // Microsoft Shuangpin can't input text via focusByRange, so it's no longer recorded on keydown, but
+            // keyup does record the pinyin characters, so isComposition is used to block the keyup recording.
+            // However, Sogou IME doesn't go through keydown when continuing to type after a selection, and
+            // isComposition blocks the keyup recording, so it needs to be recorded here instead.
             const range = getEditorRange(protyle.wysiwyg.element);
             const nodeElement = hasClosestBlock(range.startContainer);
-            // 记录组合开始时光标所在的可编辑单元格与偏移，供取消组合时恢复光标
+            // Record the editable cell and offset the caret was in when composition started, so the caret can
+            // be restored if composition is canceled
             if (nodeElement) {
                 const startCell = hasClosestByTag(range.startContainer, "TD") || hasClosestByTag(range.startContainer, "TH");
                 if (startCell) {
@@ -2836,9 +2886,9 @@ export class WYSIWYG {
             }
             if ("" !== event.data) {
                 this.escapeInline(protyle, range, event);
-                // 小鹤音形 ;k 不能使用 setTimeout;
-                // wysiwyg.element contenteditable 为 false 时，连拼 needRender 必须为 false
-                // hr 渲染；任务列表、粗体、数学公示结尾 needRender 必须为 true
+                // Xiaohe Shuangpin's ";k" can't use setTimeout;
+                // when wysiwyg.element's contenteditable is false, needRender must be false during continuous typing
+                // needRender must be true for hr rendering, and at the end of a task list/bold text/math formula
                 input(protyle, blockElement, range, true);
             } else {
                 const id = blockElement.getAttribute("data-node-id");
@@ -2888,7 +2938,7 @@ export class WYSIWYG {
                 protyle.hint.enableExtend = true;
             }
             if (event.isComposing || isComposition ||
-                // https://github.com/siyuan-note/siyuan/issues/337 编辑器内容拖拽问题
+                // https://github.com/siyuan-note/siyuan/issues/337 dragging content within the editor
                 event.inputType === "deleteByDrag" || event.inputType === "insertFromDrop"
             ) {
                 return;
@@ -2896,11 +2946,11 @@ export class WYSIWYG {
             this.escapeInline(protyle, range, event);
 
             if ((/^\d{1}$/.test(event.data) || event.data === "‘" || event.data === "“" ||
-                // 百度输入法中文反双引号 https://github.com/siyuan-note/siyuan/issues/9686
+                // Baidu IME's reversed Chinese double quote https://github.com/siyuan-note/siyuan/issues/9686
                 event.data === "”" ||
                 event.data === "「")) {
                 this.scheduleInput(() => {
-                    input(protyle, blockElement, range, true); // 搜狗拼音数字后面句号变为点；Mac 反向双引号无法输入
+                    input(protyle, blockElement, range, true); // Sogou Pinyin turns a period into a dot after a digit; a reversed double quote can't be typed on Mac
                 });
             } else {
                 if (isMac() && event.data === "【】") {
@@ -2925,9 +2975,10 @@ export class WYSIWYG {
                 event.key !== "Meta" && event.key !== "Alt" && event.key !== "Control" && event.key !== "CapsLock" &&
                 !event.ctrlKey && !event.shiftKey && !event.metaKey && !event.altKey &&
                 !/^F\d{1,2}$/.test(event.key)) {
-                // 搜狗输入法不走 keydown，没有选中字符后不走 compositionstart，需重新记录历史状态
+                // Sogou IME doesn't go through keydown, and without a selected character it doesn't go through
+                // compositionstart either, so the history state needs to be re-recorded here
                 if (!isMac() && nodeElement &&
-                    // 微软双拼 keyup 会记录拼音字符，因此在 compositionstart 记录
+                    // Microsoft Shuangpin's keyup records the pinyin characters, so it's recorded on compositionstart instead
                     !isComposition &&
                     (typeof protyle.wysiwyg.lastHTMLs[nodeElement.getAttribute("data-node-id")] === "undefined" || range.toString() !== "" || !this.preventKeyup)) {
                     setInsertWbrHTML(nodeElement, range, protyle);
@@ -2936,14 +2987,14 @@ export class WYSIWYG {
                 return;
             }
 
-            // 需放在 lastHTMLs 后，否则 https://github.com/siyuan-note/siyuan/issues/4388
+            // This must come after the lastHTMLs recording, otherwise https://github.com/siyuan-note/siyuan/issues/4388
             if (this.preventKeyup) {
                 this.preventKeyup = false;
                 return;
             }
 
             if ((event.shiftKey || isOnlyMeta(event)) && !event.isComposing && range.toString() !== "") {
-                // 工具栏
+                // Toolbar
                 protyle.toolbar.render(protyle, range, event);
                 countSelectWord(range);
             }
@@ -2973,7 +3024,7 @@ export class WYSIWYG {
                 event.stopPropagation();
             }
 
-            // 按下方向键后块高亮跟随光标移动 https://github.com/siyuan-note/siyuan/issues/8918
+            // After pressing an arrow key, the block highlight follows the caret https://github.com/siyuan-note/siyuan/issues/8918
             if ((event.key === "ArrowLeft" || event.key === "ArrowRight") &&
                 nodeElement && !nodeElement.classList.contains("protyle-wysiwyg--select")) {
                 const selectElements = Array.from(protyle.wysiwyg.element.querySelectorAll(".protyle-wysiwyg--select"));
@@ -3000,12 +3051,12 @@ export class WYSIWYG {
                 return;
             }
             const target = event.target as HTMLElement;
-            // 双击超级块拖拽手柄，均分所有列宽
+            // Double-clicking a superblock's drag handle divides all column widths equally
             if (target.classList.contains("sb__resize")) {
                 const doOperations: IOperation[] = [];
                 const undoOperations: IOperation[] = [];
                 Array.from(target.parentElement.children).forEach((item: HTMLElement) => {
-                    // 没有任何子块设过 width，无需重置
+                    // No child block has ever had a width set, so there's nothing to reset
                     if (!item.style.width && !item.style.flex) {
                         return;
                     }
@@ -3075,7 +3126,7 @@ export class WYSIWYG {
                         loadBreadcrumb(protyle, backlinkBreadcrumbItemElement);
                     }
                 } else {
-                    // 引用标题时的更多加载
+                    // Load more when referencing a heading
                     getBacklinkHeadingMore(backlinkBreadcrumbItemElement);
                 }
                 /// #else
@@ -3097,7 +3148,7 @@ export class WYSIWYG {
                     item.querySelector(".table__select").removeAttribute("style");
                 }
                 if (tableElement && tableElement === item && item.querySelector(".table__select").getAttribute("style")) {
-                    // 防止合并单元格的菜单消失
+                    // Prevent the merge-cell menu from disappearing
                     event.stopPropagation();
                 }
             });
@@ -3108,7 +3159,8 @@ export class WYSIWYG {
                 }
             }
             const range = getEditorRange(this.element);
-            // 面包屑定位，需至于前，否则 return 的元素就无法进行面包屑定位
+            // Breadcrumb positioning needs to happen first, otherwise an element that triggers an early return
+            // below would never get breadcrumb positioning
             if (protyle.options.render.breadcrumb) {
                 protyle.breadcrumb.render(protyle, false, hasClosestBlock(range.startContainer));
             }
@@ -3118,9 +3170,10 @@ export class WYSIWYG {
                 range.startContainer.parentElement.classList.contains("code-block")) {
                 setFirstNodeRange(range.startContainer.parentElement.querySelector(".hljs").lastElementChild, range);
             }
-            // 需放在嵌入块之前，否则嵌入块内的引用、链接、pdf 双链无法点击打开 https://ld246.com/article/1630479789513
+            // This must come before the embed-block check, otherwise references/links/PDF cross-references
+            // inside an embed block can't be clicked open https://ld246.com/article/1630479789513
             const aElement = hasClosestByAttribute(event.target, "data-type", "a") ||
-                hasClosestByClassName(event.target, "av__celltext--url");   // 数据库中资源文件、链接、电话、邮箱单元格
+                hasClosestByClassName(event.target, "av__celltext--url");   // asset/link/phone/email cells in the database
             let aLink = aElement ? (aElement.getAttribute("data-href") || "") : "";
             if (aElement && !aLink && aElement.classList.contains("av__celltext--url")) {
                 aLink = aElement.textContent.trim();
@@ -3154,7 +3207,7 @@ export class WYSIWYG {
                         refBlockId = aLink.substring(16, 38);
                     }
                     checkFold(refBlockId, (zoomIn, action, isRoot) => {
-                        // 块引用跳转后需要短暂高亮目标块 https://github.com/siyuan-note/siyuan/issues/11542
+                        // The target block needs a brief highlight after jumping via a block reference https://github.com/siyuan-note/siyuan/issues/11542
                         if (!isRoot) {
                             action.push(Constants.CB_GET_HL);
                         }
@@ -3204,7 +3257,7 @@ export class WYSIWYG {
                     });
                     /// #if !MOBILE
                     if (protyle.model) {
-                        // 打开双链需记录到后退中 https://github.com/siyuan-note/insider/issues/801
+                        // Opening a cross-reference needs to be recorded into the back-navigation history https://github.com/siyuan-note/insider/issues/801
                         let blockElement: HTMLElement | false;
                         if (blockRefElement) {
                             blockElement = hasClosestBlock(blockRefElement);
@@ -3249,7 +3302,7 @@ export class WYSIWYG {
             if (aElement &&
                 // https://github.com/siyuan-note/siyuan/issues/11980
                 (event.shiftKey || range.toString() === "") &&
-                // 如果aLink 为空时，当 data-type="a inline-math" 可继续后续操作
+                // If aLink is empty, processing can continue when data-type="a inline-math"
                 aLink) {
                 event.stopPropagation();
                 event.preventDefault();
@@ -3454,7 +3507,10 @@ export class WYSIWYG {
                 return;
             }
 
-            // 需放在属性后，否则数学公式无法点击属性；需放在 action 后，否则嵌入块的的 action 无法打开；需放在嵌入块后，否则嵌入块中的数学公式会被打开
+            // This must come after the attribute check, otherwise clicking an attribute on a math formula
+            // wouldn't work; it must come after the action check, otherwise an embed block's action couldn't be
+            // opened; it must come after the embed-block check, otherwise a math formula inside an embed block
+            // would get opened instead
             const mathElement = hasClosestByAttribute(event.target, "data-subtype", "math");
             if (!event.shiftKey && !ctrlIsPressed && mathElement && !protyle.disabled) {
                 protyle.toolbar.showRender(protyle, mathElement);
@@ -3475,9 +3531,9 @@ export class WYSIWYG {
                 } else if (actionElement.parentElement.classList.contains("li")) {
                     const actionId = actionElement.parentElement.getAttribute("data-node-id");
                     if (event.altKey && !protyle.disabled) {
-                        // 展开/折叠当前层级的所有列表项
+                        // Expand/fold all list items at the current level
                         if (actionElement.parentElement.parentElement.classList.contains("protyle-wysiwyg")) {
-                            // 缩放列表项 https://ld246.com/article/1653123034794
+                            // Zoom into the list item https://ld246.com/article/1653123034794
                             setFold(protyle, actionElement.parentElement);
                         } else {
                             let hasFold = true;
@@ -3545,7 +3601,7 @@ export class WYSIWYG {
                     }
                     range.collapse(true);
                     focusByRange(range);
-                    // 需等待 range 更新再次进行渲染
+                    // Must wait for the range to update before rendering again
                     if (protyle.options.render.breadcrumb) {
                         protyle.breadcrumb.render(protyle);
                     }
@@ -3640,9 +3696,9 @@ export class WYSIWYG {
             }
 
             setTimeout(() => {
-                // 选中后，在选中的文字上点击需等待 range 更新
+                // After a selection, clicking on the selected text needs to wait for the range to update
                 let newRange = getEditorRange(this.element);
-                // 表格中点击两侧或间隙导致光标跳转到开头 https://github.com/siyuan-note/siyuan/issues/16179
+                // Clicking the sides or gaps within a table causes the caret to jump to the start https://github.com/siyuan-note/siyuan/issues/16179
                 if (event.target.classList.contains("protyle-wysiwyg") || event.target.parentElement.classList.contains("table")) {
                     const rect = this.element.getBoundingClientRect();
                     let rangeElement = document.elementFromPoint(rect.left + rect.width / 2, event.clientY);
@@ -3694,12 +3750,13 @@ export class WYSIWYG {
                 pushBack(protyle, newRange);
                 /// #endif
                 mobileBlur = false;
-            }, (isMobile() || isInIOS()) ? 520 : 0); // Android/iPad 双击慢了出不来
+            }, (isMobile() || isInIOS()) ? 520 : 0); // Double-click is slow to register on Android/iPad
 
             protyle.hint.enableExtend = false;
 
             if (this.element.querySelector(".protyle-wysiwyg--select") && range.toString() !== "") {
-                // 选中块后，文字不能被选中。需在 shift click 之后，防止shift点击单个块出现文字选中
+                // Text must not be selectable once a block is selected. This must come after the shift-click
+                // handling, to prevent text from appearing selected when shift-clicking a single block
                 range.collapse(false);
                 focusByRange(range);
             }

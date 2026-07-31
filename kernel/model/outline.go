@@ -47,7 +47,7 @@ func (tx *Transaction) doMoveOutlineHeading(operation *Operation) (ret *TxErr) {
 	}
 
 	if ast.NodeDocument != heading.Parent.Type {
-		// 仅支持文档根节点下第一层标题，不支持容器块内标题
+		// Only top-level headings directly under the document root are supported, not headings inside container blocks
 		util.PushMsg(Conf.language(240), 5000)
 		return
 	}
@@ -69,14 +69,14 @@ func (tx *Transaction) doMoveOutlineHeading(operation *Operation) (ret *TxErr) {
 		}
 
 		if ast.NodeDocument != previousHeading.Parent.Type {
-			// 仅支持文档根节点下第一层标题，不支持容器块内标题
+			// Only top-level headings directly under the document root are supported, not headings inside container blocks
 			util.PushMsg(Conf.language(248), 5000)
 			return
 		}
 
 		for _, h := range headingChildren {
 			if h.ID == previousID {
-				// 不能移动到自己的子标题下
+				// Cannot move a heading under its own child heading
 				util.PushMsg(Conf.language(241), 5000)
 				return
 			}
@@ -91,7 +91,7 @@ func (tx *Transaction) doMoveOutlineHeading(operation *Operation) (ret *TxErr) {
 		}
 
 		for _, h := range headingChildren {
-			if h.ID == targetNode.ID { // 目标节点是当前标题的子节点
+			if h.ID == targetNode.ID { // the target node is a child of the current heading
 				targetNode = heading.Previous
 			}
 		}
@@ -120,14 +120,14 @@ func (tx *Transaction) doMoveOutlineHeading(operation *Operation) (ret *TxErr) {
 		}
 
 		if ast.NodeDocument != parentHeading.Parent.Type {
-			// 仅支持文档根节点下第一层标题，不支持容器块内标题
+			// Only top-level headings directly under the document root are supported, not headings inside container blocks
 			util.PushMsg(Conf.language(248), 5000)
 			return
 		}
 
 		for _, h := range headingChildren {
 			if h.ID == parentID {
-				// 不能移动到自己的子标题下
+				// Cannot move a heading under its own child heading
 				util.PushMsg(Conf.language(241), 5000)
 				return
 			}
@@ -137,7 +137,7 @@ func (tx *Transaction) doMoveOutlineHeading(operation *Operation) (ret *TxErr) {
 
 		targetNode := parentHeading
 		parentHeadingChildren := treenode.HeadingChildren(parentHeading)
-		// 找到下方第一个非标题节点
+		// Find the first non-heading node below
 		var tmp []*ast.Node
 		for _, child := range parentHeadingChildren {
 			if ast.NodeHeading == child.Type {
@@ -172,7 +172,7 @@ func (tx *Transaction) doMoveOutlineHeading(operation *Operation) (ret *TxErr) {
 	} else {
 		generateOpTypeHistory(tree, HistoryOpOutline)
 
-		// 移到第一个标题前
+		// Move before the first heading
 		var firstHeading *ast.Node
 		for n := tree.Root.FirstChild; nil != n; n = n.Next {
 			if ast.NodeHeading == n.Type {
@@ -208,7 +208,8 @@ func Outline(rootID string, preview bool) (ret []*Path, err error) {
 	return OutlineInBox(rootID, preview, "")
 }
 
-// OutlineInBox 与 Outline 一致，但按 boxID 路由 blocktree 查询到加密 db 或全局 db。
+// OutlineInBox behaves the same as Outline, but routes the blocktree query by boxID to either the
+// encrypted db or the global db.
 func OutlineInBox(rootID string, preview bool, boxID string) (ret []*Path, err error) {
 	FlushTxQueue()
 
@@ -240,7 +241,7 @@ func OutlineInBox(rootID string, preview bool, boxID string) (ret []*Path, err e
 
 	storage, _ := GetOutlineStorage(rootID)
 	if nil == storage || 0 == len(storage) {
-		// 默认全部展开
+		// Expand everything by default
 		for _, p := range ret {
 			p.Folded = false
 			for _, b := range p.Blocks {
@@ -253,7 +254,7 @@ func OutlineInBox(rootID string, preview bool, boxID string) (ret []*Path, err e
 	}
 
 	if nil != storage["expandIds"] {
-		// 先全部折叠，后面再根据展开 ID 列表展开对应标题
+		// Collapse everything first, then expand the corresponding headings according to the expand ID list
 		for _, p := range ret {
 			p.Folded = true
 			for _, b := range p.Blocks {

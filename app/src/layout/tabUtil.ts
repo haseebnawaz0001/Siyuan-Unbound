@@ -81,7 +81,7 @@ export const setTabPosition = (onlyPadding = false, onlyClear = false) => {
                 if (headerRect.right < toolbarDragRect.right && headerRect.right === centerRect.right) {
                     toolbarDragElement.style.setProperty("--b3-toolbar-drag-right", toolbarDragRect.right - headerRect.right + "px");
                 } else if (headerRect.right > toolbarDragRect.right) {
-                    // 不能取 clientWidth，因为设置了 min-width(64) 导致 clientWidth 大于实际宽度
+                    // clientWidth cannot be used here, because min-width(64) is set, which makes clientWidth larger than the actual width
                     if (headerRect.right - toolbarDragRect.right + 64 > headerRect.width) {
                         headerElement.style.visibility = "hidden";
                     } else {
@@ -141,19 +141,19 @@ export const switchTabByIndex = (index: number) => {
     if (activeDockIcoElement) {
         let indexElement = activeDockIcoElement.parentElement.children[index];
         if (index === -1) {
-            // 最后一个
+            // The last one
             indexElement = activeDockIcoElement.parentElement.lastElementChild;
             if (!indexElement.getAttribute("data-type")) {
                 indexElement = indexElement.previousElementSibling;
             }
         } else if (index === -2) {
-            // 上一个
+            // The previous one
             indexElement = activeDockIcoElement.previousElementSibling;
             if (!indexElement) {
                 indexElement = activeDockIcoElement.parentElement.lastElementChild;
             }
         } else if (index === -3) {
-            // 下一个
+            // The next one
             indexElement = activeDockIcoElement.nextElementSibling;
             if (!indexElement) {
                 indexElement = activeDockIcoElement.parentElement.firstElementChild;
@@ -169,16 +169,16 @@ export const switchTabByIndex = (index: number) => {
     if (tab) {
         let indexElement = tab.parent.headersElement.children[index];
         if (index === -1) {
-            // 最后一个
+            // The last one
             indexElement = tab.parent.headersElement.lastElementChild;
         } else if (index === -2) {
-            // 上一个
+            // The previous one
             indexElement = tab.headElement.previousElementSibling;
             if (!indexElement) {
                 indexElement = tab.headElement.parentElement.lastElementChild;
             }
         } else if (index === -3) {
-            // 下一个
+            // The next one
             indexElement = tab.headElement.nextElementSibling;
             if (!indexElement) {
                 indexElement = tab.headElement.parentElement.firstElementChild;
@@ -194,8 +194,8 @@ export const switchTabByIndex = (index: number) => {
 let resizeTimeout: number;
 export const resizeTabs = (isSaveLayout = true) => {
     clearTimeout(resizeTimeout);
-    //  .layout .fn__flex-shrink {width .15s cubic-bezier(0, 0, .2, 1) 0ms} 时需要再次计算 padding
-    // PDF 避免分屏多次调用后，页码跳转到1 https://github.com/siyuan-note/siyuan/issues/5646
+    //  padding needs to be recalculated for .layout .fn__flex-shrink {width .15s cubic-bezier(0, 0, .2, 1) 0ms}
+    // For PDF, avoid the page jumping back to 1 after multiple calls from splitting the screen https://github.com/siyuan-note/siyuan/issues/5646
     resizeTimeout = window.setTimeout(() => {
         const models = getAllModels();
         models.editor.forEach((item) => {
@@ -479,7 +479,7 @@ export const closeTabByType = (tab: Tab, type: "closeOthers" | "closeAll" | "oth
             }
         }
     }
-    // 批量更新文档关闭时间
+    // Batch-update the document close time
     if (rootIDs.length > 0) {
         fetchPost("/api/storage/batchUpdateRecentDocCloseTime", {rootIDs});
     }

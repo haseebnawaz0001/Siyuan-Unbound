@@ -38,7 +38,8 @@ import (
 	"github.com/siyuan-note/siyuan/kernel/util"
 )
 
-// InsertAssetBytes 将内存中的资源直接写入目标文档资源目录，避免生成内容经过明文临时文件。
+// InsertAssetBytes writes an in-memory asset directly into the target document's assets directory, avoiding
+// generated content passing through a plaintext temp file.
 func InsertAssetBytes(id, fileName string, data []byte) (assetPath string, created bool, err error) {
 	bt := treenode.GetBlockTree(id)
 	if bt == nil {
@@ -136,7 +137,7 @@ func InsertLocalAssets(id string, assetAbsPaths []string, isUpload bool) (succMa
 		}
 
 		if gulu.File.IsSubPath(assetsDirPath, assetAbsPath) {
-			// 已经位于 assets 目录下的资源文件不处理
+			// Skip asset files that are already located under the assets directory
 			// Dragging a file from the assets folder into the editor causes the kernel to exit https://github.com/siyuan-note/siyuan/issues/15355
 			succMap[baseName] = "assets/" + baseName
 			continue
@@ -177,9 +178,11 @@ func InsertLocalAssets(id string, assetAbsPaths []string, isUpload bool) (succMa
 		} else {
 			blockID := ast.NewNodeID()
 			if IsEncryptedBox(bt.BoxID) {
-				// 加密 box：磁盘文件名脱敏为 uuid-blockID.ext，原始名存加密映射
+				// Encrypted box: the on-disk filename is anonymized to uuid-blockID.ext, and the original name is
+				// stored in the encrypted mapping
 				fName = encryptedAssetName(util.Ext(fName), blockID)
-				// 映射写入失败则不写 asset，避免产出"孤儿密文 asset 无映射"（详见设计文档 §7）
+				// If writing the mapping fails, do not write the asset, to avoid producing an "orphaned ciphertext
+				// asset with no mapping" (see design doc section 7)
 				if mapErr := writeAssetNameMapping(bt.BoxID, fName, baseName); mapErr != nil {
 					err = mapErr
 					f.Close()
@@ -205,7 +208,7 @@ func InsertLocalAssets(id string, assetAbsPaths []string, isUpload bool) (succMa
 			}
 			succMap[baseName] = p
 			if !IsEncryptedBox(bt.BoxID) {
-				cache.SetAssetHash(hash, p) // 加密笔记本不写全局 cache，避免跨边界去重污染
+				cache.SetAssetHash(hash, p) // do not write to the global cache for an encrypted notebook, to avoid cross-boundary dedup pollution
 			}
 		}
 	}
@@ -225,12 +228,12 @@ func Upload(c *gin.Context) {
 		return
 	}
 	assetsDirPath := filepath.Join(util.DataDir, "assets")
-	var uploadBoxID string // 记录上传目标 boxID，供 writeAssetFile 判断是否需加密
+	var uploadBoxID string // records the upload target boxID, used by writeAssetFile to decide whether encryption is needed
 	if nil != form.Value["id"] {
 		id := form.Value["id"][0]
 		bt := treenode.GetBlockTree(id)
 		if nil == bt {
-			// 全局 blocktree 找不到时，遍历已打开的加密笔记本查找
+			// If not found in the global block tree, iterate over the opened encrypted notebooks to look for it
 			for _, encBoxID := range treenode.GetOpenedEncryptedBoxIDs() {
 				if encBT := treenode.GetBlockTreeInBox(id, encBoxID); nil != encBT {
 					bt = encBT
@@ -257,7 +260,8 @@ func Upload(c *gin.Context) {
 			ret.Msg = "Path [" + assetsDirPath + "] is not in workspace"
 			return
 		}
-		// assetsDirPath 可能指向加密 box（调用方未传 id），反查 boxID 让文件名脱敏/.names.json 生效
+		// assetsDirPath may point to an encrypted box (the caller did not pass id); resolve the boxID so filename
+		// anonymization / .names.json takes effect
 		if pathBox := ExtractBoxIDFromAssetsPath(assetsDirPath); pathBox != "" && IsEncryptedBox(pathBox) {
 			uploadBoxID = pathBox
 		}
@@ -273,7 +277,7 @@ func Upload(c *gin.Context) {
 	var errFiles []string
 	succMap := map[string]any{}
 	files := form.File["file[]"]
-	skipIfDuplicated := false // 默认不跳过重复文件，但是有的场景需要跳过，比如上传 PDF 标注图片 https://github.com/siyuan-note/siyuan/issues/10666
+	skipIfDuplicated := false // by default duplicate files are not skipped, but some scenarios need to skip them, e.g. uploading PDF annotation images https://github.com/siyuan-note/siyuan/issues/10666
 	if nil != form.Value["skipIfDuplicated"] {
 		skipIfDuplicated = "true" == form.Value["skipIfDuplicated"][0]
 	}
@@ -336,11 +340,11 @@ func Upload(c *gin.Context) {
 			f.Close()
 		} else {
 			if skipIfDuplicated {
-				// 复制 PDF 矩形注解时不再重复插入图片 No longer upload image repeatedly when copying PDF rectangle annotation https://github.com/siyuan-note/siyuan/issues/10666
+				// No longer insert the image repeatedly when copying a PDF rectangle annotation. No longer upload image repeatedly when copying PDF rectangle annotation https://github.com/siyuan-note/siyuan/issues/10666
 				pattern := assetsDirPath + string(os.PathSeparator) + strings.TrimSuffix(fName, ext)
 				_, patternLastID := util.LastID(fName)
 				if lastID != "" && lastID != patternLastID {
-					// 文件名太长被截断了，通过之前的 lastID 来匹配 PDF files with too long file names cannot generate annotated images https://github.com/siyuan-note/siyuan/issues/15739
+					// The filename was truncated for being too long; match using the previous lastID instead. PDF files with too long file names cannot generate annotated images https://github.com/siyuan-note/siyuan/issues/15739
 					pattern = assetsDirPath + string(os.PathSeparator) + "*" + lastID + ext
 				} else {
 					pattern += "*" + ext
@@ -363,9 +367,11 @@ func Upload(c *gin.Context) {
 				lastID = ast.NewNodeID()
 			}
 			if IsEncryptedBox(uploadBoxID) {
-				// 加密 box：磁盘文件名脱敏为 uuid-blockID.ext，原始名存加密映射
+				// Encrypted box: the on-disk filename is anonymized to uuid-blockID.ext, and the original name is
+				// stored in the encrypted mapping
 				fName = encryptedAssetName(util.Ext(fName), lastID)
-				// 映射写入失败则不写 asset，避免产出"孤儿密文 asset 无映射"（详见设计文档 §7）
+				// If writing the mapping fails, do not write the asset, to avoid producing an "orphaned ciphertext
+				// asset with no mapping" (see design doc section 7)
 				if mapErr := writeAssetNameMapping(uploadBoxID, fName, baseName); mapErr != nil {
 					errFiles = append(errFiles, fName)
 					ret.Msg = mapErr.Error()
@@ -462,7 +468,7 @@ func Upload(c *gin.Context) {
 			}
 			succMap[baseName] = p
 			if uploadBoxID == "" || !IsEncryptedBox(uploadBoxID) {
-				cache.SetAssetHash(hash, p) // 加密笔记本不写全局 cache
+				cache.SetAssetHash(hash, p) // do not write to the global cache for an encrypted notebook
 			}
 		}
 	}
@@ -480,7 +486,8 @@ func getAssetsDir(boxLocalPath, docDirLocalPath string) (assets string) {
 	if !filelock.IsExist(assets) {
 		assets = filepath.Join(boxLocalPath, "assets")
 		if !filelock.IsExist(assets) {
-			// 加密笔记本禁用全局 data/assets 回退，强制使用笔记本级 assets，避免明文资源泄漏到全局
+			// Falling back to the global data/assets directory is disabled for encrypted notebooks; force use of
+			// notebook-level assets to avoid leaking plaintext resources into the global directory
 			boxID := filepath.Base(boxLocalPath)
 			if IsEncryptedBox(boxID) {
 				_ = os.MkdirAll(assets, 0755)
@@ -492,34 +499,40 @@ func getAssetsDir(boxLocalPath, docDirLocalPath string) (assets string) {
 	return
 }
 
-// writeAssetFile 把 src 的内容写入 writePath。从 writePath 反查真实 boxID 决定是否加密——
-// 不轻信传入的 boxID（调用方可能未传，或 assetsDirPath 指向加密笔记本但 id 为空）。
-// 加密笔记本必须已解锁（DEK 在内存）才写入；加密但未解锁返回错误（fail-closed，避免明文落盘）。
-// 非加密笔记本按 reader 直接写（走 filelock.WriteFileByReader 原路径，保留锁语义）。
+// writeAssetFile writes the content of src to writePath. The real boxID is resolved from writePath to decide
+// whether encryption is needed -- the passed-in boxID is not trusted blindly (the caller may not have passed one,
+// or assetsDirPath may point to an encrypted notebook while id is empty).
+// An encrypted notebook must already be unlocked (DEK in memory) before writing; if encrypted but not unlocked,
+// an error is returned (fail-closed, to avoid writing plaintext to disk).
+// A non-encrypted notebook is written directly via the reader (goes through the original
+// filelock.WriteFileByReader path, preserving lock semantics).
 func writeAssetFile(writePath string, src io.Reader, boxID string) (err error) {
-	// 从 writePath 反查真实 boxID，与传入 boxID 交叉校验
+	// Resolve the real boxID from writePath and cross-check it against the passed-in boxID
 	pathBoxID := ExtractBoxIDFromAssetsPath(writePath)
-	// 传入 boxID 与路径 box 都非空但不一致：路径指向另一个 box，拒绝（防跨 box 写入）
+	// Both the passed-in boxID and the path's box are non-empty but differ: the path points to another box, reject
+	// it (to prevent cross-box writes)
 	if boxID != "" && pathBoxID != "" && boxID != pathBoxID {
 		return fmt.Errorf("boxID mismatch: param=%s, path=%s", boxID, pathBoxID)
 	}
-	// 路径不在 box 下但传入的是加密 box：加密内容只能写 box 内，拒绝写全局 assets
+	// The path is not under a box but the passed-in box is encrypted: encrypted content may only be written inside
+	// the box, reject writing to global assets
 	if pathBoxID == "" && boxID != "" && IsEncryptedBox(boxID) {
 		return fmt.Errorf("encrypted box asset must be written inside the box directory, got global path: %s", writePath)
 	}
 	actualBoxID := pathBoxID
 	if actualBoxID == "" {
-		actualBoxID = boxID // 路径不在 box 下（如全局 assets），回退传入值
+		actualBoxID = boxID // the path is not under a box (e.g. global assets), fall back to the passed-in value
 	}
 	if actualBoxID != "" && IsEncryptedBox(actualBoxID) {
 		HoldBoxReadLock(actualBoxID)
 		defer ReleaseBoxReadLock(actualBoxID)
 		dek, dekErr := GetDEKIfUnlocked(actualBoxID)
 		if dekErr != nil {
-			// 加密笔记本未解锁：拒绝写入，避免明文落盘（深度防御，见 issue #18034）
+			// The encrypted notebook is not unlocked: reject the write to avoid writing plaintext to disk
+			// (defense in depth, see issue #18034)
 			return dekErr
 		}
-		// 已解锁的加密 box：全读 → 加密 → 落盘
+		// Unlocked encrypted box: read all -> encrypt -> write to disk
 		raw, readErr := io.ReadAll(src)
 		if readErr != nil {
 			return readErr
@@ -533,18 +546,22 @@ func writeAssetFile(writePath string, src io.Reader, boxID string) (err error) {
 	return filelock.WriteFileByReader(writePath, src)
 }
 
-// StoreAssetForBox 统一资产写入入口：根据 boxID 决定加密/明文写入，返回磁盘文件名（不含路径前缀）。
-// 加密 box：生成脱敏名 → writeAssetNameMapping 记录映射 → EncryptAsset 加密 → filelock.WriteFile
-// 普通 box：util.AssetName 生成名 → filelock.WriteFile 明文写入
-// boxID 为空时按普通 box 处理（写入全局 assets）。
+// StoreAssetForBox is the unified asset write entry point: it decides encrypted vs. plaintext write based on
+// boxID, and returns the on-disk filename (without the path prefix).
+// Encrypted box: generate an anonymized name -> writeAssetNameMapping records the mapping -> EncryptAsset
+// encrypts -> filelock.WriteFile.
+// Regular box: util.AssetName generates the name -> filelock.WriteFile writes plaintext.
+// When boxID is empty, it is treated as a regular box (written to global assets).
 func StoreAssetForBox(boxID, assetDirPath, originalName string, data []byte) (diskName string, err error) {
 	return storeAssetForBox(boxID, assetDirPath, originalName, data)
 }
 
-// storeAssetForBox 统一资产写入入口：根据 boxID 决定加密/明文写入，返回磁盘文件名（不含路径前缀）。
-// 加密 box：生成脱敏名 → writeAssetNameMapping 记录映射 → EncryptAsset 加密 → filelock.WriteFile
-// 普通 box：util.AssetName 生成名 → filelock.WriteFile 明文写入
-// boxID 为空时按普通 box 处理（写入全局 assets）。
+// storeAssetForBox is the unified asset write entry point: it decides encrypted vs. plaintext write based on
+// boxID, and returns the on-disk filename (without the path prefix).
+// Encrypted box: generate an anonymized name -> writeAssetNameMapping records the mapping -> EncryptAsset
+// encrypts -> filelock.WriteFile.
+// Regular box: util.AssetName generates the name -> filelock.WriteFile writes plaintext.
+// When boxID is empty, it is treated as a regular box (written to global assets).
 func storeAssetForBox(boxID, assetDirPath, originalName string, data []byte) (diskName string, err error) {
 	if IsEncryptedBox(boxID) {
 		HoldBoxReadLock(boxID)
@@ -553,7 +570,8 @@ func storeAssetForBox(boxID, assetDirPath, originalName string, data []byte) (di
 		ext := filepath.Ext(originalName)
 		blockID := ast.NewNodeID()
 		diskName = encryptedAssetName(ext, blockID)
-		// 映射写入失败则不写 asset，避免产出"孤儿密文 asset 无映射"（详见设计文档 §7）
+		// If writing the mapping fails, do not write the asset, to avoid producing an "orphaned ciphertext asset
+		// with no mapping" (see design doc section 7)
 		if mapErr := writeAssetNameMappingLocked(boxID, diskName, originalName); mapErr != nil {
 			return "", mapErr
 		}
@@ -573,7 +591,7 @@ func storeAssetForBox(boxID, assetDirPath, originalName string, data []byte) (di
 		return diskName, nil
 	}
 
-	// 普通 box：生成带 ID 的文件名，明文写入
+	// Regular box: generate a filename with an ID, write plaintext
 	diskName = util.AssetName(originalName, ast.NewNodeID())
 	writePath := filepath.Join(assetDirPath, diskName)
 	if err = filelock.WriteFile(writePath, data); err != nil {
@@ -582,22 +600,26 @@ func storeAssetForBox(boxID, assetDirPath, originalName string, data []byte) (di
 	return diskName, nil
 }
 
-// encryptedAssetName 生成加密笔记本专用的无语义资源文件名：uuid-blockID.ext。
-// 原始语义文件名（如"合同.pdf"）通过 writeAssetNameMapping 存入加密映射，磁盘上只保留随机名。
+// encryptedAssetName generates a meaningless asset filename dedicated to encrypted notebooks: uuid-blockID.ext.
+// The original meaningful filename (e.g. "contract.pdf") is stored in the encrypted mapping via
+// writeAssetNameMapping, leaving only a random name on disk.
 func encryptedAssetName(ext, blockID string) string {
 	return gulu.Rand.String(16) + "-" + blockID + ext
 }
 
-// assetNameMappingPath 返回加密笔记本资源名映射文件路径 <boxID>/assets/.names.json。
+// assetNameMappingPath returns the path to an encrypted notebook's asset name mapping file: <boxID>/assets/.names.json.
 func assetNameMappingPath(boxID string) string {
 	return filepath.Join(util.DataDir, boxID, "assets", ".names.json")
 }
 
-// assetNameMappingLocks 按 boxID 分组的互斥锁，保护 .names.json read-modify-write 的并发安全
+// assetNameMappingLocks holds mutexes grouped by boxID, protecting the concurrency safety of .names.json
+// read-modify-write operations
 var assetNameMappingLocks sync.Map // map[string]*sync.Mutex
 
-// writeAssetNameMapping 把"磁盘文件名 -> 原始文件名"映射写入加密笔记本的 .names.json（DEK 加密落盘）。
-// 返回错误时调用方不得继续写 asset 密文，避免产出"孤儿密文 asset 无映射"（详见设计文档 §7）。
+// writeAssetNameMapping writes a "disk filename -> original filename" mapping into an encrypted notebook's
+// .names.json (encrypted with the DEK before writing to disk).
+// If it returns an error, the caller must not proceed to write the asset ciphertext, to avoid producing an
+// "orphaned ciphertext asset with no mapping" (see design doc section 7).
 func writeAssetNameMapping(boxID, diskName, originalName string) error {
 	if boxID == "" || !IsEncryptedBox(boxID) {
 		return nil
@@ -627,7 +649,8 @@ func writeAssetNameMappingLocked(boxID, diskName, originalName string) error {
 	if err != nil {
 		return fmt.Errorf("encrypt asset name mapping failed: %w", err)
 	}
-	// 原子写入（temp+rename）：防止半写映射残留，并避免与并发写者竞争同一文件造成 lost update
+	// Atomic write (temp+rename): prevents a partially-written mapping from lingering, and avoids a lost update
+	// from racing with a concurrent writer on the same file
 	if err = atomicWriteFile(assetNameMappingPath(boxID), enc); err != nil {
 		return fmt.Errorf("write asset name mapping failed: %w", err)
 	}
@@ -668,7 +691,8 @@ func removeAssetNameMapping(boxID, diskName string) error {
 	return nil
 }
 
-// readAssetNameMapping 读取加密笔记本的资源名映射（DEK 解密）。未解锁或文件不存在时返回空 map。
+// readAssetNameMapping reads an encrypted notebook's asset name mapping (decrypted with the DEK). Returns an
+// empty map if not unlocked or the file does not exist.
 func readAssetNameMapping(boxID string) map[string]string {
 	ret := map[string]string{}
 	if boxID == "" || !IsEncryptedBox(boxID) {
@@ -702,13 +726,14 @@ func readAssetNameMappingLocked(boxID string) map[string]string {
 	return ret
 }
 
-// LookupAssetOriginalName 查询加密笔记本资源的原始文件名（供下载 Content-Disposition 等展示用）。
-// 未找到时返回空串。
+// LookupAssetOriginalName looks up the original filename of an encrypted notebook's asset (used for download
+// Content-Disposition and similar display purposes).
+// Returns an empty string if not found.
 func LookupAssetOriginalName(boxID, diskName string) string {
 	return readAssetNameMapping(boxID)[diskName]
 }
 
-// LookupAssetOriginalNameLocked 在调用方已持有 box 读锁时查询原始资源名。
+// LookupAssetOriginalNameLocked looks up the original asset name when the caller already holds the box's read lock.
 func LookupAssetOriginalNameLocked(boxID, diskName string) string {
 	return readAssetNameMappingLocked(boxID)[diskName]
 }

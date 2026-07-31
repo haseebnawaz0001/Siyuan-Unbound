@@ -9,7 +9,8 @@ html {
   box-sizing: border-box;
 }
 
-// 声明当前配色方案，用于修正 iOS 深色模式下输入法候选词高亮项背景丢失等问题 https://github.com/siyuan-note/siyuan/issues/17894
+// Declares the current color scheme, to fix issues like the missing background on the highlighted
+// IME candidate word in iOS dark mode https://github.com/siyuan-note/siyuan/issues/17894
 :root[data-theme-mode="dark"] {
   color-scheme: dark;
 }
@@ -32,7 +33,8 @@ body {
   max-height: 100%;
   overflow: hidden;
 
-  // body 使用字号导致显示不全 https://github.com/siyuan-note/siyuan/issues/11670#issuecomment-2282329358
+  // Using body's font size causes incomplete rendering
+  // https://github.com/siyuan-note/siyuan/issues/11670#issuecomment-2282329358
   & > .fn__flex-1 {
     font-size: 14px;
   }

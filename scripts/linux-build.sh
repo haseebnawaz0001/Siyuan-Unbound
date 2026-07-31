@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# 启用错误处理：任何命令失败立即退出，并打印错误信息
+# Enable error handling: exit immediately on any command failure and print the error message
 set -e
 trap 'echo "Error occurred at line $LINENO. Command: $BASH_COMMAND"; exit 1' ERR
 
@@ -135,5 +135,5 @@ echo '=============================='
 echo '      Build successful!'
 echo '=============================='
 
-# 返回初始目录
+# Return to the initial directory
 cd "$INITIAL_DIR"

@@ -50,7 +50,7 @@ export class Menus {
             } else {
                 event.preventDefault();
             }
-            while (target && target.parentElement   // ⌃⇥ 后点击会为空
+            while (target && target.parentElement   // Can be empty after ⌃⇥
             && !target.parentElement.isEqualNode(document.querySelector("body"))) {
                 const dataType = target.getAttribute("data-type");
                 if (dataType === "tab-header") {
@@ -66,14 +66,14 @@ export class Menus {
                         return;
                     }
                     this.unselect();
-                    // navigation 根上：新建文档/文件夹/取消挂在/打开文件位置
+                    // On a navigation root: new document/folder, unmount, open file location
                     initNavigationMenu(app, target).popup({x: event.clientX, y: event.clientY});
                     setPanelFocus(hasClosestByClassName(target, "sy__file") as HTMLElement);
                     event.stopPropagation();
                     break;
                 } else if (dataType === "navigation-file") {
                     this.unselect();
-                    // navigation 文件上：删除/重命名/打开文件位置/导出
+                    // On a navigation file: delete/rename/open file location/export
                     initFileMenu(app, this.getDir(target), target.getAttribute("data-path"), target).popup({
                         x: event.clientX,
                         y: event.clientY

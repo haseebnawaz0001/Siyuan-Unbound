@@ -38,13 +38,15 @@ import {isEncryptedBox} from "../../util/pathName";
 
 export const removeBlock = async (protyle: IProtyle, blockElement: Element, range: Range, type: "Delete" | "Backspace" | "remove") => {
     protyle.observerLoad?.disconnect();
-    // 删除后，防止滚动条滚动后调用 get 请求，因为返回的请求已查找不到内容块了
+    // After deletion, prevent a get request from firing on scroll, since the returned request would no longer
+    // find the content block
     preventScroll(protyle);
     const selectElements = Array.from(protyle.wysiwyg.element.querySelectorAll(".protyle-wysiwyg--select"));
     if (selectElements?.length > 0) {
         const embedSelectElements = selectElements.filter(item => isInEmbedBlock(item));
         if (embedSelectElements.length > 0) {
-            // 嵌入块内暂不支持跨边界或多块删除，避免上溯时删除查询目标。
+            // Deleting across a boundary or deleting multiple blocks isn't supported inside an embed block yet,
+            // to avoid deleting the query target while walking upward.
             if (embedSelectElements.length !== selectElements.length || embedSelectElements.length !== 1) {
                 return;
             }
@@ -141,9 +143,9 @@ export const removeBlock = async (protyle: IProtyle, blockElement: Element, rang
                 topElement.firstElementChild.removeAttribute("contenteditable");
                 topElement.remove();
             } else {
-                let data = topElement.outerHTML;    // 不能 spin ，否则 li 会变为 list
+                let data = topElement.outerHTML;    // Must not be spun, otherwise an li would turn into a list
                 if (topElement.classList.contains("render-node") || topElement.querySelector("div.render-node")) {
-                    data = protyle.lute.SpinBlockDOM(topElement.outerHTML);  // 防止图表撤销问题
+                    data = protyle.lute.SpinBlockDOM(topElement.outerHTML);  // Prevent chart undo issues
                 }
                 const previousBlockElement = getPreviousBlockSibling(topElement);
                 let previousID = previousBlockElement ? previousBlockElement.getAttribute("data-node-id") : "";
@@ -182,17 +184,20 @@ export const removeBlock = async (protyle: IProtyle, blockElement: Element, rang
                     };
                 }
                 topElement.remove();
-                // 删除列表项内容块后，若该列表项仅剩子列表而无内容块，需补一个空段落
-                // 避免"列表项下直接挂列表"的非法结构 https://github.com/siyuan-note/siyuan/issues/17892
+                // After deleting a list item's content block, if the list item now only has a nested list and
+                // no content block, an empty paragraph must be added
+                // to avoid the illegal structure of "a list hanging directly under a list item" https://github.com/siyuan-note/siyuan/issues/17892
                 const liChildren = Array.from(topParentElement.children);
-                // 首个子块是列表块时，说明列表项下直接挂列表，需补一个空段落作为内容块
+                // When the first child block is a list block, it means a list hangs directly under the list
+                // item, so an empty paragraph must be added as the content block
                 // https://github.com/siyuan-note/siyuan/issues/17892
                 const firstBlock = liChildren.find(item => item.hasAttribute("data-node-id") &&
                     !item.classList.contains("protyle-action") && !item.classList.contains("protyle-attr"));
                 if (topParentElement.classList.contains("li") && firstBlock?.classList.contains("list")) {
                     const emptyID = Lute.NewNodeID();
                     const emptyElement = genEmptyElement(false, false, emptyID);
-                    // 空段落插到列表标记之后、首个子块之前，与服务端 doInsert 通过 nextID 定位的位置一致
+                    // Insert the empty paragraph after the list marker and before the first child block,
+                    // consistent with where the server's doInsert locates it via nextID
                     liChildren.find(item => item.classList.contains("protyle-action"))?.after(emptyElement);
                     deletes.push({
                         action: "insert",
@@ -268,7 +273,8 @@ export const removeBlock = async (protyle: IProtyle, blockElement: Element, rang
                 const sbData = await cancelSB(protyle, topParentElement, range);
                 transaction(protyle, deletes.concat(sbData.doOperations), sbData.undoOperations.concat(inserts.reverse()));
             } else {
-                // 超级块删除子块后剩余多个子块时，刷新拖拽手柄（被删块两侧手柄需移除/重建）
+                // When multiple child blocks remain after deleting a child block from a superblock, refresh the
+                // drag handles (handles on either side of the deleted block need to be removed/rebuilt)
                 if (topParentElement && topParentElement.getAttribute("data-type") === "NodeSuperBlock") {
                     refreshSbResize(topParentElement);
                     const widthChanges = rebalanceSbWidth(topParentElement);
@@ -330,7 +336,7 @@ export const removeBlock = async (protyle: IProtyle, blockElement: Element, rang
                     });
                 });
             }
-        }, Constants.TIMEOUT_COUNT);// 需等待滚动阻塞、后台处理完成。否则会加载已删除的内容
+        }, Constants.TIMEOUT_COUNT);// Must wait for scroll blocking and background processing to finish, otherwise deleted content would get loaded
         return;
     }
     const embedBlockElement = isInEmbedBlock(blockElement);
@@ -339,7 +345,7 @@ export const removeBlock = async (protyle: IProtyle, blockElement: Element, rang
         return;
     }
     const blockType = blockElement.getAttribute("data-type");
-    // 空代码块直接删除
+    // Delete an empty code block directly
     if (blockType === "NodeCodeBlock" && getContenteditableElement(blockElement)?.textContent.trim() === "") {
         blockElement.classList.add("protyle-wysiwyg--select");
         removeBlock(protyle, blockElement, range, type);
@@ -371,7 +377,8 @@ export const removeBlock = async (protyle: IProtyle, blockElement: Element, rang
             range.insertNode(document.createElement("wbr"));
         }
         blockParentElement.insertAdjacentElement("beforebegin", blockElement);
-        // 跳过 sb__resize 手柄取前一个块，避免超级块内引述块首删除时 previousID 为手柄导致位置错
+        // Skip the sb__resize handle when getting the previous block, to avoid previousID pointing at the
+        // handle (and landing in the wrong position) when deleting the first block of a quote inside a superblock
         const previousID = getPreviousBlockSibling(blockElement)?.getAttribute("data-node-id");
         if (isCallout ? blockParentElement.querySelector(".callout-content").childElementCount === 0 :
             blockParentElement.childElementCount === 1) {
@@ -407,7 +414,7 @@ export const removeBlock = async (protyle: IProtyle, blockElement: Element, rang
                 parentID: blockParentElement.getAttribute("data-node-id")
             }]);
         }
-        // 引述块移出/删除后，若所在容器是超级块则刷新拖拽手柄（清残留）
+        // After a quote block is moved out/deleted, refresh the drag handle if its container is a superblock (clear stale handles)
         const sbAncestor = getParentBlock(blockElement);
         if (sbAncestor?.classList.contains("sb")) {
             refreshSbResize(sbAncestor);
@@ -442,12 +449,12 @@ export const removeBlock = async (protyle: IProtyle, blockElement: Element, rang
     if (embedContext && (!previousElement || !embedContext.boundaryElement.contains(previousElement))) {
         return;
     }
-    // 设置 bq 和代码块光标
-    // 需放在列表处理后 https://github.com/siyuan-note/siyuan/issues/11606
+    // Set the caret for a bq or code block
+    // Must come after list handling https://github.com/siyuan-note/siyuan/issues/11606
     if (["NodeCodeBlock", "NodeTable", "NodeAttributeView"].includes(blockType)) {
         if (previousElement) {
             if (previousElement.classList.contains("p") && getContenteditableElement(previousElement).textContent === "") {
-                // 空块向后删除时移除改块 https://github.com/siyuan-note/siyuan/issues/11732
+                // Remove this block when forward-deleting from an empty block https://github.com/siyuan-note/siyuan/issues/11732
                 const ppElement = getPreviousBlock(previousElement);
                 transaction(protyle, [{
                     action: "delete",
@@ -491,7 +498,7 @@ export const removeBlock = async (protyle: IProtyle, blockElement: Element, rang
     if (!previousElement) {
         if (protyle.wysiwyg.element.childElementCount > 1 && getContenteditableElement(blockElement).textContent === "") {
             focusBlock(protyle.wysiwyg.element.firstElementChild.nextElementSibling);
-            // 列表项中包含超级块时需要到顶层
+            // Must go up to the top level when a list item contains a superblock
             const topElement = getTopAloneElement(blockElement);
             transaction(protyle, [{
                 action: "delete",
@@ -548,7 +555,7 @@ export const removeBlock = async (protyle: IProtyle, blockElement: Element, rang
                     parentID: getOperationParentID(blockElement, protyle.block.parentID)
                 }];
                 blockElement.remove();
-                // 取消超级块
+                // Cancel the superblock
                 if (parentElement && parentElement.getAttribute("data-type") === "NodeSuperBlock" && getSbChildBlockCount(parentElement) === 1) {
                     const sbData = await cancelSB(protyle, parentElement);
                     transaction(protyle, doOperations.concat(sbData.doOperations), sbData.undoOperations.concat(undoOperations));
@@ -594,7 +601,7 @@ export const removeBlock = async (protyle: IProtyle, blockElement: Element, rang
     }];
 
     if (isSelectNode) {
-        // 需先移除 removeElement，否则 side 会选中 removeElement
+        // removeElement must be removed first, otherwise side would select removeElement
         removeElement.remove();
         focusBlock(previousLastElement, undefined, false);
         // https://github.com/siyuan-note/siyuan/issues/13254
@@ -602,9 +609,9 @@ export const removeBlock = async (protyle: IProtyle, blockElement: Element, rang
     } else {
         const previousLastEditElement = getContenteditableElement(previousLastElement);
         if (editableElement && (editableElement.textContent !== "" || editableElement.querySelector(".emoji"))) {
-            // 非空块
+            // A non-empty block
             range.setEndAfter(editableElement.lastChild);
-            // 数学公式回车后再删除 https://github.com/siyuan-note/siyuan/issues/3850
+            // Deleting right after pressing Enter on a math formula https://github.com/siyuan-note/siyuan/issues/3850
             if ((previousLastEditElement?.lastElementChild?.getAttribute("data-type") || "").indexOf("inline-math") > -1) {
                 const lastSibling = hasNextSibling(previousLastEditElement?.lastElementChild);
                 if (lastSibling && lastSibling.textContent === "\n") {
@@ -639,7 +646,7 @@ export const removeBlock = async (protyle: IProtyle, blockElement: Element, rang
             (previousHTML.indexOf("\n~~~") > -1 && previousText.indexOf("\n~~~") > -1) ||
             (previousHTML.indexOf("\n···") > -1 && previousText.indexOf("\n···") > -1)) {
             if (previousHTML.indexOf("\n") === -1 && previousHTML.replace(/·|~/g, "`").replace(/^`{3,}/g, "").indexOf("`") > -1) {
-                // ```test` 不处理，正常渲染为段落块
+                // ```test` is left alone and renders normally as a paragraph block
             } else {
                 let replaceNewHTML = previousLastEditElement.innerHTML.replace(/\n(~|·|`){3,}/g, "\n```").trim().replace(/^(~|·|`){3,}/g, "```");
                 if (!replaceNewHTML.endsWith("\n```")) {
@@ -648,7 +655,7 @@ export const removeBlock = async (protyle: IProtyle, blockElement: Element, rang
                 previousLastEditElement.innerHTML = replaceNewHTML;
             }
         }
-        // 图片前删除到上一个文字块时，图片前有 zwsp
+        // When deleting back into the previous text block right before an image, the image has a leading zwsp
         previousLastElement.insertAdjacentHTML("afterend",  protyle.lute.SpinBlockDOM(previousLastElement.outerHTML));
         previousLastElement = previousLastElement.nextElementSibling as HTMLElement;
         previousLastElement.previousElementSibling.remove();
@@ -662,7 +669,7 @@ export const removeBlock = async (protyle: IProtyle, blockElement: Element, rang
             undoOperations.splice(0, 0, ...foldOperations.undoOperations);
         }
         removeElement.remove();
-        // extractContents 内容过多时需要进行滚动条重置，否则位置会错位
+        // The scroll position needs to be reset when extractContents processes too much content, otherwise it would be misaligned
         protyle.contentElement.scrollTop = scroll;
         protyle.scroll.lastScrollTop = scroll - 1;
         previousLastElement.setAttribute(Constants.ATTRIBUTE_EDITING, "true");
@@ -678,7 +685,7 @@ export const removeBlock = async (protyle: IProtyle, blockElement: Element, rang
     } else {
         if (parentElement && parentElement.getAttribute("data-type") === "NodeSuperBlock") {
             refreshSbResize(parentElement);
-            // 删除子块后重新分配剩余块宽度并持久化
+            // After deleting a child block, redistribute and persist the remaining blocks' widths
             const widthChanges = rebalanceSbWidth(parentElement);
             widthChanges.forEach(change => {
                 const targetEl = parentElement.querySelector(`[data-node-id="${change.id}"]`);
@@ -762,7 +769,7 @@ export const removeImage = (imgSelectElement: Element, nodeElement: HTMLElement,
     imgSelectElement.remove();
     updateTransaction(protyle, nodeElement, oldHTML);
     focusByWbr(nodeElement, range);
-    // 不太清楚为什么删除图片后无法上下键定位，但重绘后就好了 https://ld246.com/article/1714314625702
+    // Not entirely sure why up/down arrow positioning breaks after deleting an image, but a repaint fixes it https://ld246.com/article/1714314625702
     const editElement = getContenteditableElement(nodeElement);
     if (editElement.innerHTML.trim() === "") {
         editElement.innerHTML = "";
@@ -774,7 +781,7 @@ const removeLi = async (protyle: IProtyle, blockElement: Element, range: Range, 
         listOutdent(protyle, [blockElement.parentElement], range, isDelete, blockElement);
         return;
     }
-    // 第一个子列表合并到上一个块的末尾
+    // The first nested list merges into the end of the previous block
     if (!blockElement.parentElement.previousElementSibling && blockElement.parentElement.parentElement.parentElement.classList.contains("list")) {
         range.insertNode(document.createElement("wbr"));
         const listElement = blockElement.parentElement.parentElement;
@@ -810,7 +817,7 @@ const removeLi = async (protyle: IProtyle, blockElement: Element, range: Range, 
         focusByWbr(previousLastElement.parentElement, range);
         return;
     }
-    // 顶级列表首行删除变为块
+    // Deleting the first row of a top-level list turns it into a block
     if (!blockElement.parentElement.previousElementSibling) {
         if (blockElement.parentElement.parentElement.classList.contains("protyle-wysiwyg")) {
             return;
@@ -865,7 +872,7 @@ const removeLi = async (protyle: IProtyle, blockElement: Element, range: Range, 
                 }
                 previousElement = previousElement.previousElementSibling;
             }
-            // 合并到同一个 transaction，避免新超级块 id 在第二个 transaction 中找不到
+            // Merge into the same transaction, otherwise the new superblock's id wouldn't be found in a second transaction
             const mergeOperations = await turnsIntoOneTransaction({
                 protyle,
                 selectsElement: selectsElement.reverse(),
@@ -882,7 +889,7 @@ const removeLi = async (protyle: IProtyle, blockElement: Element, range: Range, 
         return;
     }
 
-    // 列表项合并到前一个列表项的最后一个块末尾
+    // The list item merges into the end of the previous list item's last block
     const listItemElement = blockElement.parentElement;
     if (listItemElement.previousElementSibling && listItemElement.previousElementSibling.classList.contains("protyle-breadcrumb__bar")) {
         return;

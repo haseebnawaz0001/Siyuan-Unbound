@@ -68,23 +68,19 @@ declare namespace Config {
         };
         /**
          * Publish service
-         * 发布服务
          */
         publish: IPublish;
         /**
-         * Whether it is running in read-only mode
-         * 全局只读
+         * Whether the whole workspace is running in read-only mode
          */
         readonly: boolean;
         /**
          * Encrypted notebook global settings
-         * 加密笔记本全局设置
          */
         notebookCrypto: INotebookCrypto;
         repo: IRepo;
         /**
          * Global secrets store, referenced via {{secrets.NAME}} placeholders.
-         * 全局密钥库，通过 {{secrets.NAME}} 占位符引用
          */
         secrets: ISecrets;
         search: ISearch;
@@ -104,7 +100,6 @@ declare namespace Config {
         userData: string;
         /**
          * Global variables store, referenced via {{vars.NAME}} placeholders.
-         * 全局变量库，通过 {{vars.NAME}} 占位符引用
          */
         variables: IVariables;
     }
@@ -351,7 +346,8 @@ declare namespace Config {
     }
 
     /**
-     * 外观通知开关配置。Appearance.Notifications 为 undefined 时表示旧配置尚未迁移，整体按默认启用处理。
+     * Appearance notification toggles. When Appearance.Notifications is undefined the configuration predates this
+     * setting and has not been migrated yet, in which case every notification is treated as enabled by default.
      */
     export interface IAppearanceNotifications {
         docTreeMaxList: boolean;
@@ -452,7 +448,7 @@ declare namespace Config {
         allowSVGScript: boolean;
 
         /**
-         * 是否允许在 HTML 内容中执行 JavaScript
+         * Whether to allow to execute javascript in the HTML content
          */
         allowHTMLBLockScript: boolean;
 
@@ -1548,17 +1544,14 @@ declare namespace Config {
      */
     /**
      * Encrypted notebook global settings
-     * 加密笔记本全局设置
      */
     export interface INotebookCrypto {
         /**
-         * Whether encrypted notebook feature is enabled
-         * 加密笔记本功能是否已启用
+         * Whether the encrypted notebook feature is enabled
          */
         enabled: boolean;
         /**
-         * Auto-lock after idle minutes, 0 = disabled
-         * 自动锁定闲置分钟数，0 表示禁用
+         * Number of idle minutes after which encrypted notebooks are locked again, 0 = disabled
          */
         autoLockMinutes: number;
     }
@@ -2214,7 +2207,7 @@ declare namespace Config {
          */
         blockId: string;
         /**
-         * 数据库行预览块 ID
+         * (Editor) Block ID of the database row being previewed
          */
         databaseRowId?: string;
         /**
@@ -2340,7 +2333,7 @@ declare namespace Config {
      */
     export interface IUILayoutTabSearchConfig {
         /**
-         * 搜索传入的查询内容
+         * The query the search was opened with
          */
         query?: string;
         /**
@@ -2386,7 +2379,7 @@ declare namespace Config {
         r?: string;
         /**
          * Whether to clear the search box after removing the currently used query condition group
-         * 移除后需记录搜索内容 https://github.com/siyuan-note/siyuan/issues/7745
+         * The search content still has to be recorded after removal https://github.com/siyuan-note/siyuan/issues/7745
          */
         removed?: boolean;
         replaceTypes?: IUILayoutTabSearchConfigReplaceTypes;

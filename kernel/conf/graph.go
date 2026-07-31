@@ -17,10 +17,10 @@
 package conf
 
 type Graph struct {
-	MaxBlocks int `json:"maxBlocks"` // 内容块最大显示数
+	MaxBlocks int `json:"maxBlocks"` // Max number of content blocks displayed
 
-	Local  *LocalGraph  `json:"local"`  // 局部图
-	Global *GlobalGraph `json:"global"` // 全局图
+	Local  *LocalGraph  `json:"local"`  // Local graph
+	Global *GlobalGraph `json:"global"` // Global graph
 }
 
 func NewGraph() *Graph {
@@ -46,7 +46,7 @@ func NewLocalGraph() *LocalGraph {
 }
 
 type GlobalGraph struct {
-	MinRefs     int  `json:"minRefs"` // 引用次数
+	MinRefs     int  `json:"minRefs"` // Reference count
 	DailyNote   bool `json:"dailyNote"`
 	*TypeFilter `json:"type"`
 	*D3         `json:"d3"`

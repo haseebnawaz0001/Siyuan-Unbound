@@ -447,7 +447,7 @@ export const genHintItemHTML = (item: IBlock) => {
     if (item.refCount) {
         countHTML = `<span class="popover__block counter b3-tooltips b3-tooltips__w" aria-label="${window.siyuan.languages.ref}">${item.refCount}</span>`;
     }
-    // data-node-id 用于获取引用面板
+    // data-node-id is used to get the reference panel
     return `${attrHTML}<div class="b3-list-item__first" data-node-id="${item.id}">
     ${iconHTML}
     <span class="b3-list-item__text">${item.content}</span>${countHTML}
@@ -578,7 +578,7 @@ export const hintRenderTemplate = (value: string, protyle: IProtyle, nodeElement
 
 export const hintRenderWidget = (value: string, protyle: IProtyle) => {
     focusByRange(protyle.toolbar.range);
-    // src 地址以 / 结尾
+    // The src address ends with /
     // Use the path ending with `/` when loading the widget https://github.com/siyuan-note/siyuan/issues/10520
     insertHTML(protyle.lute.SpinBlockDOM(`<iframe src="/widgets/${value}/" data-subtype="widget" border="0" frameborder="no" framespacing="0" allowfullscreen="true"></iframe>`), protyle, true);
     hideElements(["util"], protyle);
@@ -606,7 +606,7 @@ export const hintMoveBlock = (pathString: string, sourceElements: Element[], pro
     let sideElement;
     sourceElements.forEach((item, index) => {
         if (index === sourceElements.length - 1 &&
-            // 动态加载过慢，导致 item 被移除
+            // Dynamic loading is too slow, causing the item to be removed
             item.parentElement) {
             topSourceElement = getTopAloneElement(item);
             sideElement = topSourceElement.nextElementSibling || topSourceElement.previousElementSibling;
@@ -621,7 +621,7 @@ export const hintMoveBlock = (pathString: string, sourceElements: Element[], pro
         });
         item.remove();
     });
-    // 删除空元素
+    // Remove the empty element
     if (topSourceElement) {
         doOperations.push({
             action: "delete",
@@ -649,7 +649,7 @@ export const hintMoveBlock = (pathString: string, sourceElements: Element[], pro
     } else if (parentElement.classList.contains("protyle-wysiwyg") && parentElement.innerHTML === "" &&
         !hasClosestByClassName(parentElement, "block__edit", true) &&
         protyle.block.id === protyle.block.rootID) {
-        // 根文档原内容为空
+        // The root document's original content is empty
         const newId = Lute.NewNodeID();
         const newElement = genEmptyElement(false, false, newId);
         doOperations.splice(0, 0, {
@@ -663,6 +663,6 @@ export const hintMoveBlock = (pathString: string, sourceElements: Element[], pro
     } else if (sideElement) {
         focusBlock(sideElement);
     }
-    // 跨文档不支持撤销
+    // Undo is not supported across documents
     transaction(protyle, doOperations);
 };

@@ -125,20 +125,20 @@ export class Plugin {
     }
 
     public onload(): Promise<void> | void {
-        // 加载
+        // Load
     }
 
     public onunload() {
-        // 禁用/关闭
+        // Disable/close
     }
 
     public uninstall() {
-        // 卸载
+        // Uninstall
     }
 
     public onDataChanged() {
-        // 存储数据变更
-        // 兼容 3.4.1 以前同步数据使用重载插件的问题
+        // Stored data changed
+        // Compatible with the pre-3.4.1 issue where syncing data used the plugin reload path
         uninstall(this.app, this.name, true);
         loadPlugins(this.app, [this.name], false).then(() => {
             this.app.plugins.find(item => {
@@ -158,7 +158,7 @@ export class Plugin {
     }
 
     public onLayoutReady() {
-        // 布局加载完成
+        // Layout loading complete
     }
 
     public addCommand(command: ICommand) {
@@ -419,8 +419,10 @@ export class Plugin {
     // to the LLM under the full name "plugin__<pluginName>__<name>" with the given description, and
     // is dispatched via the "frontend" tool. On uninstall, all registered actions are removed.
     /**
-     * 按名称取密钥值（来自「设置 → 密钥和变量」的密钥库）。找不到时返回空字符串。
-     * 密钥在内核侧加密存储，此处读到的是运行时明文；仅在本地管理员身份下可用。
+     * Get a secret value by name (from the "Settings -> Secrets and Variables" secrets store). Returns an
+     * empty string if not found.
+     * Secrets are stored encrypted on the kernel side; what is read here is the runtime plaintext, and this is
+     * only available under local admin identity.
      */
     public getSecret(name: string): string {
         const found = window.siyuan.config.secrets?.items?.find((item) => item.name === name);
@@ -428,8 +430,9 @@ export class Plugin {
     }
 
     /**
-     * 按名称取变量值（来自「设置 → 密钥和变量」的变量库）。找不到时返回空字符串。
-     * 变量以明文存储，用于非敏感配置。
+     * Get a variable value by name (from the "Settings -> Secrets and Variables" variables store). Returns an
+     * empty string if not found.
+     * Variables are stored in plaintext, for non-sensitive configuration.
      */
     public getVariable(name: string): string {
         const found = window.siyuan.config.variables?.items?.find((item) => item.name === name);

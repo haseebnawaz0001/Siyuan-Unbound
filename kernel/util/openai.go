@@ -148,18 +148,20 @@ func NewOpenAIClient(apiKey, apiBaseURL string) *openai.Client {
 	return openai.NewClientWithConfig(config)
 }
 
-// builtinExtraBody 是「模型名前缀 → 额外请求参数」的内置适配清单。
-// 仅收录参数语义为「纯输出格式开关」的模型（不改变思考行为、无副作用），
-// 让这类模型从源头把推理内容拆到 reasoning_content 字段，而非以 <think> 标签混在 content 中。
-// 其他模型由 agent.thinkSplitter 兜底解析 <think> 标签。
+// builtinExtraBody is the built-in adaptation list mapping "model name prefix -> extra request parameters".
+// It only includes models whose parameter is purely an output-format switch (it doesn't change thinking behavior
+// and has no side effects), so that these models split the reasoning content into the reasoning_content field at
+// the source instead of mixing it into content via <think> tags.
+// Other models fall back to agent.thinkSplitter to parse <think> tags.
 var builtinExtraBody = map[string]map[string]any{
-	// MiniMax：开启 reasoning_split 后，thinking 内容拆到 reasoning_content 字段，
-	// 不改变是否思考、无流式要求。覆盖 MiniMax-M* 和 abab* 两个命名族。
+	// MiniMax: once reasoning_split is enabled, the thinking content is split into the reasoning_content field,
+	// without changing whether it thinks or requiring streaming. Covers the MiniMax-M* and abab* naming families.
 	"minimax-m": {"reasoning_split": true},
 	"abab-":     {"reasoning_split": true},
 }
 
-// ExtraBodyForModel 按模型名大小写不敏感匹配内置清单，返回需注入的额外请求参数；无匹配返回 nil。
+// ExtraBodyForModel matches the model name against the built-in list case-insensitively and returns the extra
+// request parameters to inject; returns nil if there is no match.
 func ExtraBodyForModel(model string) map[string]any {
 	lower := strings.ToLower(model)
 	for prefix, extra := range builtinExtraBody {
@@ -170,9 +172,10 @@ func ExtraBodyForModel(model string) map[string]any {
 	return nil
 }
 
-// extraBodyTransport 包装一个 HTTPDoer，在 chat/completions 请求体中注入额外字段。
-// 利用 go-openai 在 client 层暴露的 HTTPDoer 扩展点（Chat 路径不支持 withExtraBody），
-// 对流式与非流式 chat 请求都生效；非 chat 请求原样透传。
+// extraBodyTransport wraps an HTTPDoer to inject extra fields into the chat/completions request body.
+// It takes advantage of the HTTPDoer extension point that go-openai exposes at the client layer (the Chat path
+// does not support withExtraBody); it applies to both streaming and non-streaming chat requests, while non-chat
+// requests are passed through unchanged.
 type extraBodyTransport struct {
 	base      openai.HTTPDoer
 	extraBody map[string]any
@@ -193,7 +196,7 @@ func (t *extraBodyTransport) Do(req *http.Request) (*http.Response, error) {
 
 	var payload map[string]any
 	if err = json.Unmarshal(body, &payload); err != nil {
-		// 请求体解析失败，用原始 body 透传，绝不破坏请求。
+		// Request body parsing failed; pass through the original body unchanged, never break the request.
 		req.Body = io.NopCloser(bytes.NewReader(body))
 		req.ContentLength = int64(len(body))
 		return t.base.Do(req)
@@ -213,9 +216,10 @@ func (t *extraBodyTransport) Do(req *http.Request) (*http.Response, error) {
 	return t.base.Do(req)
 }
 
-// NewOpenAIClientWithModel 创建 OpenAI client，并按模型名匹配内置清单注入额外请求参数。
-// 绝大多数模型无匹配，走 NewOpenAIClient 老路径（不包中间件，零开销）；
-// 命中清单的模型（如 MiniMax）会注入厂商专属参数（如 reasoning_split）。
+// NewOpenAIClientWithModel creates an OpenAI client and injects extra request parameters by matching the model
+// name against the built-in list.
+// Most models have no match and go through the old NewOpenAIClient path (no middleware wrapper, zero overhead);
+// models that match the list (e.g. MiniMax) get vendor-specific parameters injected (e.g. reasoning_split).
 func NewOpenAIClientWithModel(apiKey, apiBaseURL, model string) *openai.Client {
 	extra := ExtraBodyForModel(model)
 	if len(extra) == 0 {
@@ -227,10 +231,12 @@ func NewOpenAIClientWithModel(apiKey, apiBaseURL, model string) *openai.Client {
 	return openai.NewClientWithConfig(config)
 }
 
-// TestModel 测试模型可用性。优先调用 ListModels（GET /v1/models）拉取可用模型清单，
-// 校验 model 是否在其中；若该端点不可用（部分 OpenAI 兼容服务未实现），则回退到极简 Chat Completion。
-// 返回值：available 为可用模型清单（仅 ListModels 成功时填充），matched 表示 model 是否可用，
-// err 为请求错误（鉴权失败、网络异常、模型不存在等，原样返回便于调用方展示原因）。
+// TestModel tests whether a model is available. It first calls ListModels (GET /v1/models) to fetch the list of
+// available models and checks whether model is among them; if that endpoint is unavailable (unimplemented by some
+// OpenAI-compatible services), it falls back to a minimal Chat Completion.
+// Return values: available is the list of available models (only populated when ListModels succeeds), matched
+// indicates whether model is available, and err is the request error (auth failure, network error, model not
+// found, etc, returned as-is so the caller can display the reason).
 func TestModel(apiKey, apiBaseURL, model string, timeout int) (available []string, matched bool, err error) {
 	if 1 > timeout {
 		timeout = 30
@@ -239,7 +245,7 @@ func TestModel(apiKey, apiBaseURL, model string, timeout int) (available []strin
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancel()
 
-	// 优先校验模型是否在可用清单中
+	// First check whether the model is in the list of available models
 	list, listErr := client.ListModels(ctx)
 	if nil == listErr {
 		model = strings.TrimSpace(model)
@@ -253,7 +259,7 @@ func TestModel(apiKey, apiBaseURL, model string, timeout int) (available []strin
 		return
 	}
 
-	// ListModels 不可用时回退到极简 Chat Completion 验证连通性与鉴权
+	// When ListModels is unavailable, fall back to a minimal Chat Completion to verify connectivity and auth
 	logging.LogInfof("list models failed [%s], fallback to chat completion: %s", apiBaseURL, listErr)
 	messages := []openai.ChatCompletionMessage{{Role: "user", Content: "1"}}
 	_, err = client.CreateChatCompletion(ctx, openai.ChatCompletionRequest{
@@ -270,9 +276,11 @@ func TestModel(apiKey, apiBaseURL, model string, timeout int) (available []strin
 	return
 }
 
-// TestEmbeddingModel 测试嵌入模型可用性，发送极简文本并返回首个向量维度。
-// 返回值：matched 表示是否连通成功，dimensions 为返回的向量维度（便于核对配置），
-// err 为请求错误（鉴权失败、网络异常、模型不存在等，原样返回便于调用方展示原因）。
+// TestEmbeddingModel tests whether an embedding model is available by sending minimal text and returning the
+// dimensions of the first vector.
+// Return values: matched indicates whether the connection succeeded, dimensions is the returned vector dimension
+// (useful for verifying the configuration), and err is the request error (auth failure, network error, model not
+// found, etc, returned as-is so the caller can display the reason).
 func TestEmbeddingModel(apiKey, apiBaseURL, model string, dimensions, timeout int) (matched bool, dims int, err error) {
 	if 1 > timeout {
 		timeout = 30
@@ -281,11 +289,11 @@ func TestEmbeddingModel(apiKey, apiBaseURL, model string, dimensions, timeout in
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancel()
 
-	// 用极简文本发一次 embedding 请求，验证连通性、鉴权与模型可用性
+	// Send an embedding request with minimal text to verify connectivity, auth, and model availability
 	resp, err := client.CreateEmbeddings(ctx, openai.EmbeddingRequestStrings{
 		Input:      []string{"1"},
 		Model:      openai.EmbeddingModel(model),
-		Dimensions: dimensions, // 0 时因 omitempty 不发送，等同于用模型默认维度
+		Dimensions: dimensions, // Not sent when 0 due to omitempty, equivalent to using the model's default dimension
 	})
 	if nil != err {
 		logging.LogErrorf("test embedding model [%s] failed: %s", model, err)
@@ -298,8 +306,10 @@ func TestEmbeddingModel(apiKey, apiBaseURL, model string, dimensions, timeout in
 	return
 }
 
-// ListAvailableModels 拉取 Provider 的可用模型清单（GET /v1/models），仅返回模型 ID 列表。
-// 用于填充前端模型名称下拉框。不支持该端点的服务会返回错误，由调用方回退为手动输入。
+// ListAvailableModels fetches the provider's list of available models (GET /v1/models), returning only the list
+// of model IDs.
+// Used to populate the frontend model name dropdown. Services that don't support this endpoint will return an
+// error, and the caller falls back to manual input.
 func ListAvailableModels(apiKey, apiBaseURL string, timeout int) (models []string, err error) {
 	if 1 > timeout {
 		timeout = 30
@@ -339,9 +349,9 @@ func IsNetworkError(err error) bool {
 		strings.Contains(msg, "network")
 }
 
-// embeddingHTTPClient 单例 HTTP 客户端，复用连接池并限制每主机最大连接数，
-// 避免 embedding 索引器在 API 不可用时新建大量连接形成连接风暴。
-// 单次请求超时由调用方用 context.WithTimeout 控制，client 本身不设全局 Timeout。
+// embeddingHTTPClient is a singleton HTTP client that reuses the connection pool and caps the max connections per
+// host, preventing the embedding indexer from opening a flood of new connections when the API is unavailable.
+// Per-request timeout is controlled by the caller via context.WithTimeout; the client itself sets no global Timeout.
 var (
 	embeddingHTTPClientOnce sync.Once
 	embeddingHTTPClient     *http.Client
@@ -350,7 +360,7 @@ var (
 func getEmbeddingHTTPClient() *http.Client {
 	embeddingHTTPClientOnce.Do(func() {
 		transport := &http.Transport{
-			MaxConnsPerHost:     4, // 同一 embedding endpoint 的并发连接上限
+			MaxConnsPerHost:     4, // Max concurrent connections to the same embedding endpoint
 			MaxIdleConns:        8,
 			MaxIdleConnsPerHost: 4,
 			IdleConnTimeout:     90 * time.Second,
@@ -376,7 +386,7 @@ func BatchGetEmbeddings(texts []string, apiKey, baseURL, model string, dimension
 	resp, err := client.CreateEmbeddings(ctx, openai.EmbeddingRequestStrings{
 		Input:      texts,
 		Model:      openai.EmbeddingModel(model),
-		Dimensions: dimensions, // 0 时因 omitempty 不发送，等同于用模型默认维度
+		Dimensions: dimensions, // Not sent when 0 due to omitempty, equivalent to using the model's default dimension
 	})
 	if err != nil {
 		logging.LogErrorf("create embeddings failed: %s", err)
@@ -389,10 +399,12 @@ func BatchGetEmbeddings(texts []string, apiKey, baseURL, model string, dimension
 	return
 }
 
-// rerankDocTextMaxRunes 限制单篇文档送入重排服务的最大 Unicode 字符数，兼顾常见模型的输入上限。
+// rerankDocTextMaxRunes limits the max number of Unicode characters of a single document sent to the rerank
+// service, in line with the input limits of common models.
 const rerankDocTextMaxRunes = 4000
 
-// rerankHTTPClient 单例 HTTP 客户端，复用连接池并限制每主机最大连接数，避免重排请求打满连接。
+// rerankHTTPClient is a singleton HTTP client that reuses the connection pool and caps the max connections per
+// host, preventing rerank requests from saturating connections.
 var (
 	rerankHTTPClientOnce sync.Once
 	rerankHTTPClient     *http.Client
@@ -410,7 +422,8 @@ func getRerankHTTPClient() *http.Client {
 	return rerankHTTPClient
 }
 
-// rerankRequest 对应主流重排服务的 /rerank 请求体（Jina/Cohere/阿里云 compatible-api 等）。
+// rerankRequest corresponds to the /rerank request body of mainstream rerank services (Jina/Cohere/Alibaba Cloud
+// compatible-api, etc).
 type rerankRequest struct {
 	Model     string   `json:"model"`
 	Query     string   `json:"query"`
@@ -418,23 +431,27 @@ type rerankRequest struct {
 	TopN      int      `json:"top_n,omitempty"`
 }
 
-// rerankResult 为响应 results 数组中的单项，index 指向 documents 下标。
+// rerankResult is a single item in the response's results array, with index pointing into the documents slice.
 type rerankResult struct {
 	Index          int     `json:"index"`
 	RelevanceScore float64 `json:"relevance_score"`
 }
 
-// rerankResponse 对应 /v1/rerank 响应体。
+// rerankResponse corresponds to the /v1/rerank response body.
 type rerankResponse struct {
 	Results []rerankResult `json:"results"`
 }
 
-// Rerank 调用重排服务对 query 与候选文档逐对精排。endpoint 为完整重排端点地址，不同服务商路径无统一标准
-// （Jina /v1/rerank、阿里云 compatible-api/v1/reranks、Cohere /v1/rerank 等），由用户照文档填写。
-// 返回的 indices 与 scores 均按 relevance_score 降序，indices 指向传入 documents 的下标。
-// 对每条 document 文本按 rerankDocTextMaxRunes 截断，防超服务端 token 限制并保证 UTF-8 完整。
-// topN 语义：topN <= 0 时不传 top_n（服务端默认返回全部文档评分，搜索场景用此避免被服务端 top_n 上限截断）；
-// topN > 0 时透传给服务端，仅用于测试连通性等只需少量结果的场景。
+// Rerank calls the rerank service to score query against each candidate document. endpoint is the full rerank
+// endpoint address; different providers have no unified path convention (Jina /v1/rerank, Alibaba Cloud
+// compatible-api/v1/reranks, Cohere /v1/rerank, etc), so the user fills it in per their provider's docs.
+// The returned indices and scores are both sorted descending by relevance_score, with indices pointing into the
+// passed-in documents slice.
+// Each document's text is truncated per rerankDocTextMaxRunes to avoid exceeding server-side token limits while
+// keeping UTF-8 intact.
+// topN semantics: when topN <= 0, top_n is not sent (the server returns scores for all documents by default;
+// search scenarios use this to avoid being truncated by the server's top_n cap); when topN > 0, it is passed
+// through to the server, used only for scenarios needing few results such as connectivity testing.
 func Rerank(query string, documents []string, apiKey, endpoint, model string, topN, timeout int) (indices []int, scores []float64, err error) {
 	if 1 > timeout {
 		timeout = 30
@@ -461,7 +478,8 @@ func Rerank(query string, documents []string, apiKey, endpoint, model string, to
 		return
 	}
 
-	// endpoint 为完整重排端点地址，不做路径追加——不同服务商端点路径无统一标准，用户照文档填写。
+	// endpoint is the full rerank endpoint address; no path is appended -- different providers have no unified
+	// endpoint path convention, and the user fills it in per their provider's docs.
 	req, err := http.NewRequest(http.MethodPost, strings.TrimRight(endpoint, "/"), bytes.NewReader(body))
 	if nil != err {
 		return
@@ -513,8 +531,10 @@ func truncateRerankDocument(document string) string {
 	return document
 }
 
-// TestRerankModel 测试重排模型可用性，用极简 query+documents 发一次重排请求验证连通性与鉴权。
-// 返回值：matched 表示是否连通成功，err 为请求错误（鉴权失败、网络异常、模型不存在等，原样返回便于调用方展示原因）。
+// TestRerankModel tests whether a rerank model is available by sending a rerank request with a minimal
+// query+documents to verify connectivity and auth.
+// Return values: matched indicates whether the connection succeeded, and err is the request error (auth failure,
+// network error, model not found, etc, returned as-is so the caller can display the reason).
 func TestRerankModel(apiKey, apiBaseURL, model string, timeout int) (matched bool, err error) {
 	documents := []string{"a", "b"}
 	indices, _, err := Rerank("1", documents, apiKey, apiBaseURL, model, len(documents), timeout)
@@ -537,7 +557,8 @@ func TestRerankModel(apiKey, apiBaseURL, model string, timeout int) (matched boo
 	return
 }
 
-// PrepareForVision 校验并按需缩放图片，尽量保留视觉模型支持的原始格式和图片质量。
+// PrepareForVision validates and, if needed, resizes the image, trying to preserve the original format and image
+// quality supported by vision models.
 func PrepareForVision(data []byte, maxBytes, maxPixels, maxEdge int) (PreparedImage, error) {
 	if len(data) == 0 {
 		return PreparedImage{}, errors.New("image data is empty")
@@ -612,7 +633,7 @@ func PrepareForVision(data []byte, maxBytes, maxPixels, maxEdge int) (PreparedIm
 	}, nil
 }
 
-// ValidateGeneratedImage 校验生成图片的格式、尺寸和体积。
+// ValidateGeneratedImage validates the format, dimensions, and size of a generated image.
 func ValidateGeneratedImage(data []byte) (mimeType, extension string, err error) {
 	if len(data) == 0 {
 		return "", "", errors.New("generated image is empty")
@@ -812,7 +833,7 @@ func isUnsafeGeneratedImageIP(ip netip.Addr) bool {
 	if !ip.IsValid() || !ip.IsGlobalUnicast() || ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsUnspecified() {
 		return true
 	}
-	// IsPrivate 不包含共享地址空间和基准测试网段，这些地址仍可能指向本地基础设施。
+	// IsPrivate does not cover the shared address space and benchmarking ranges, which can still point at local infrastructure.
 	for _, prefix := range []netip.Prefix{
 		netip.MustParsePrefix("100.64.0.0/10"),
 		netip.MustParsePrefix("198.18.0.0/15"),

@@ -89,7 +89,7 @@ const getTargetListItem = (targetElement: Element, isBottom: boolean) => {
     return targetElement.closest(".li") as HTMLElement;
 };
 
-// position: afterbegin 为拖拽成超级块; "afterend", "beforebegin" 一般拖拽
+// position: afterbegin means dragging to form a superblock; "afterend"/"beforebegin" are ordinary drags
 const moveTo = async (protyle: IProtyle, sourceElements: Element[], targetElement: Element,
                       isSameDoc: boolean, position: InsertPosition, isCopy: boolean) => {
     const doOperations: IOperation[] = [];
@@ -108,10 +108,12 @@ const moveTo = async (protyle: IProtyle, sourceElements: Element[], targetElemen
     let newListElement: Element;
     let newListId: string;
     const orderListElements: { [key: string]: Element } = {};
-    // 在 DOM 移动前显式捕获每个源块的位置，供 undoOperations 使用。
-    // 不能依赖循环内 getParentBlock(item)（移动后 item 的父已变），否则撤销会移到错误位置。
-    // 关键：对于文档顶层块，getParentBlock 返回 .protyle-wysiwyg 容器（无 data-node-id），
-    // 不能用目标 protyle 的 rootID（跨文档拖拽时这是错误的文档），必须用源 DOM 所属文档 rootID。
+    // Explicitly capture each source block's position before the DOM move, for use by undoOperations.
+    // Cannot rely on getParentBlock(item) inside the loop below (item's parent has already changed after the
+    // move), or undo would move the block to the wrong location.
+    // Key point: for a top-level document block, getParentBlock returns the .protyle-wysiwyg container (which
+    // has no data-node-id). We can't use the target protyle's rootID here (wrong document in cross-document
+    // drags) -- we must use the rootID of the document the source DOM actually belongs to.
     const sourcePositions = new Map<string, { previousID: string, parentID: string }>();
     for (const item of sourceElements) {
         const id = item.getAttribute("data-node-id");
@@ -119,10 +121,10 @@ const moveTo = async (protyle: IProtyle, sourceElements: Element[], targetElemen
             const parentBlock = getParentBlock(item);
             let srcParentID = parentBlock?.getAttribute("data-node-id");
             if (!srcParentID) {
-                // 顶层块：父是 .protyle-wysiwyg 容器（无 data-node-id）。
+                // Top-level block: its parent is the .protyle-wysiwyg container (no data-node-id).
                 let srcRootID = "";
                 /// #if !MOBILE
-                // 通过 getAllEditor 反查 item 所属的源 protyle，取其 block.rootID。
+                // Use getAllEditor to look up the source protyle that item belongs to, and read its block.rootID.
                 const sourceEditor = getAllEditor().find(editor =>
                     editor.protyle.wysiwyg.element === parentBlock);
                 if (sourceEditor?.protyle?.block?.rootID) {
@@ -132,8 +134,9 @@ const moveTo = async (protyle: IProtyle, sourceElements: Element[], targetElemen
                 if (srcRootID) {
                     srcParentID = srcRootID;
                 } else {
-                    // 跨窗口/移动端 getAllEditor 找不到源编辑器，用 kernel API 反查块的真实 rootID。
-                    // 不能 fallback 到目标 protyle 的 rootID（会导致撤销把块移到错误文档）。
+                    // Cross-window or mobile: getAllEditor can't find the source editor, so fall back to the
+                    // kernel API to look up the block's real rootID.
+                    // Can't fall back to the target protyle's rootID (undo would move the block to the wrong document).
                     const response = await fetchSyncPost("/api/block/getBlockInfo", {id});
                     srcParentID = response?.data?.rootID || "";
                 }
@@ -183,7 +186,8 @@ const moveTo = async (protyle: IProtyle, sourceElements: Element[], targetElemen
                 id: copyNewId,
             });
         } else {
-            // 用 DOM 移动前预捕获的源位置构造撤销操作，避免移动后 item 的父/兄弟已变导致撤销移到错误位置
+            // Build the undo operation from the source position captured before the DOM move, since item's
+            // parent/sibling have already changed after the move, which would send undo to the wrong location
             const srcPos = sourcePositions.get(id) || {previousID: "", parentID};
             undoOperations.push({
                 action: "move",
@@ -193,7 +197,7 @@ const moveTo = async (protyle: IProtyle, sourceElements: Element[], targetElemen
             });
         }
         if (!isSameDoc && !isCopy) {
-            // 打开两个相同的文档
+            // The same document is open twice
             const sameElement = protyle.wysiwyg.element.querySelector(`[data-node-id="${id}"]`);
             if (sameElement) {
                 sameElement.remove();
@@ -227,7 +231,7 @@ const moveTo = async (protyle: IProtyle, sourceElements: Element[], targetElemen
                     action: "insert",
                     id: copyNewId,
                     data: copyElement.outerHTML,
-                    previousID: position === "afterbegin" ? null : (position === "afterend" ? targetId : getPreviousBlockSibling(copyElement)?.getAttribute("data-node-id")), // 不能使用常量，移动后会被修改
+                    previousID: position === "afterbegin" ? null : (position === "afterend" ? targetId : getPreviousBlockSibling(copyElement)?.getAttribute("data-node-id")), // cannot cache this in a constant, it changes after the move
                     parentID: position === "afterbegin" ? targetId : (getParentBlock(copyElement)?.getAttribute("data-node-id") || protyle.block.parentID || protyle.block.rootID),
                 });
                 newSourceElements.push(copyElement);
@@ -250,7 +254,7 @@ const moveTo = async (protyle: IProtyle, sourceElements: Element[], targetElemen
                 doOperations.push({
                     action: "move",
                     id,
-                    previousID: position === "afterbegin" ? null : (position === "afterend" ? targetId : getPreviousBlockSibling(item)?.getAttribute("data-node-id")), // 不能使用常量，移动后会被修改
+                    previousID: position === "afterbegin" ? null : (position === "afterend" ? targetId : getPreviousBlockSibling(item)?.getAttribute("data-node-id")), // cannot cache this in a constant, it changes after the move
                     parentID: position === "afterbegin" ? targetId : (getParentBlock(item)?.getAttribute("data-node-id") || protyle.block.parentID || protyle.block.rootID),
                 });
                 newSourceElements.push(item);
@@ -260,7 +264,7 @@ const moveTo = async (protyle: IProtyle, sourceElements: Element[], targetElemen
                 if (topSourceElement.contains(item)) {
                     topSourceElement = getTopAloneElement(oldSourceParentElement);
                 }
-                // 拖拽后剩下空元素
+                // Empty element left behind after the drag
                 doOperations.push({
                     action: "delete",
                     id: topSourceElement.getAttribute("data-node-id"),
@@ -275,14 +279,14 @@ const moveTo = async (protyle: IProtyle, sourceElements: Element[], targetElemen
                 const topSourceParentElement = topSourceElement.parentElement;
                 topSourceElement.remove();
                 if (!isSameDoc) {
-                    // 打开两个相同的文档
+                    // The same document is open twice
                     const sameElement = protyle.wysiwyg.element.querySelector(`[data-node-id="${topSourceElement.getAttribute("data-node-id")}"]`);
                     if (sameElement) {
                         sameElement.remove();
                     }
                 }
                 if (topSourceParentElement.classList.contains("sb") && getSbChildBlockCount(topSourceParentElement) === 1) {
-                    // 拖拽后，sb 只剩下一个元素
+                    // Only one element remains in the sb after the drag
                     if (isSameDoc) {
                         const sbData = await cancelSB(protyle, topSourceParentElement);
                         doOperations.push(sbData.doOperations[0], sbData.doOperations[1]);
@@ -295,7 +299,8 @@ const moveTo = async (protyle: IProtyle, sourceElements: Element[], targetElemen
                                 const otherSbData = await cancelSB(allEditor[i].protyle, topSourceParentElement);
                                 doOperations.push(otherSbData.doOperations[0], otherSbData.doOperations[1]);
                                 undoOperations.push(otherSbData.undoOperations[1], otherSbData.undoOperations[0]);
-                                // 全局撤销栈下跨文档移动为可逆条目，无需清空源编辑器历史
+                                // Cross-document moves are reversible entries in the global undo stack, so there's
+                                // no need to clear the source editor's history
                                 break;
                             }
                         }
@@ -303,7 +308,7 @@ const moveTo = async (protyle: IProtyle, sourceElements: Element[], targetElemen
                     }
                 }
             } else if (oldSourceParentElement.classList.contains("sb") && getSbChildBlockCount(oldSourceParentElement) === 1) {
-                // 拖拽后，sb 只剩下一个元素
+                // Only one element remains in the sb after the drag
                 if (isSameDoc) {
                     const sbData = await cancelSB(protyle, oldSourceParentElement);
                     doOperations.push(sbData.doOperations[0], sbData.doOperations[1]);
@@ -316,7 +321,8 @@ const moveTo = async (protyle: IProtyle, sourceElements: Element[], targetElemen
                             const otherSbData = await cancelSB(allEditor[i].protyle, oldSourceParentElement);
                             doOperations.push(otherSbData.doOperations[0], otherSbData.doOperations[1]);
                             undoOperations.push(otherSbData.undoOperations[1], otherSbData.undoOperations[0]);
-                            // 全局撤销栈下跨文档移动为可逆条目，无需清空源编辑器历史
+                            // Cross-document moves are reversible entries in the global undo stack, so there's
+                            // no need to clear the source editor's history
                             break;
                         }
                     }
@@ -324,7 +330,7 @@ const moveTo = async (protyle: IProtyle, sourceElements: Element[], targetElemen
                 }
             } else if (oldSourceParentElement.classList.contains("protyle-wysiwyg") && oldSourceParentElement.childElementCount === 0) {
                 /// #if !MOBILE
-                // 拖拽后，根文档原内容为空
+                // The root document's original content is empty after the drag
                 getAllEditor().find(item => {
                     if (item.protyle.element.contains(oldSourceParentElement)) {
                         if (!item.protyle.block.showAll) {
@@ -446,16 +452,18 @@ const moveTo = async (protyle: IProtyle, sourceElements: Element[], targetElemen
 const dragSb = async (protyle: IProtyle, sourceElements: Element[], targetElement: Element, isBottom: boolean,
                       direct: "col" | "row", isCopy: boolean) => {
     const isSameDoc = protyle.element.contains(sourceElements[0]);
-    // 移动前记录源块所在的超级块，移动后刷新其手柄（移出后需重建）https://github.com/siyuan-note/siyuan/issues/9521
+    // Record the superblock the source block belongs to before the move, so its handle can be refreshed after
+    // the move (it needs rebuilding once the block leaves) https://github.com/siyuan-note/siyuan/issues/9521
     const originSbSet = new Set<Element>();
     sourceElements.forEach(el => {
         const sb = el.closest('[data-type="NodeSuperBlock"]');
         if (sb && sb !== targetElement.closest('[data-type="NodeSuperBlock"]')) {
-            // 目标本身不在该超级块内（否则是 SB 内部重排，不必重建）
+            // The target itself is not inside this superblock (otherwise it's just an internal SB
+            // reorder and doesn't need rebuilding)
             originSbSet.add(sb);
         }
     });
-    // 把列表块中的唯一一个列表项块拖拽到列表块的左侧 https://github.com/siyuan-note/siyuan/issues/16315
+    // Dragging the only list item in a list block to the left side of the list block https://github.com/siyuan-note/siyuan/issues/16315
     if (isSameDoc && sourceElements[0].classList.contains("li") && targetElement === sourceElements[0].parentElement &&
         targetElement.childElementCount === sourceElements.length + 1) {
         const outLiElement = sourceElements.find((element) => {
@@ -487,27 +495,29 @@ const dragSb = async (protyle: IProtyle, sourceElements: Element[], targetElemen
         previousID: getPreviousBlockSibling(sbElement)?.getAttribute("data-node-id"),
         parentID: getParentBlock(sbElement)?.getAttribute("data-node-id") || protyle.block.parentID || protyle.block.rootID
     }];
-    // 临时插入，防止后面计算错误，最终再移动矫正
+    // Insert temporarily to prevent later miscalculation, then correct the position with a final move
     sbElement.lastElementChild.before(targetElement);
     const moveToResult = await moveTo(protyle, sourceElements, sbElement, isSameDoc, "afterbegin", isCopy);
     doOperations.push(...moveToResult.doOperations);
     undoOperations.push(...moveToResult.undoOperations);
     const newSourceParentElement = moveToResult.newSourceElements;
-    // 横向超级块A内两个元素拖拽成纵向超级块B，取消超级块A会导致 targetElement 被删除，需先移动再删除 https://github.com/siyuan-note/siyuan/issues/16292
+    // Dragging two elements in a row-layout superblock A to form a col-layout superblock B: canceling superblock A
+    // would delete targetElement, so we must move it before deleting https://github.com/siyuan-note/siyuan/issues/16292
     let removeIndex = doOperations.length;
     doOperations.find((item, index) => {
-        // 横向超级块A内两个元素拖拽成纵向超级块B，取消超级块A会导致 targetElement 被删除，需先移动再删除 https://github.com/siyuan-note/siyuan/issues/16292
+        // Dragging two elements in a row-layout superblock A to form a col-layout superblock B: canceling superblock A
+        // would delete targetElement, so we must move it before deleting https://github.com/siyuan-note/siyuan/issues/16292
         if (item.action === "delete" && item.id === targetMoveUndo.parentID) {
             removeIndex = index;
         }
-        // 超级块内有两个块，拖拽其中一个到超级块外 https://github.com/siyuan-note/siyuan/issues/16292#issuecomment-3523600155
+        // A superblock with two blocks, dragging one of them outside the superblock https://github.com/siyuan-note/siyuan/issues/16292#issuecomment-3523600155
         if (item.action === "delete" && item.id === targetElement.getAttribute("data-node-id")) {
             targetElement = sbElement.querySelector(`[data-node-id="${doOperations[index - 1].id}"]`);
         }
     });
 
     if (isBottom) {
-        // 拖拽到超级块 col 下方， 其他块右侧
+        // Dragging below the superblock col, other blocks to the right
         sbElement.insertAdjacentElement("afterbegin", targetElement);
         doOperations.splice(removeIndex, 0, {
             action: "move",
@@ -559,7 +569,8 @@ const dragSb = async (protyle: IProtyle, sourceElements: Element[], targetElemen
     originSbSet.forEach(sb => {
         refreshSbAndPersistWidth(sb, doOperations, undoOperations);
     });
-    // 跨文档移动为可逆条目：全局撤销栈按 rootID 分栈联动，撤销时经 mutatedRootIDs 判定弹确认
+    // Cross-document moves are reversible entries: the global undo stack is partitioned per rootID and linked
+    // together, and undo shows a confirmation based on mutatedRootIDs
     transaction(protyle, doOperations, undoOperations);
     if (document.contains(sourceElements[0])) {
         focusBlock(sourceElements[0]);
@@ -572,7 +583,8 @@ const dragSame = async (protyle: IProtyle, sourceElements: Element[], targetElem
     const isSameDoc = protyle.element.contains(sourceElements[0]);
     const doOperations: IOperation[] = [];
     const undoOperations: IOperation[] = [];
-    // 移动前记录源块所在的超级块，移动后刷新其手柄（移出后需重建）
+    // Record the superblock the source block belongs to before the move, so its handle can be refreshed after
+    // the move (it needs rebuilding once the block leaves)
     const originSbSet = new Set<Element>();
     sourceElements.forEach(el => {
         const sb = el.closest('[data-type="NodeSuperBlock"]');
@@ -639,12 +651,13 @@ const dragSame = async (protyle: IProtyle, sourceElements: Element[], targetElem
             )) {
                 const foldOperations = setFold(protyle, item, true, false, false, true);
                 doOperations.push(...foldOperations.doOperations);
-                // 不折叠，否则无法撤销 undoOperations.push(...foldOperations.undoOperations);
+                // Don't fold, otherwise it can't be undone -- undoOperations.push(...foldOperations.undoOperations);
             }
             return true;
         }
     });
-    // 移入/移出超级块后刷新拖拽手柄并重新分配宽度（如 A 拖到超级块内 B 前面，需在 A、B 间补手柄）
+    // After moving into/out of a superblock, refresh the drag handles and redistribute widths (e.g. dragging A
+    // in front of B inside a superblock requires adding a handle between A and B)
     const dragSbSet = new Set<Element>(originSbSet);
     [newSourceParentElement[0], targetElement].forEach(el => {
         const sb = el?.closest('[data-type="NodeSuperBlock"]');
@@ -658,7 +671,7 @@ const dragSame = async (protyle: IProtyle, sourceElements: Element[], targetElem
     if ((newSourceParentElement.length > 1 || hasFoldHeading) &&
         newSourceParentElement[0].parentElement.classList.contains("sb") &&
         newSourceParentElement[0].parentElement.getAttribute("data-sb-layout") === "col") {
-        // 合并到同一个 transaction，避免新超级块 id 在第二个 transaction 中找不到
+        // Merge into the same transaction, otherwise the new superblock id wouldn't be found in a second transaction
         const mergeOperations = await turnsIntoOneTransaction({
             protyle,
             selectsElement: newSourceParentElement.reverse(),
@@ -670,7 +683,8 @@ const dragSame = async (protyle: IProtyle, sourceElements: Element[], targetElem
         doOperations.push(...mergeOperations.doOperations);
         undoOperations.splice(0, 0, ...mergeOperations.undoOperations);
     }
-    // 跨文档移动为可逆条目：全局撤销栈按 rootID 分栈联动，撤销时经 mutatedRootIDs 判定弹确认
+    // Cross-document moves are reversible entries: the global undo stack is partitioned per rootID and linked
+    // together, and undo shows a confirmation based on mutatedRootIDs
     transaction(protyle, doOperations, undoOperations);
     if (document.contains(sourceElements[0])) {
         focusBlock(sourceElements[0]);
@@ -722,11 +736,11 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
                 ghostElement.setAttribute("style", `position:fixed;opacity:.1;width:${target.parentElement.clientWidth}px;padding:0;`);
                 document.body.append(ghostElement);
                 if (window.siyuan.touchDragActive) {
-                    // 触屏保留 DOM ghost 供 touchDragBridge 跟随手指
+                    // On touch, keep the DOM ghost around so touchDragBridge can follow the finger
                     event.dataTransfer.setDragImage(ghostElement, 0, 0);
                     window.siyuan.touchDragGhost = ghostElement;
                 } else {
-                    // 桌面端隐藏原生 ghost，改用自定义双区跟随框
+                    // On desktop, hide the native ghost and use a custom two-zone follower box instead
                     const transparentImg = new Image();
                     transparentImg.src = transparentImgSrc;
                     event.dataTransfer.setDragImage(transparentImg, 0, 0);
@@ -822,7 +836,7 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
                 return;
             }
         }
-        // 选中编辑器中的文字进行拖拽
+        // Selected text within the editor is being dragged
         event.dataTransfer.setData(Constants.SIYUAN_DROP_EDITOR, Constants.SIYUAN_DROP_EDITOR);
         protyle.element.style.userSelect = "auto";
         document.onmousemove = null;
@@ -872,13 +886,14 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
         event.preventDefault();
     };
     editorElement.addEventListener("drop", async (event: DragEvent & { target: HTMLElement }) => {
-        // lite 模式不落盘，拖拽块时强制复制语义（避免移动操作删除源块）。
+        // Lite mode doesn't persist to disk, so dragging a block forces copy semantics (a move would delete
+        // the source block).
         const isCopyDrag = protyle.lite || event.ctrlKey;
         counter = 0;
         hideDragTip();
         window.siyuan.dragTitle = "";
         if (protyle.disabled || event.dataTransfer.getData(Constants.SIYUAN_DROP_EDITOR)) {
-            // 只读模式/编辑器内选中文字拖拽
+            // Read-only mode / dragging selected text within the editor
             event.preventDefault();
             event.stopPropagation();
             return;
@@ -924,7 +939,7 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
                     blockID,
                     id,
                     previousID: window.siyuan.dragElement.previousElementSibling?.getAttribute("data-id"),
-                    data: "unRefresh"   // 不需要重新渲染
+                    data: "unRefresh"   // no need to re-render
                 }], [{
                     action: "sortAttrViewView",
                     avID,
@@ -942,7 +957,7 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
             targetElement.removeAttribute("select-end");
         }
         if (gutterType) {
-            // gutter 或反链面板拖拽
+            // Dragging from the gutter or the backlink panel
             const sourceElements: Element[] = [];
             const gutterTypes = gutterType.replace(Constants.SIYUAN_DROP_GUTTER, "").split(Constants.ZWSP);
             const selectedIds = gutterTypes[2].split(",");
@@ -959,8 +974,9 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
                 }
             }
             if (event.altKey || (event.shiftKey && protyle.lite)) {
-                // 引用：getRefText → Md2BlockDOM((id 'text'))
-                // lite 模式下 Shift（原嵌入块）也走引用，避免依赖后端 SQL 查询的嵌入块。
+                // Reference: getRefText -> Md2BlockDOM((id 'text'))
+                // In lite mode, Shift (which normally makes an embed block) also goes through the reference
+                // path, to avoid depending on embed blocks that require a backend SQL query.
                 await insertBlockRefs(selectedIds);
             } else if (event.shiftKey) {
                 let html = "";
@@ -981,8 +997,8 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
                         }
                     });
                 } else if (window.siyuan.config.system.workspaceDir.toLowerCase() === gutterTypes[3]) {
-                    // 跨窗口拖拽
-                    // 不能跨工作区域拖拽 https://github.com/siyuan-note/siyuan/issues/13582
+                    // Cross-window drag
+                    // Dragging across workspaces is not allowed https://github.com/siyuan-note/siyuan/issues/13582
                     const targetProtyleElement = document.createElement("template");
                     targetProtyleElement.innerHTML = `<div>${event.dataTransfer.getData(gutterType)}</div>`;
                     targetProtyleElement.content.querySelectorAll(queryClass.substring(0, queryClass.length - 1)).forEach(elementItem => {
@@ -998,7 +1014,7 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
                     item.classList.remove("protyle-wysiwyg--hl");
                     item.removeAttribute("select-start");
                     item.removeAttribute("select-end");
-                    // 反链提及有高亮，如果拖拽到正文的话，应移除
+                    // Backlink mentions carry a highlight, which should be removed when dragged into the document body
                     item.querySelectorAll('[data-type="search-mark"]').forEach(markItem => {
                         markItem.outerHTML = markItem.innerHTML;
                     });
@@ -1067,7 +1083,7 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
                         }
                     }
                 } else if (targetElement.classList.contains("av__row")) {
-                    // 拖拽到属性视图 table 内
+                    // Dragging into an attribute-view table
                     const blockElement = hasClosestBlock(targetElement);
                     if (blockElement) {
                         let previousID = "";
@@ -1078,7 +1094,7 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
                         }
                         const avID = blockElement.getAttribute("data-av-id");
                         if (gutterTypes[0] === "nodeattributeviewrowmenu") {
-                            // 行内拖拽
+                            // Dragging within a row
                             const doOperations: IOperation[] = [];
                             const undoOperations: IOperation[] = [];
                             const targetGroupID = targetElement.parentElement.getAttribute("data-group-id");
@@ -1146,7 +1162,7 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
                         }
                     }
                 } else if (targetElement.classList.contains("av__gallery-item") || targetElement.classList.contains("av__gallery-add")) {
-                    // 拖拽到属性视图 gallery 内
+                    // Dragging into an attribute-view gallery
                     const blockElement = hasClosestBlock(targetElement);
                     if (blockElement) {
                         let previousID = "";
@@ -1157,7 +1173,7 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
                         }
                         const avID = blockElement.getAttribute("data-av-id");
                         if (gutterTypes[1] === "galleryitem" && gutterTypes[0] === "nodeattributeview") {
-                            // gallery item 内部拖拽
+                            // Dragging within gallery items
                             const doOperations: IOperation[] = [];
                             const undoOperations: IOperation[] = [];
                             const targetGroupID = targetElement.parentElement.parentElement.getAttribute("data-group-id");
@@ -1227,33 +1243,39 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
                     const isChild = targetClass.some((c: string) => c.indexOf("--child") > -1);
                     const isBottom = targetClass.some((c: string) => c.indexOf("dragover__bottom") === 0);
 
-                    // 列表项/列表块拖到自身、子孙、或原位置时无操作，避免源被移出形成单独列表
+                    // No-op when a list item/list block is dropped on itself, its descendants, or its original
+                    // position, so the source isn't moved out and left as a standalone list
                     const isListItemSource = gutterTypes[0] === "nodelistitem" || gutterTypes[0] === "nodelist";
                     if (isListItemSource) {
-                        // 源列表项在目标列表容器内部时无操作（子列表项拖到父列表底部/顶部）
+                        // No-op when the source list item is inside the target list container (a nested list
+                        // item dragged to the top/bottom of its parent list)
                         if (targetElement.classList.contains("list") &&
                             sourceElements.some(s => targetElement.contains(s))) {
                             dragoverElement = undefined;
                             return;
                         }
-                        // targetElement 可能是列表项的子块（如 .p）或列表容器（.list），需找到对应 .li 再判断
+                        // targetElement may be a list item's child block (e.g. .p) or the list container (.list);
+                        // find its corresponding .li before deciding
                         const targetLi = getTargetListItem(targetElement, isBottom);
                         if (targetLi) {
                             const isNoOpDrop = sourceElements.some(source =>
-                                source === targetLi ||                                              // 拖到自身
-                                source.contains(targetLi) ||                                        // 拖到子孙中
-                                (!isChild && isBottom && source === targetLi.nextElementSibling) ||  // 底部同级：源原本就在目标后面
-                                (!isChild && !isBottom && source === targetLi.previousElementSibling)); // 顶部同级：源原本就在目标前面
-                            // Ctrl(复制)/Shift(嵌入)/Alt(引用) 走各自的 drop 分支，不进此移动 no-op；此处仅纯移动需拦截
+                                source === targetLi ||                                              // dropped on itself
+                                source.contains(targetLi) ||                                        // dropped on a descendant
+                                (!isChild && isBottom && source === targetLi.nextElementSibling) ||  // sibling below: source is already right after the target
+                                (!isChild && !isBottom && source === targetLi.previousElementSibling)); // sibling above: source is already right before the target
+                            // Ctrl (copy)/Shift (embed)/Alt (reference) go through their own drop branches and don't
+                            // hit this move no-op guard; only a plain move needs to be blocked here
                             if (isNoOpDrop && !event.ctrlKey && !event.shiftKey && !event.altKey) {
                                 dragoverElement = undefined;
                                 return;
                             }
                         } else {
-                            // 列表项/列表块拖到列表外紧邻块或父列表时无操作（含多级嵌套），避免源被移出形成独立列表
+                            // No-op when a list item/list block is dropped on an adjacent block just outside the
+                            // list, or on the parent list (including multi-level nesting), so the source isn't
+                            // moved out and left as a standalone list
                             const sourceSelected = sourceElements[0];
                             if (sourceSelected && (sourceSelected.classList.contains("li") || sourceSelected.classList.contains("list"))) {
-                                // 源在目标列表容器内部时无操作
+                                // No-op when the source is inside the target list container
                                 if (targetElement.classList.contains("list") && targetElement.contains(sourceSelected)) {
                                     dragoverElement = undefined;
                                     return;
@@ -1273,8 +1295,10 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
                                             return targetElement === prevSibling || targetElement === nextSibling;
                                         };
                                         if (checkSiblings(current)) {
-                                            // 源列表本身是文档顶层块、目标是其顶层紧邻块时，属合法顶层重排
-                                            // （moveTo 会为新位置新建合法列表包装），不拦截
+                                            // When the source list itself is a top-level document block and the
+                                            // target is its top-level adjacent block, this is a legitimate
+                                            // top-level reorder (moveTo will create a new valid list wrapper for
+                                            // the new position), so don't block it
                                             if (current.parentElement === editorElement) {
                                                 break;
                                             }
@@ -1288,9 +1312,12 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
                         }
                     }
 
-                    // 拖拽整个列表块（NodeList）到列表项时，展开为其下的列表项，避免形成 list>list 非法嵌套
-                    // 但当目标是超级块（col 布局）内的列表块时，列表块本身是超级块的一个列单元，
-                    // 应走列重排（dragSame）而非展开，否则 targetElement 被改写为 .li 后无法命中列重排分支
+                    // Dragging an entire list block (NodeList) onto a list item: expand it into its list items,
+                    // to avoid forming an illegal list>list nesting.
+                    // But when the target is a list block inside a superblock (col layout), the list block itself
+                    // is a column unit of the superblock, so it should go through column reordering (dragSame)
+                    // instead of being expanded -- otherwise targetElement gets rewritten to .li and the column
+                    // reorder branch is never hit
                     const isColSbChildList = targetElement.parentElement?.getAttribute("data-type") === "NodeSuperBlock" &&
                         targetElement.parentElement?.getAttribute("data-sb-layout") === "col";
                     if (isListItemSource && targetElement.classList.contains("list") &&
@@ -1322,9 +1349,12 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
                     const hasContentBlockSource = sourceElements.some(item =>
                         !["NodeList", "NodeListItem"].includes(item.getAttribute("data-type")));
 
-                    // 非列表项源（如段落）拖到子列表首项上方间隙：列表只能包含列表项，段落无法成为 .li 的同级，
-                    // 而该间隙的语义实为"插入到父列表项内容末尾（子列表之前）"，故锚点改为父列表项，
-                    // 将段落作为父列表项内容插到子列表之前。命中后立即结束落盘，避免后续通用分支重复移动。
+                    // A non-list-item source (e.g. a paragraph) dropped in the gap above a nested list's first item:
+                    // a list can only contain list items, so a paragraph can't become a sibling of .li. The real
+                    // meaning of this gap is "insert at the end of the parent list item's content, before the
+                    // nested list", so we retarget the anchor to the parent list item and insert the paragraph as
+                    // parent-list-item content before the nested list. Return immediately once handled here to
+                    // avoid the generic branch below moving it again.
                     if (hasContentBlockSource && !isChild && targetElement.getAttribute("data-type") === "NodeListItem") {
                         const parentLi = targetElement.parentElement?.parentElement;
                         if (targetClass.some((c: string) => c.indexOf("dragover__top--sibling") === 0) &&
@@ -1334,7 +1364,8 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
                                 c => c.hasAttribute("data-node-id") && !c.classList.contains("list"));
                             const anchorBlock = contentBlocks.length > 0 ? contentBlocks[contentBlocks.length - 1] : null;
                             if (anchorBlock) {
-                                // 插到最后一个内容块之后：moveTo 会把段落放在子列表之前，形成列表项内容
+                                // Insert after the last content block: moveTo will place the paragraph before the
+                                // nested list, making it part of the list item's content
                                 await dragSame(protyle, sourceElements, anchorBlock, true, isCopyDrag);
                             } else {
                                 await dragSame(protyle, sourceElements, contentLi, isBottom, isCopyDrag);
@@ -1346,7 +1377,7 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
 
                     if (hasContentBlockSource && !isChild &&
                         targetElement.getAttribute("data-type") === "NodeListItem") {
-                        // 普通内容块不能成为列表块的直接子节点。
+                        // A plain content block can't become a direct child of a list block.
                         dragoverElement = undefined;
                         return;
                     }
@@ -1363,18 +1394,20 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
                             }
                         }
                         if (nestedTarget) {
-                            // 拖拽自身子列表项到父项位置时，nestedTarget 可能就是源项自身，需跳过避免自己拖到自己
+                            // When dragging a nested list item to its parent item's position, nestedTarget may
+                            // turn out to be the source item itself, so skip it to avoid dropping onto itself
                             if (!sourceElements.includes(nestedTarget)) {
                                 dragSame(protyle, sourceElements, nestedTarget, isBottom, isCopyDrag);
                             }
                         } else {
-                            // 目标列表项无嵌套子列表：定位其最后一个内容块，在其后插入，
-                            // moveTo 会自动创建嵌套列表包装源列表项，形成子项结构
+                            // The target list item has no nested list: locate its last content block and insert
+                            // after it -- moveTo will automatically create a nested list wrapping the source
+                            // list item, forming the child-item structure
                             const contentBlocks = Array.from(targetElement.children).filter(
                                 c => c.hasAttribute("data-node-id") && !c.classList.contains("list"));
                             const lastContentBlock = contentBlocks[contentBlocks.length - 1];
                             if (lastContentBlock) {
-                                // 嵌套列表始终创建在最后一个内容块之后
+                                // The nested list is always created after the last content block
                                 dragSame(protyle, sourceElements, lastContentBlock, true, isCopyDrag);
                             } else {
                                 dragSame(protyle, sourceElements, targetElement, isBottom, isCopyDrag);
@@ -1383,18 +1416,19 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
                     } else if (targetElement.parentElement.getAttribute("data-type") === "NodeSuperBlock" &&
                         targetElement.parentElement.getAttribute("data-sb-layout") === "col") {
                         if (targetClass.includes("dragover__left") || targetClass.includes("dragover__right")) {
-                            // Mac 上 ⌘ 无法进行拖拽
+                            // Cmd doesn't work for dragging on Mac
                             dragSame(protyle, sourceElements, targetElement, targetClass.includes("dragover__right"), isCopyDrag);
                         } else {
                             dragSb(protyle, sourceElements, targetElement, isBottom, "row", isCopyDrag);
                         }
                     } else {
-                        // 列表项拖到列表容器边缘时禁止形成横向超级块（列表块拖到列表边缘可形成超级块）
+                        // Dragging a list item to the edge of a list container must not form a row-layout
+                        // superblock (dragging a list block to a list edge can still form one)
                         const isListItemOnlySource = gutterTypes[0] === "nodelistitem";
                         const isListTarget = targetElement.classList.contains("list");
                         if (isListItemOnlySource && isListTarget &&
                             (targetClass.includes("dragover__left") || targetClass.includes("dragover__right"))) {
-                            // 列表项拖到列表左右边缘：无操作
+                            // List item dropped on the left/right edge of a list: no-op
                         } else if (targetClass.includes("dragover__left") || targetClass.includes("dragover__right")) {
                             dragSb(protyle, sourceElements, targetElement, targetClass.includes("dragover__right"), "col", isCopyDrag);
                         } else {
@@ -1410,7 +1444,7 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
                 dragoverElement = undefined;
             }
         } else if (event.dataTransfer.getData(Constants.SIYUAN_DROP_FILE)?.split("-").length > 1) {
-            // 文件树拖拽
+            // Dragging from the file tree
             const ids = event.dataTransfer.getData(Constants.SIYUAN_DROP_FILE).split(",");
             if (!event.altKey && (!targetElement || (
                 !targetElement.classList.contains("av__row") && !targetElement.classList.contains("av__gallery-item") &&
@@ -1443,7 +1477,7 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
                 if (targetElement.classList.contains("av__row") ||
                     targetElement.classList.contains("av__gallery-item") ||
                     targetElement.classList.contains("av__gallery-add")) {
-                    // 拖拽到属性视图内
+                    // Dragging into an attribute view
                     const blockElement = hasClosestBlock(targetElement);
                     if (blockElement) {
                         let previousID = "";
@@ -1526,7 +1560,7 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
                     fetchPost("/api/filetree/getDoc", getDocParam, getResponse => {
                         onGet({data: getResponse, protyle});
                         /// #if !MOBILE
-                        // 文档标题互转后，需更新大纲
+                        // After converting between document title and heading, the outline needs to be updated
                         updatePanelByEditor({
                             protyle,
                             focus: false,
@@ -1535,7 +1569,8 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
                             resize: false,
                         });
                         /// #endif
-                        // 文档标题互转后，编辑区会跳转到开头 https://github.com/siyuan-note/siyuan/issues/2939
+                        // After converting between document title and heading, the editor jumps to the beginning
+                        // https://github.com/siyuan-note/siyuan/issues/2939
                         setTimeout(() => {
                             protyle.contentElement.scrollTop = scrollTop;
                             protyle.scroll.lastScrollTop = scrollTop - 1;
@@ -1548,7 +1583,7 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
             event.dataTransfer.types.includes("Files") || event.dataTransfer.types.includes("text/html")
         )) {
             event.preventDefault();
-            // 外部文件拖入编辑器中或者编辑器内选中文字拖拽
+            // External files dropped into the editor, or selected text dragged within the editor
             // https://github.com/siyuan-note/siyuan/issues/9544
             const avElement = hasClosestByClassName(event.target, "av");
             if (!avElement) {
@@ -1605,7 +1640,7 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
     let dragoverElement: Element;
     let dragCache: { nodeId: string, indent: number, rgb: { r: number, g: number, b: number }, guides: string };
     let disabledPosition: string;
-    // 列表项目标的插入点与提示处理：设置 class、CSS 变量、showDragTip
+    // Handle the drop indicator and tooltip for a list-item target: set class, CSS variables, showDragTip
     const applyLiTarget = (htmlTarget: HTMLElement, event: DragEvent, canDropAsSibling = true): void => {
         cleanupDragIndicators(editorElement);
         const nodeId = htmlTarget.getAttribute("data-node-id");
@@ -1619,7 +1654,8 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
             let siblingGuides = "";
             for (let n = 1; n <= depth; n++) {
                 if (siblingGuides) siblingGuides += ", ";
-                // guide 竖线透明度从 0.5（最近）渐变到 0.1（最远），均低于插入线（0.6）以突出目标位置
+                // Guide-line opacity fades from 0.5 (nearest) to 0.1 (farthest), both below the insertion
+                // line's opacity (0.6) so the target position stands out
                 const opacity = depth <= 1 ? 0.3 : 0.5 - (n - 1) / (depth - 1) * 0.4;
                 siblingGuides += `${-n * indent}px 0 0 0 rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${opacity.toFixed(2)})`;
             }
@@ -1630,32 +1666,36 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
         const liRect = htmlTarget.getBoundingClientRect();
         const isRTL = getComputedStyle(htmlTarget).direction === "rtl";
         const offsetX = isRTL ? (liRect.right - event.clientX) : (event.clientX - liRect.left);
-        // 用内容块（不含子列表）的 rect 判断上下半，避免有子列表时下半区域过小难以命中
+        // Use the content block's rect (excluding the nested list) to decide top/bottom half, so the bottom
+        // zone isn't too small to hit when a nested list is present
         const contentBlockForRect = Array.from(htmlTarget.children).find(c =>
             c.hasAttribute("data-node-id") && !c.classList.contains("list")) as HTMLElement;
         const contentRect = contentBlockForRect ? contentBlockForRect.getBoundingClientRect() : liRect;
         const isBottom = event.clientY > contentRect.top + contentRect.height / 2;
-        // 列表首项的上半保留顶部插入点；其余列表项整个区域统一使用底部插入点，避免下半区域过小难以命中
+        // The top half of the first list item keeps the top insertion point; every other list item uses a
+        // bottom insertion point across its whole area, so the bottom zone isn't too small to hit
         const isFirstLi = !htmlTarget.previousElementSibling || !htmlTarget.previousElementSibling.classList.contains("li");
         let position = "bottom";
         if (isFirstLi && !isBottom) {
             position = "top";
         }
-        // 有子列表时鼠标无法到达子列表区域（elementFromPoint 会命中子项的 .li），
-        // 因此有子列表的列表项内容区域全部作为 sibling（在目标后插入同级），无子列表时用 offsetX 判断 child/sibling
+        // When a nested list is present, the mouse can never reach the nested list's area (elementFromPoint hits
+        // the child item's .li instead), so the whole content area of a list item with a nested list is treated
+        // as sibling (insert as a sibling after the target); without a nested list, offsetX decides child/sibling
         const hasChildList = !!Array.from(htmlTarget.children).find(c => c.classList.contains("list"));
         const isChild = position === "bottom" && !hasChildList && offsetX >= indent;
         if (!canDropAsSibling && !isChild) {
             hideDragTip();
             return;
         }
-        // 源列表项拖到自身、子孙中、或原位置时不显示高亮与提示
+        // Don't show highlight/tooltip when the source list item is dropped on itself, its descendants, or its
+        // original position
         const sourceElements = Array.from(editorElement.querySelectorAll(".protyle-wysiwyg--select")) as HTMLElement[];
         const isNoOp = sourceElements.some(source =>
-            source === htmlTarget ||                                    // 拖到自身
-            source.contains(htmlTarget) ||                              // 拖到子孙中
-            (!isChild && position === "bottom" && source === htmlTarget.nextElementSibling) ||  // 底部同级：源原本就在目标后面
-            (position === "top" && source === htmlTarget.previousElementSibling));              // 顶部同级：源原本就在目标前面
+            source === htmlTarget ||                                    // dropped on itself
+            source.contains(htmlTarget) ||                              // dropped on a descendant
+            (!isChild && position === "bottom" && source === htmlTarget.nextElementSibling) ||  // sibling below: source is already right after the target
+            (position === "top" && source === htmlTarget.previousElementSibling));              // sibling above: source is already right before the target
         if (isNoOp) {
             cleanupDragIndicators(editorElement);
             hideDragTip();
@@ -1666,25 +1706,27 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
         htmlTarget.classList.add(className);
         htmlTarget.style.setProperty("--drag-indent", `${indent}px`);
         htmlTarget.style.setProperty("--drag-line-left", isChild ? `${indent}px` : "0");
-        // guide 竖线在 sibling 和 child 时都显示（sibling 时 ::before 为 transparent 不会与 guide 线重叠）
+        // The guide line is shown in both sibling and child states (in the sibling state ::before is
+        // transparent, so it won't overlap the guide line)
         htmlTarget.style.setProperty("--drag-guides", guides);
-        // ::before 目标标记仅在成为子项时显示，sibling 时由横线独占该区域避免半透明叠加变深
+        // The ::before target marker only shows when becoming a child item; in the sibling state the horizontal
+        // line has exclusive use of that area, to avoid a darker overlap from stacked translucency
         htmlTarget.style.setProperty("--drag-base-bg",
             isChild ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.6)` : "transparent");
-        // 横向插入线使用独立颜色，始终显示
+        // The horizontal insertion line uses its own dedicated color and is always shown
         htmlTarget.style.setProperty("--drag-line-bg",
             `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.6)`);
         highlightByLevel(editorElement, htmlTarget);
-        // 提示文案：修饰键显示对应操作，无修饰键显示插入位置
+        // Tooltip text: a modifier key shows the corresponding action; no modifier key shows the insertion position
         const targetText = (getContenteditableElement(htmlTarget)?.textContent?.trim() || "").slice(0, 20);
         let action: string;
         if (event.altKey || (event.shiftKey && protyle.lite)) {
-            // Alt=引用；lite 模式 Shift 也为引用
+            // Alt = reference; in lite mode, Shift is also a reference
             action = window.siyuan.languages.dragTipRef;
         } else if (event.shiftKey) {
             action = window.siyuan.languages.dragTipEmbed;
         } else if (event.ctrlKey || protyle.lite) {
-            // Ctrl=创建副本；lite 模式无修饰键也为复制
+            // Ctrl = create a copy; in lite mode, no modifier key also means copy
             action = window.siyuan.languages.duplicate;
         } else if (isChild) {
             action = window.siyuan.languages.dragTipListItemChild.replace("${x}", targetText);
@@ -1694,7 +1736,7 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
         }
         showDragTip(window.siyuan.dragTitle || "", action, event.clientX, event.clientY);
     };
-    // 缓存当前目标的文本和列布局判断，避免优化路径每次 dragover 重复计算
+    // Cache the current target's text and col-layout check, so the fast path doesn't recompute them on every dragover
     let cachedTargetText = "";
     let cachedIsCol = false;
     editorElement.addEventListener("dragover", (event: DragEvent & { target: HTMLElement }) => {
@@ -1730,36 +1772,37 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
             event.preventDefault();
             return;
         }
-        // 解析 gutter 类型数组，区分普通块、AV 块、AV 子类型
+        // Parse the gutter type array to distinguish plain blocks, AV blocks, and AV subtypes
         const gutterTypes = gutterType ? gutterType.replace(Constants.SIYUAN_DROP_GUTTER, "").split(Constants.ZWSP) : [];
         const isAvSubType = gutterTypes[0] === "nodeattributeviewrowmenu" ||
             gutterTypes[0] === "nodeattributeviewrow" ||
             (gutterTypes[0] === "nodeattributeview" && ["viewtab", "col", "galleryitem"].includes(gutterTypes[1] || ""));
-        // 操作提示：上半=操作对象名称，下半=操作文案
+        // Tooltip: top half = name of the operation's target, bottom half = operation text
         const isAvTarget = hasClosestByClassName(event.target, "av__row") ||
             hasClosestByClassName(event.target, "av__row--util") ||
             hasClosestByClassName(event.target, "av__gallery-item") ||
             hasClosestByClassName(event.target, "av__gallery-add");
         if (event.dataTransfer.types.includes(Constants.SIYUAN_DROP_FILE)) {
-            // 文档面板拖拽文档到编辑器
+            // Dragging a document from the document panel into the editor
             showDragTip(window.siyuan.dragTitle || "",
                 isAvTarget ? window.siyuan.languages.addToDatabase :
                     (event.altKey ? window.siyuan.languages.dragTip2Heading : window.siyuan.languages.dragTipRef),
                 event.clientX, event.clientY);
         } else if (gutterType && !isAvSubType && !(event.altKey && isInEmbedBlock(event.target))) {
-            // 普通块（段落/标题/列表/引用/AV块等，排除 AV 行/列/视图/卡片）拖入编辑器
-            // Alt 拖到嵌入块上不支持插入引用，跳过提示
+            // A plain block (paragraph/heading/list/quote/AV block, etc., excluding AV row/col/view/card)
+            // dragged into the editor
+            // Inserting a reference via Alt is not supported when dropping onto an embed block, so skip the tooltip
             let action: string;
             if (isAvTarget) {
-                // 拖到数据库视图：绑定为记录
+                // Dropped onto a database view: bind as a record
                 action = window.siyuan.languages.addToDatabase;
             } else if (event.altKey || (event.shiftKey && protyle.lite)) {
-                // Alt=引用；lite 模式 Shift 也为引用（原嵌入块改为引用）
+                // Alt = reference; in lite mode, Shift is also a reference (what used to be an embed block becomes a reference)
                 action = window.siyuan.languages.dragTipRef;
             } else if (event.shiftKey) {
                 action = window.siyuan.languages.dragTipEmbed;
             } else if (event.ctrlKey || protyle.lite) {
-                // Ctrl=创建副本；lite 模式无修饰键也为复制（不移动源块）
+                // Ctrl = create a copy; in lite mode, no modifier key also means copy (the source block isn't moved)
                 action = window.siyuan.languages.duplicate;
             } else {
                 action = window.siyuan.languages.move;
@@ -1769,12 +1812,12 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
             hideDragTip();
         }
         let targetElement: HTMLElement | false;
-        // 设置了的话 drop 就无法监听 shift/control event.dataTransfer.dropEffect = "move";
+        // Setting event.dataTransfer.dropEffect = "move" here would prevent drop from observing shift/control
         if (event.dataTransfer.types.includes("Files")) {
             targetElement = hasClosestByClassName(event.target, "av__cell");
             if (targetElement && targetElement.getAttribute("data-dtype") === "mAsset" &&
                 !targetElement.classList.contains("av__cell--header")) {
-                event.preventDefault(); // 不使用导致无法触发 drop
+                event.preventDefault(); // omitting this prevents drop from firing
                 if (dragoverElement && targetElement === dragoverElement) {
                     return;
                 }
@@ -1788,7 +1831,7 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
                     dragoverElement = targetElement;
                 }
             }
-            // 使用 event.preventDefault(); 会导致无光标 https://github.com/siyuan-note/siyuan/issues/12857
+            // Calling event.preventDefault() here would leave no caret https://github.com/siyuan-note/siyuan/issues/12857
             return;
         }
 
@@ -1799,30 +1842,36 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
         }
         const fileTreeIds = (event.dataTransfer.types.includes(Constants.SIYUAN_DROP_FILE) && window.siyuan.dragElement) ? window.siyuan.dragElement.innerText : "";
         if (event.altKey && fileTreeIds.indexOf("-") === -1) {
-            // Alt=插入引用（行级）：走光标定位语义，清除全部拖拽指示。
-            // 复用 cleanupDragIndicators 以覆盖列表专属指示类（--sibling/--child）与 --drag-* 变量，
-            // 否则按 Alt 时列表指示线会冻结在原处不动（仅清通用类不足以移除列表指示）。
-            // 注意：保留源块 .protyle-wysiwyg--select 不移除——该类仅在 dragstart 添加一次，
-            // 移除后永不恢复；松开修饰键回到普通拖拽时，no-op 守卫需靠它识别源块，
-            // 否则源项可被"移动"回自身原位。引用语义不依赖该类（用 gutterTypes[2] 的 id）。
+            // Alt = insert a reference (line-level): follows caret-positioning semantics, so clear all drag indicators.
+            // Reuse cleanupDragIndicators so it also covers the list-only indicator classes (--sibling/--child) and
+            // the --drag-* CSS variables; otherwise the list indicator line would freeze in place once Alt is held
+            // (clearing only the generic classes isn't enough to remove the list indicator).
+            // Note: the source block's .protyle-wysiwyg--select class is intentionally kept and not removed here --
+            // that class is only added once on dragstart and never restored once removed. When the modifier key is
+            // released and dragging returns to normal, the no-op guard relies on this class to recognize the source
+            // block, otherwise the source item could be "moved" back onto its own original position. Reference
+            // semantics don't depend on this class anyway (they use the id from gutterTypes[2]).
             renderBlockRefDragover(event);
             return;
         }
-        // 非 Alt 路径：清除可能残留的 Alt 竖线指示
+        // Non-Alt path: clear any leftover Alt vertical-line indicator
         hideCaretLine();
-        // 编辑器内文字拖拽或资源文件拖拽或按住 alt/shift 拖拽反链图标进入编辑器时不能运行 event.preventDefault()， 否则无光标; 需放在 !window.siyuan.dragElement 之后
+        // Dragging text within the editor, dragging an asset file, or dragging a backlink icon into the editor
+        // while holding alt/shift must not run event.preventDefault(), otherwise there's no caret; this must be
+        // placed after the !window.siyuan.dragElement check
         event.preventDefault();
         targetElement = hasClosestByClassName(event.target, "av__gallery-item") || hasClosestByClassName(event.target, "av__gallery-add") ||
             hasClosestByClassName(event.target, "av__row") || hasClosestByClassName(event.target, "av__row--util") ||
             hasClosestBlock(event.target);
         const directTargetElement = targetElement;
         if (targetElement && ["gallery", "kanban"].includes(targetElement.getAttribute("data-av-type")) && event.target.classList.contains("av__gallery")) {
-            // 拖拽到属性视图 gallery 内，但没选中 item
+            // Dragging into an attribute-view gallery, but no item is selected
             return;
         }
         const point = {x: event.clientX, y: event.clientY, className: ""};
 
-        // 超级块中有a，b两个段落块，移动到 ab 之间的间隙 targetElement 会变为超级块，需修正为 a
+        // If a superblock contains two paragraph blocks a and b, moving into the gap between them makes
+        // targetElement resolve to the superblock, which needs to be corrected back to a
         if (targetElement && (targetElement.classList.contains("bq") || targetElement.classList.contains("sb") || targetElement.classList.contains("list") || targetElement.classList.contains("li"))) {
             let prevElement = hasClosestBlock(document.elementFromPoint(point.x, point.y - 6));
             while (prevElement && targetElement.contains(prevElement)) {
@@ -1834,11 +1883,11 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
         }
         if (!targetElement) {
             if (event.clientY > editorElement.lastElementChild.getBoundingClientRect().bottom) {
-                // 命中底部
+                // Hit the bottom
                 targetElement = editorElement.lastElementChild as HTMLElement;
                 point.className = "dragover__bottom";
             } else if (event.clientY < editorElement.firstElementChild.getBoundingClientRect().top) {
-                // 命中顶部
+                // Hit the top
                 targetElement = editorElement.firstElementChild as HTMLElement;
                 point.className = "dragover__top";
             } else {
@@ -1848,42 +1897,44 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
                     right: contentRect.left + protyle.contentElement.clientWidth - parseInt(editorElement.style.paddingRight)
                 };
                 if (event.clientX < editorPosition.left) {
-                    // 左侧
+                    // Left side
                     point.x = editorPosition.left;
                     point.className = "dragover__left";
                 } else if (event.clientX >= editorPosition.right) {
-                    // 右侧
+                    // Right side
                     point.x = editorPosition.right - 6;
                     point.className = "dragover__right";
                 }
                 targetElement = document.elementFromPoint(point.x, point.y) as HTMLElement;
-                // 命中间隙时逐步向上探测，找到最近的块级元素（解决深层列表项下方间隙无法命中问题）
+                // When a gap is hit, probe upward step by step to find the nearest block-level element (solves
+                // the case where a gap below a deeply nested list item can't be hit)
                 let probeOffset = 6;
                 while (targetElement.classList.contains("protyle-wysiwyg") && probeOffset < 100) {
                     targetElement = document.elementFromPoint(point.x, point.y - probeOffset) as HTMLElement;
                     probeOffset += 6;
                 }
-                // 超级块右侧/左侧间隙：向内（水平）探测找到超级块
+                // Gap to the right/left of a superblock: probe inward (horizontally) to find the superblock
                 let hProbed = false;
                 if (targetElement.classList.contains("protyle-wysiwyg")) {
                     const editorRect = editorElement.getBoundingClientRect();
                     const editorCenter = editorRect.left + editorRect.width / 2;
                     let hProbe = 6;
                     while (targetElement.classList.contains("protyle-wysiwyg") && hProbe < 100) {
-                        // 右侧间隙向左探测，左侧间隙向右探测
+                        // Probe left from a right-side gap, probe right from a left-side gap
                         const probeX = point.x > editorCenter ? point.x - hProbe : point.x + hProbe;
                         targetElement = document.elementFromPoint(probeX, point.y) as HTMLElement;
                         hProbe += 6;
                     }
                     hProbed = !targetElement.classList.contains("protyle-wysiwyg");
                 }
-                // 列表项源优先深层 .li（精确插入），其他源（含列表块）用顶层块（支持超级块）
+                // For a list-item source, prefer the deepest .li (precise insertion); for other sources
+                // (including list blocks), use the top-level block (to support superblocks)
                 if (gutterTypes[0] === "nodelistitem") {
                     let closestLiFromPoint: HTMLElement;
                     if (targetElement.classList.contains("li")) {
                         closestLiFromPoint = targetElement;
                     } else if (targetElement.classList.contains("list")) {
-                        // 命中列表容器：取最后一个 .li，表示插到列表末尾之后
+                        // Hit the list container: take the last .li, meaning insert after the end of the list
                         const lis = targetElement.querySelectorAll(":scope > .li");
                         closestLiFromPoint = lis.length > 0 ? lis[lis.length - 1] as HTMLElement : targetElement.closest(".li") as HTMLElement;
                     } else {
@@ -1894,7 +1945,8 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
                     targetElement = hasTopClosestByAttribute(targetElement, "data-node-id", null) as HTMLElement;
                 }
                 if (targetElement && targetElement.classList.contains("sb") && targetElement.getAttribute("data-sb-layout") === "col") {
-                    // 鼠标在编辑器左右边缘或水平探测找到时保持整个超级块，否则改为子块
+                    // Keep the whole superblock as target when the mouse is at the editor's left/right edge or
+                    // found via horizontal probing, otherwise switch to a child block
                     if (point.className !== "dragover__left" && point.className !== "dragover__right" && !hProbed) {
                         const childElement = targetElement.querySelectorAll("[data-node-id]");
                         targetElement = childElement[point.className === "dragover__left" ? 0 : childElement.length - 1] as HTMLElement;
@@ -1902,11 +1954,11 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
                 }
             }
         } else if (targetElement && targetElement.classList.contains("list")) {
-            // 列表项和列表块拖拽统一处理，使命中子列表容器时行为一致
+            // Handle list-item and list-block drags uniformly, so hitting a nested list container behaves consistently
             targetElement = hasClosestBlock(document.elementFromPoint(event.clientX, event.clientY - 6));
         }
         if (gutterType && gutterType.startsWith(`${Constants.SIYUAN_DROP_GUTTER}NodeAttributeView${Constants.ZWSP}Col${Constants.ZWSP}`.toLowerCase())) {
-            // 表头只能拖拽到当前 av 的表头中
+            // A column header can only be dragged into the header row of the current av
             targetElement = hasClosestByClassName(event.target, "av__cell");
             if (targetElement) {
                 const targetRowElement = hasClosestByClassName(targetElement, "av__row--header");
@@ -1920,16 +1972,17 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
         } else if (targetElement && gutterType && gutterType.startsWith(`${Constants.SIYUAN_DROP_GUTTER}NodeAttributeViewRowMenu${Constants.ZWSP}`.toLowerCase())) {
             if ((!targetElement.classList.contains("av__row") && !targetElement.classList.contains("av__row--util")) ||
                 (window.siyuan.dragElement && !window.siyuan.dragElement.contains(targetElement))) {
-                // 行只能拖拽当前 av 中
+                // A row can only be dragged within the current av
                 targetElement = false;
             } else {
                 const bodyElement = hasClosestByClassName(targetElement, "av__body");
                 if (bodyElement) {
                     const blockElement = hasClosestBlock(bodyElement) as HTMLElement;
                     const groupID = bodyElement.getAttribute("data-group-id");
-                    // 模板、创建时间、更新时间 字段作为分组方式时不允许跨分组拖拽 https://github.com/siyuan-note/siyuan/issues/15553
+                    // Cross-group dragging is not allowed when the grouping field is template, created, or updated
+                    // https://github.com/siyuan-note/siyuan/issues/15553
                     const isTCU = ["template", "created", "updated"].includes(bodyElement.getAttribute("data-dtype"));
-                    // 排序只能夸组拖拽
+                    // Sorting can only be dragged across groups
                     const hasSort = blockElement.querySelector('.block__icon[data-type="av-sort"]')?.classList.contains("block__icon--active");
                     gutterTypes[2].split(",").find(item => {
                         const sourceGroupID = item ? item.split("@")[1] : "";
@@ -1948,16 +2001,17 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
             const containerElement = hasClosestByClassName(event.target, "av__container");
             if (targetElement.classList.contains("av") || !containerElement ||
                 !containerElement.contains(window.siyuan.dragElement) || targetElement === window.siyuan.dragElement) {
-                // gallery item 只能拖拽当前 av 中
+                // A gallery item can only be dragged within the current av
                 targetElement = false;
             } else {
                 const bodyElement = hasClosestByClassName(targetElement, "av__body");
                 if (bodyElement) {
                     const blockElement = hasClosestBlock(bodyElement) as HTMLElement;
                     const groupID = bodyElement.getAttribute("data-group-id");
-                    // 模板、创建时间、更新时间 字段作为分组方式时不允许跨分组拖拽 https://github.com/siyuan-note/siyuan/issues/15553
+                    // Cross-group dragging is not allowed when the grouping field is template, created, or updated
+                    // https://github.com/siyuan-note/siyuan/issues/15553
                     const isTCU = ["template", "created", "updated"].includes(bodyElement.getAttribute("data-dtype"));
-                    // 排序只能夸组拖拽
+                    // Sorting can only be dragged across groups
                     const hasSort = blockElement.querySelector('.block__icon[data-type="av-sort"]')?.classList.contains("block__icon--active");
                     gutterTypes[2].split(",").find(item => {
                         const sourceGroupID = item ? item.split("@")[1] : "";
@@ -1981,8 +2035,10 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
             hideDragTip();
             return;
         }
-        // 不允许拖拽到嵌入块中（嵌入块本身或其内部任意内容均不可作为拖拽目标）
-        // 例外：嵌入块是文档首块/末块且光标在其顶/底边外时，允许作为"嵌入块上/下方"落点（before/afterend 插入）
+        // Dragging into an embed block is not allowed (neither the embed block itself nor any content inside it
+        // can be a drop target)
+        // Exception: when the embed block is the document's first/last block and the cursor is outside its
+        // top/bottom edge, it can be dropped as "above/below the embed block" (before/afterend insertion)
         if (targetElement.getAttribute("data-type") === "NodeBlockQueryEmbed") {
             if (editorElement.firstElementChild === targetElement &&
                 event.clientY < targetElement.getBoundingClientRect().top) {
@@ -2002,7 +2058,8 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
             !targetElement.classList.contains("av__row--util") &&
             !targetElement.classList.contains("av__gallery-item") &&
             !targetElement.classList.contains("av__gallery-add");
-        // targetElement 在超级块内时：仅超级块最外侧子块的边缘（第一个子块左/最后一个子块右）算超级块操作
+        // When targetElement is inside a superblock: only the edges of the outermost child blocks (left of the
+        // first child / right of the last child) count as a superblock operation
         if (!targetElement.classList.contains("sb")) {
             const ancestorSb = targetElement.closest('[data-type="NodeSuperBlock"]') as HTMLElement;
             if (ancestorSb) {
@@ -2016,9 +2073,11 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
                     (isLastBlock && event.clientX > childRect.right - 8)) {
                     targetElement = ancestorSb;
                 }
-                // 整个列表块（NodeList）拖到 col 超级块内时，列表块本身是一列单元。
-                // 命中点落在某列 .list 的后代（.li/.p）时需把 targetElement 提升为该 .list，
-                // 否则左右边缘指示线会错误地落在内部列表项前（无法表达"插入到该列左/右"）
+                // When an entire list block (NodeList) is dragged into a col-layout superblock, the list block
+                // itself is a column unit. When the hit point lands on a descendant (.li/.p) of some column's
+                // .list, targetElement needs to be promoted to that .list, otherwise the left/right edge
+                // indicator line would incorrectly land in front of an inner list item (unable to express
+                // "insert to the left/right of this column")
                 if (gutterTypes[0] === "nodelist" &&
                     ancestorSb.getAttribute("data-sb-layout") === "col" &&
                     targetElement !== ancestorSb) {
@@ -2031,25 +2090,29 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
         }
         const isListSource = gutterTypes[0] === "nodelistitem" || gutterTypes[0] === "nodelist";
         const isContentBlockSource = !!gutterType && !isListSource && !isAvSubType;
-        // 仅真正命中列表项内部内容块时保留精确目标；由列表项间隙修正出的内容块仍按列表项处理。
+        // Only keep the precise target when a content block truly inside a list item is hit directly; a content
+        // block resolved via list-item gap correction is still treated as the list item.
         const keepLiContentTarget = targetElement === directTargetElement && isContentBlockSource &&
             targetElement.parentElement?.getAttribute("data-type") === "NodeListItem";
-        // 命中子列表容器或列表项内部内容块时不解析为 liTarget，走通用分支处理。
+        // Don't resolve to liTarget when a nested list container or a content block inside a list item is hit;
+        // let the generic branch handle it.
         let liTarget = targetElement.classList.contains("list") || keepLiContentTarget ? null :
             (targetElement.getAttribute("data-type") === "NodeListItem"
                 ? targetElement : targetElement.parentElement?.getAttribute("data-type") === "NodeListItem"
                     ? targetElement.parentElement : null);
-        // 列表项或列表块拖到列表外紧邻块时无操作，避免源被移出形成独立列表（含多级嵌套）
+        // No-op when a list item/list block is dropped on a block just outside the list, so the source isn't
+        // moved out and left as a standalone list (including multi-level nesting)
         if (isListSource && !liTarget) {
             const sourceSelected = editorElement.querySelector(".protyle-wysiwyg--select") as HTMLElement;
             if (sourceSelected && (sourceSelected.classList.contains("li") || sourceSelected.classList.contains("list"))) {
-                // 源列表项/列表块在目标列表容器内部时无操作
+                // No-op when the source list item/list block is inside the target list container
                 if (targetElement.classList.contains("list") && targetElement.contains(sourceSelected)) {
                     cleanupDragIndicators(editorElement);
                     hideDragTip();
                     return;
                 }
-                // 从源向上遍历，检查目标是否为任一层级 .list 或其所在 .li 的紧邻兄弟
+                // Walk upward from the source, checking whether the target is an adjacent sibling of any-level
+                // .list or the .li it belongs to
                 let current: Element = sourceSelected;
                 while (current && current !== editorElement) {
                     if (current.classList.contains("list") || current.classList.contains("li")) {
@@ -2065,8 +2128,9 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
                             return targetElement === prevSibling || targetElement === nextSibling;
                         };
                         if (checkSiblings(current)) {
-                            // 源列表本身是文档顶层块、目标是其顶层紧邻块时，属合法顶层重排
-                            // （moveTo 会为新位置新建合法列表包装），不拦截
+                            // When the source list itself is a top-level document block and the target is its
+                            // top-level adjacent block, this is a legitimate top-level reorder (moveTo will
+                            // create a new valid list wrapper for the new position), so don't block it
                             if (current.parentElement === editorElement) {
                                 break;
                             }
@@ -2079,7 +2143,8 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
                 }
             }
         }
-        // 从文档树拖拽文档到编辑器时，默认禁止拖入（需按 Alt 才能作为引用插入），且不能拖入文档自身
+        // When dragging a document from the file tree into the editor, dropping is disallowed by default (Alt
+        // must be held to insert it as a reference), and it can't be dropped into itself
         if (liTarget && fileTreeIds.indexOf("-") > -1 && isNotAvItem) {
             if (!event.altKey) {
                 return;
@@ -2087,10 +2152,12 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
                 return;
             }
         }
-        // 列表项/列表块拖到列表容器底部/顶部时，若源在列表内部或源就是列表末尾/开头的项，则为无操作
+        // When a list item/list block is dropped at the top/bottom of a list container, it's a no-op if the
+        // source is inside the list or is already the first/last item of the list
         if (isListSource && targetElement.classList.contains("list")) {
             const sourceSelected = editorElement.querySelector(".protyle-wysiwyg--select");
-            // 源在目标列表容器内部（子列表项/列表块拖到父列表），无操作
+            // No-op when the source is inside the target list container (a nested list item/list block dragged
+            // to its parent list)
             if (sourceSelected && targetElement.contains(sourceSelected)) {
                 cleanupDragIndicators(editorElement);
                 hideDragTip();
@@ -2111,9 +2178,11 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
                 return;
             }
         }
-        // 列表项目标无论是否命中优化分支都需立即处理，避免拖到列表标记符（.protyle-action）上时提示和插入点缺失
+        // A list-item target must be handled immediately regardless of whether the fast path was hit, otherwise
+        // the tooltip and insertion point are missing when dropping onto the list marker (.protyle-action)
         if (liTarget) {
-            // 向上找顶层列表容器，用于判断整个列表的左右边缘（而非子列表）
+            // Walk up to find the top-level list container, used to determine the whole list's left/right
+            // edges (rather than a nested list's)
             let topList: Element = liTarget as HTMLElement;
             while (topList.parentElement?.classList.contains("li") ||
                    topList.parentElement?.classList.contains("list")) {
@@ -2126,7 +2195,8 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
             const isLeftEdge = event.clientX < topListRect.left + 32;
             const isRightEdge = event.clientX > topListRect.right - 32;
             if (gutterTypes[0] === "nodelistitem") {
-                // 列表项拖拽：右侧边缘不触发超级块（清理后 return），左侧边缘和中间走 applyLiTarget
+                // List-item drag: the right edge doesn't trigger a superblock (clean up and return); the left
+                // edge and the middle go through applyLiTarget
                 if (isRightEdge) {
                     cleanupDragIndicators(editorElement);
                     return;
@@ -2134,7 +2204,8 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
                 applyLiTarget(liTarget as HTMLElement, event);
                 return;
             }
-            // 非列表项源：边缘不进入 applyLiTarget，清空 liTarget 让后续通用分支处理横向超级块
+            // Non-list-item source: an edge doesn't go into applyLiTarget; clear liTarget so the subsequent
+            // generic branch handles the row-layout superblock
             if (isLeftEdge || isRightEdge) {
                 liTarget = null;
             } else {
@@ -2143,14 +2214,14 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
             }
         }
         if (targetElement && dragoverElement && targetElement === dragoverElement) {
-            // 性能优化，目标为同一个元素不再进行校验
+            // Performance optimization: skip re-validation when the target is the same element as before
             const nodeRect = targetElement.getBoundingClientRect();
             cleanupDragIndicators(editorElement);
             editorElement.querySelectorAll("[select-start], [select-end]").forEach((item: HTMLElement) => {
                 item.removeAttribute("select-start");
                 item.removeAttribute("select-end");
             });
-            // 文档树拖拽限制
+            // File-tree drag restriction
             if (fileTreeIds.indexOf("-") > -1 && isNotAvItem) {
                 if (!event.altKey) {
                     return;
@@ -2161,8 +2232,10 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
             if (targetElement.getAttribute("data-type") === "NodeAttributeView" && hasClosestByTag(event.target, "TD")) {
                 return;
             }
-            // 拖到自身/子孙且为纯移动（无修饰键）时为无效移动：松开 Ctrl/Shift/Alt 后恢复成"拖拽自身"状态，不显示移动指示线
-            // Ctrl(复制)/Shift(嵌入)/Alt(引用) 允许落在源自身位置（创建副本/嵌入块/引用），不拦截
+            // Dropping on itself/a descendant as a plain move (no modifier key) is an invalid move: after
+            // releasing Ctrl/Shift/Alt it reverts to a "dragging itself" state and shouldn't show a move
+            // indicator. Ctrl (copy)/Shift (embed)/Alt (reference) are allowed to drop on the source's own
+            // position (create a copy/embed block/reference), so don't block those.
             const isSelfFast = !event.ctrlKey && !event.shiftKey && !event.altKey && gutterTypes[2]?.split(",").some((item: string) =>
                 item && hasClosestByAttribute(targetElement as HTMLElement, "data-node-id", item));
             if (isSelfFast && "nodeattributeviewrowmenu" !== gutterTypes[0]) {
@@ -2170,23 +2243,24 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
                 return;
             }
             if (point.className && !liTarget && !targetElement.classList.contains("sb")) {
-                // 列表项拖拽不触发横向超级块，列表边缘不显示插入指示
+                // A list-item drag doesn't trigger a row-layout superblock; don't show an insertion indicator at a list edge
                 if (!(gutterTypes[0] === "nodelistitem" && targetElement.classList.contains("list") &&
                     (point.className === "dragover__left" || point.className === "dragover__right"))) {
                     targetElement.classList.add(point.className);
                     addDragover(targetElement);
-                    // .list 目标无 contenteditable 元素，用第一个列表项的文字作为提示名
+                    // A .list target has no contenteditable element, so use the first list item's text as the tooltip name
                     let displayText = cachedTargetText;
                     if (!displayText && targetElement.classList.contains("list")) {
                         const firstLi = targetElement.querySelector(":scope > .li");
                         displayText = getContenteditableElement(firstLi as HTMLElement)?.textContent?.trim() || "";
                     }
-                    // 默认移动（无修饰键、非 AV 目标、普通块源、非超级块本身）时，更新下半为带目标名的位置文案
+                    // For the default move (no modifier key, non-AV target, plain block source, not the superblock
+                    // itself), update the bottom half with the position text including the target's name
                     if (!event.altKey && !event.shiftKey && !event.ctrlKey && gutterType && !isAvSubType && !isAvTarget && !targetElement.classList.contains("sb")) {
                         const isFront = point.className === "dragover__top" || point.className === "dragover__left";
                         const isBack = point.className === "dragover__bottom" || point.className === "dragover__right";
                         if ((isFront || isBack) && displayText) {
-                            // left/right 始终用前方/后方，top/bottom 根据 col 布局判断
+                            // left/right always use front/back; top/bottom are decided by the col layout
                             const isHorizontal = point.className === "dragover__left" || point.className === "dragover__right";
                             const key = (isHorizontal || cachedIsCol)
                                 ? (isFront ? window.siyuan.languages.dragTipMoveTargetFront : window.siyuan.languages.dragTipMoveTargetBack)
@@ -2207,7 +2281,7 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
                     !targetElement.classList.contains("av__row") && targetElement !== window.siyuan.dragElement.previousElementSibling) {
                     if (window.siyuan.dragElement.previousElementSibling.classList.contains("av__colsticky") &&
                         targetElement === window.siyuan.dragElement.previousElementSibling.lastElementChild) {
-                        // 拖拽到固定列的最后一个元素
+                        // Dragged onto the last element of a sticky/frozen column
                     } else {
                         targetElement.classList.add("dragover__right");
                     }
@@ -2242,7 +2316,8 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
                 return;
             }
 
-            // 超级块本身：左右边缘显示整个超级块的插入点，非边缘走通用判断（和段落一致）
+            // The superblock itself: left/right edges show an insertion point for the whole superblock; a
+            // non-edge hit falls through to the generic logic (same as for a paragraph)
             if (targetElement.classList.contains("sb")) {
                 const sbRect = targetElement.getBoundingClientRect();
                 const isSbLeftEdge = point.className === "dragover__left" || event.clientX < sbRect.left + 32;
@@ -2262,16 +2337,17 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
                     }
                     return;
                 }
-                // 非边缘：不 return，继续走通用判断
+                // Non-edge: don't return, fall through to the generic logic
             }
 
-            // 减小两个列表之间左侧间距，以便拖拽到其中 https://github.com/siyuan-note/siyuan/issues/15672
+            // Shrink the left-side gap between two lists so it's easier to drag into it https://github.com/siyuan-note/siyuan/issues/15672
             if (event.clientX < nodeRect.left + (targetElement.classList.contains("list") ? 8 : 32) &&
                 event.clientX >= nodeRect.left - 1 &&
                 !targetElement.classList.contains("av__row")) {
                 targetElement.classList.add("dragover__left");
                 addDragover(targetElement);
-                // 默认移动时，更新下半为带目标名的位置文案（超级块本身跳过）
+                // For the default move, update the bottom half with the position text including the target's
+                // name (skipped for the superblock itself)
                 if (!event.altKey && !event.shiftKey && !event.ctrlKey && gutterType && !isAvSubType && !isAvTarget && !targetElement.classList.contains("sb") && cachedTargetText) {
                     showDragTip(window.siyuan.dragTitle || "",
                         window.siyuan.languages.dragTipMoveTargetFront.replace("${x}", cachedTargetText),
@@ -2281,7 +2357,8 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
                 !targetElement.classList.contains("av__row")) {
                 targetElement.classList.add("dragover__right");
                 addDragover(targetElement);
-                // 默认移动时，更新下半为带目标名的位置文案（超级块本身跳过）
+                // For the default move, update the bottom half with the position text including the target's
+                // name (skipped for the superblock itself)
                 if (!event.altKey && !event.shiftKey && !event.ctrlKey && gutterType && !isAvSubType && !isAvTarget && !targetElement.classList.contains("sb") && cachedTargetText) {
                     showDragTip(window.siyuan.dragTitle || "",
                         window.siyuan.languages.dragTipMoveTargetBack.replace("${x}", cachedTargetText),
@@ -2295,7 +2372,8 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
                 if (event.clientY > nodeRect.top + nodeRect.height / 2 && disabledPosition !== "bottom") {
                     targetElement.classList.add("dragover__bottom");
                     addDragover(targetElement);
-                    // 默认移动时，更新下半为带目标名的位置文案（超级块本身跳过）
+                    // For the default move, update the bottom half with the position text including the target's
+                    // name (skipped for the superblock itself)
                     if (!event.altKey && !event.shiftKey && !event.ctrlKey && gutterType && !isAvSubType && !isAvTarget && !targetElement.classList.contains("sb") && cachedTargetText) {
                         showDragTip(window.siyuan.dragTitle || "",
                             (cachedIsCol ? window.siyuan.languages.dragTipMoveTargetBack : window.siyuan.languages.dragTipMoveTargetBelow).replace("${x}", cachedTargetText),
@@ -2304,7 +2382,8 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
                 } else if (disabledPosition !== "top") {
                     targetElement.classList.add("dragover__top");
                     addDragover(targetElement);
-                    // 默认移动时，更新下半为带目标名的位置文案（超级块本身跳过）
+                    // For the default move, update the bottom half with the position text including the target's
+                    // name (skipped for the superblock itself)
                     if (!event.altKey && !event.shiftKey && !event.ctrlKey && gutterType && !isAvSubType && !isAvTarget && !targetElement.classList.contains("sb") && cachedTargetText) {
                         showDragTip(window.siyuan.dragTitle || "",
                             (cachedIsCol ? window.siyuan.languages.dragTipMoveTargetFront : window.siyuan.languages.dragTipMoveTargetAbove).replace("${x}", cachedTargetText),
@@ -2331,15 +2410,15 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
 
         if (gutterType) {
             disabledPosition = "";
-            // gutter 文档内拖拽限制
-            // 排除自己及子孙
+            // In-document gutter drag restrictions
+            // Exclude itself and its descendants
             if (gutterTypes[0] === "nodeattributeview" && gutterTypes[1] === "col" && targetElement.getAttribute("data-id") === gutterTypes[2]) {
-                // 表头不能拖到自己上
+                // A column header can't be dropped onto itself
                 clearDragoverElement(dragoverElement);
                 return;
             }
             if (gutterTypes[0] === "nodeattributeviewrowmenu" && gutterTypes[2].split("@")[0] === targetElement.getAttribute("data-id")) {
-                // 行不能拖到自己上
+                // A row can't be dropped onto itself
                 clearDragoverElement(dragoverElement);
                 return;
             }
@@ -2349,12 +2428,13 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
                 }
             });
             if (isSelf && "nodeattributeviewrowmenu" !== gutterTypes[0] && !event.ctrlKey && !event.shiftKey && !event.altKey) {
-                // 拖到自身/子孙且为纯移动时无操作；Ctrl(复制)/Shift(嵌入)/Alt(引用) 允许落在源自身位置（创建副本/嵌入块/引用），不拦截
+                // No-op for a plain move onto itself/a descendant; Ctrl (copy)/Shift (embed)/Alt (reference) are
+                // allowed to drop on the source's own position (create a copy/embed block/reference), so don't block those
                 clearDragoverElement(dragoverElement);
                 return;
             }
             if (gutterTypes[0] === "nodelistitem" && "NodeListItem" === targetElement.getAttribute("data-type")) {
-                // 选中非列表不能拖拽到列表中 https://github.com/siyuan-note/siyuan/issues/13822
+                // A non-list selection can't be dragged into a list https://github.com/siyuan-note/siyuan/issues/13822
                 const notLiItem = Array.from(protyle.wysiwyg.element.querySelectorAll(".protyle-wysiwyg--select")).find((item: HTMLElement) => {
                     if (!item.classList.contains("li")) {
                         return true;
@@ -2366,33 +2446,34 @@ export const dropEvent = (protyle: IProtyle, editorElement: HTMLElement) => {
                 }
             }
             if (!["nodelistitem", "nodelist"].includes(gutterTypes[0]) && targetElement.getAttribute("data-type") === "NodeListItem") {
-                // 非列表项不能拖入列表项周围
+                // A non-list-item can't be dragged around a list item
                 clearDragoverElement(dragoverElement);
                 return;
             }
             if (gutterTypes[0] === "nodelistitem" && targetElement.parentElement.classList.contains("li") &&
                 targetElement.previousElementSibling?.classList.contains("protyle-action")) {
-                // 列表项不能拖入列表项中第一个元素之上
+                // A list item can't be dragged above the first element within a list item
                 disabledPosition = "top";
             }
             if (gutterTypes[0] === "nodelistitem" &&
                 targetElement.nextElementSibling?.classList.contains("list") &&
                 // https://github.com/siyuan-note/siyuan/issues/15672
                 targetElement.parentElement?.classList.contains("li")) {
-                // 列表项不能拖入列表上方块的下面
+                // A list item can't be dragged below the block above a list
                 disabledPosition = "bottom";
             }
             if (targetElement && targetElement.classList.contains("av__row--header")) {
-                // 块不能拖在表头上
+                // A block can't be dragged onto the header row
                 disabledPosition = "top";
             }
             dragoverElement = targetElement;
-            // 目标变化时更新缓存
+            // Update the cache when the target changes
             cachedTargetText = getContenteditableElement(targetElement as HTMLElement)?.textContent?.trim() || "";
             cachedIsCol = !!hasClosestByAttribute(targetElement as HTMLElement, "data-sb-layout", "col");
             highlightColColumn(targetElement as HTMLElement);
         }
-        // 默认移动（无修饰键、非 AV 目标、普通块源）时，更新下半为带目标名的位置文案
+        // For the default move (no modifier key, non-AV target, plain block source), update the bottom half
+        // with the position text including the target's name
         if (!event.altKey && !event.shiftKey && !event.ctrlKey && gutterType && !isAvSubType && targetElement && !isAvTarget && point.className) {
             const targetText = getContenteditableElement(targetElement as HTMLElement)?.textContent?.trim() || "";
             const isFront = point.className === "dragover__top" || point.className === "dragover__left";
@@ -2515,8 +2596,8 @@ const addDragover = (element: HTMLElement) => {
 };
 
 const highlightColColumn = (element: HTMLElement) => {
-    // col 布局中点亮所在列（列级 sb），方便区分左右列
-    // 仅当目标本身就是 col 超级块时才高亮，子块操作不高亮整个超级块
+    // In a col layout, highlight the column it's in (a column-level sb), to make left/right columns easier to tell apart
+    // Only highlight when the target itself is the col superblock; a child-block operation doesn't highlight the whole superblock
     if (element.getAttribute("data-sb-layout") === "col") {
         element.classList.add("dragover");
     }
@@ -2532,6 +2613,6 @@ const clearDragoverElement = (element: Element) => {
         (element as HTMLElement).style.removeProperty("--drag-base-bg");
         element = undefined;
     }
-    // 拖拽被限制（不允许插入）时隐藏提示，避免残留"移动"文字
+    // Hide the tooltip when dragging is restricted (insertion not allowed), so no leftover "move" text remains
     hideDragTip();
 };

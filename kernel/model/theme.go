@@ -31,7 +31,7 @@ import (
 	"github.com/vanng822/css"
 )
 
-// 将文档中的 CSS 变量替换为具体的主题样式值
+// fillThemeStyleVar replaces CSS variables in the document with their concrete theme style values
 func fillThemeStyleVar(tree *parse.Tree) {
 	if nil == tree || nil == tree.Root {
 		return
@@ -52,7 +52,7 @@ func fillThemeStyleVar(tree *parse.Tree) {
 			return ast.WalkContinue
 		}
 
-		// 遍历节点的 Kramdown IAL (Inline Attribute List) 属性
+		// Iterate over the node's Kramdown IAL (Inline Attribute List) attributes
 		for _, ial := range n.KramdownIAL {
 			if "style" != ial[0] {
 				continue
@@ -66,11 +66,11 @@ func fillThemeStyleVar(tree *parse.Tree) {
 					buf.WriteString(style)
 					buf.WriteString(": ")
 
-					// 解析嵌套的 CSS 变量
+					// Resolve nested CSS variables
 					value := resolveNestedCSSVar(themeStyles, name)
 
 					if "" == value {
-						// 回退为原始 var() 形式
+						// Fall back to the original var() form
 						buf.WriteString("var(")
 						buf.WriteString(name)
 						buf.WriteString(")")
@@ -88,10 +88,10 @@ func fillThemeStyleVar(tree *parse.Tree) {
 	})
 }
 
-// 递归解析嵌套的 CSS 变量
+// resolveNestedCSSVar recursively resolves nested CSS variables
 func resolveNestedCSSVar(themeStyles map[string]string, varName string) string {
-	visited := make(map[string]bool) // 循环引用检测
-	maxDepth := 10                   // 防止无限嵌套
+	visited := make(map[string]bool) // detect circular references
+	maxDepth := 10                   // prevent infinite nesting
 
 	currentName := varName
 	for range maxDepth {
@@ -105,12 +105,12 @@ func resolveNestedCSSVar(themeStyles map[string]string, varName string) string {
 			return ""
 		}
 
-		// 如果不包含嵌套变量，直接返回最终值
+		// If it doesn't contain a nested variable, just return the final value
 		if !strings.Contains(value, "var(") {
 			return value
 		}
 
-		// 提取嵌套变量名：var(--variable-name) -> --variable-name
+		// Extract the nested variable name: var(--variable-name) -> --variable-name
 		nestedVarName := gulu.Str.SubStringBetween(value, "(", ")")
 		if "" == nestedVarName {
 			return value
@@ -122,14 +122,15 @@ func resolveNestedCSSVar(themeStyles map[string]string, varName string) string {
 	return ""
 }
 
-// 从 CSS 选择器值中解析出样式属性和对应的 CSS 变量名
+// getStyleVarName parses the style property and its corresponding CSS variable name out of a CSS
+// selector value
 func getStyleVarName(value *css.CSSValue) (ret map[string]string) {
 	ret = map[string]string{}
 
 	var start, end int
 	var style, name string
 	for i, t := range value.Tokens {
-		// 获取样式属性名
+		// Get the style property name
 		if scanner.TokenIdent == t.Type && 0 == start {
 			style = strings.TrimSpace(t.Value)
 			continue
@@ -142,7 +143,7 @@ func getStyleVarName(value *css.CSSValue) (ret map[string]string) {
 		if scanner.TokenChar == t.Type && ")" == t.Value {
 			end = i
 
-			// 提取 var() 中的变量名
+			// Extract the variable name inside var()
 			if 0 < start && 0 < end {
 				for _, tt := range value.Tokens[start+1 : end] {
 					name += tt.Value
@@ -157,13 +158,13 @@ func getStyleVarName(value *css.CSSValue) (ret map[string]string) {
 	return
 }
 
-// 获取主题的样式变量映射表
+// getThemeStyleVar gets the theme's style variable map
 func getThemeStyleVar(theme string, isDarkMode bool) (ret map[string]string) {
 	ret = map[string]string{}
 
 	var cssContent string
 
-	// 第三方主题可能缺少基础变量，先加载默认主题作为基础
+	// A third-party theme may be missing base variables, so load the default theme first as a base
 	defaultTheme := map[bool]string{false: "daylight", true: "midnight"}[isDarkMode]
 	if theme != defaultTheme {
 		defaultData, err := os.ReadFile(filepath.Join(util.ThemesPath, defaultTheme, "theme.css"))
@@ -174,7 +175,7 @@ func getThemeStyleVar(theme string, isDarkMode bool) (ret map[string]string) {
 		}
 	}
 
-	// 拼接主题 CSS，后面的规则覆盖前面的规则
+	// Concatenate the theme CSS; later rules override earlier ones
 	userData, err := os.ReadFile(filepath.Join(util.ThemesPath, theme, "theme.css"))
 	if err != nil {
 		logging.LogErrorf("read theme [%s] css file failed: %s", theme, err)
@@ -182,7 +183,7 @@ func getThemeStyleVar(theme string, isDarkMode bool) (ret map[string]string) {
 	}
 	cssContent += string(userData)
 
-	// 解析拼接后的完整 CSS 内容
+	// Parse the concatenated, complete CSS content
 	styleSheet := css.Parse(cssContent)
 	stylePriorities := map[string]int{}
 	currentMode := map[bool]string{false: "light", true: "dark"}[isDarkMode]
@@ -197,8 +198,9 @@ func getThemeStyleVar(theme string, isDarkMode bool) (ret map[string]string) {
 				stylePriorities[propName] = priority
 			}
 
-			// 如果两个短横线开头 CSS 解析器有问题，--b3-theme-primary: #3575f0; 会被解析为 -b3-theme-primary:- #3575f0
-			// 这里两种解析都放到结果中
+			// For a property starting with two hyphens, the CSS parser has a bug: `--b3-theme-primary:
+			// #3575f0;` gets parsed as `-b3-theme-primary:- #3575f0`. Put both parsed forms into the
+			// result to cover this case.
 			bugFixPropName := "-" + propName
 			bugFixPropValue := strings.TrimSpace(strings.TrimPrefix(propValue, "-"))
 			if existingPriority, exists := stylePriorities[bugFixPropName]; !exists || priority >= existingPriority {
@@ -210,7 +212,7 @@ func getThemeStyleVar(theme string, isDarkMode bool) (ret map[string]string) {
 	return ret
 }
 
-// 粗略计算 CSS 选择器的优先级
+// getSelectorPriority roughly computes the priority of a CSS selector
 func getSelectorPriority(selector, currentMode string) int {
 	selector = strings.TrimSpace(strings.ToLower(selector))
 

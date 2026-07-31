@@ -17,20 +17,20 @@ export abstract class Constants {
     public static readonly NODE_ENV: string = _NODE_ENV;
     public static readonly SIYUAN_APPID: string = Math.random().toString(36).substring(8);
 
-    // 服务器地址
+    // Server address
     public static readonly ASSETS_ADDRESS: string = "https://assets.b3logfile.com/siyuan/";
     public static readonly PROTYLE_CDN: string = "/stage/protyle";
     public static readonly UPLOAD_ADDRESS: string = "/upload";
     public static readonly SERVICE_WORKER_PATH: string = "/service-worker.js";
 
-    // drop 事件
+    // Drop events
     public static readonly SIYUAN_DROP_FILE: string = "application/siyuan-file";
     public static readonly SIYUAN_DROP_GUTTER: string = "application/siyuan-gutter";
     public static readonly SIYUAN_DROP_BLOCK_REF: string = "application/siyuan-block-ref";
     public static readonly SIYUAN_DROP_TAB: string = "application/siyuan-tab";
     public static readonly SIYUAN_DROP_EDITOR: string = "application/siyuan-editor";
 
-    // 渲染进程调主进程
+    // Renderer process calling the main process
     public static readonly SIYUAN_CMD: string = "siyuan-cmd";
     public static readonly SIYUAN_GET: string = "siyuan-get";
     public static readonly SIYUAN_EVENT: string = "siyuan-event";
@@ -41,7 +41,7 @@ export abstract class Constants {
     public static readonly SIYUAN_HOTKEY: string = "siyuan-hotkey";
     public static readonly SIYUAN_INIT: string = "siyuan-init";
     public static readonly SIYUAN_READY_TO_SHOW: string = "siyuan-ready-to-show";
-    public static readonly SIYUAN_SEND_WINDOWS: string = "siyuan-send-windows"; // 主窗口和各新窗口之间的通信，{cmd: "closetab"|"lockscreen"|"lockscreenByMode", data: {}})
+    public static readonly SIYUAN_SEND_WINDOWS: string = "siyuan-send-windows"; // Communication between the main window and each new window, {cmd: "closetab"|"lockscreen"|"lockscreenByMode", data: {}})
     public static readonly SIYUAN_SAVE_CLOSE: string = "siyuan-save-close";
     public static readonly SIYUAN_AUTO_LAUNCH: string = "siyuan-auto-launch";
 
@@ -67,7 +67,7 @@ export abstract class Constants {
     public static readonly CUSTOM_SY_AV_VIEW: string = "custom-sy-av-view";
     public static readonly CUSTOM_SY_TITLE_EMPTY: string = "custom-sy-title-empty";
 
-    // 临时标记 DOM 属性以辅助完成其功能
+    // Temporary DOM attributes used to help implement their respective features
     public static readonly ATTRIBUTE_EDITING = "data-editing";
     public static readonly ATTRIBUTE_V_SCROLL = "data-v-scroll";
     public static readonly ATTRIBUTE_DOCK_WIDTH = "data-dock-width";
@@ -126,25 +126,25 @@ export abstract class Constants {
 
     // ws callback
     public static readonly CB_MOVE_NOLIST = "cb-move-nolist";
-    public static readonly CB_GET_APPEND = "cb-get-append"; // 向下滚动加载
-    public static readonly CB_GET_BEFORE = "cb-get-before"; // 向上滚动加载
-    public static readonly CB_GET_UNCHANGEID = "cb-get-unchangeid"; // 上下滚动，定位时不修改 blockid
-    public static readonly CB_GET_HL = "cb-get-hl"; // 高亮
-    public static readonly CB_GET_FOCUS = "cb-get-focus"; // 光标定位
-    public static readonly CB_GET_FOCUSFIRST = "cb-get-focusfirst"; // 动态定位到第一个块
-    public static readonly CB_GET_SETID = "cb-get-setid"; // 无折叠大纲点击 重置 blockid
-    public static readonly CB_GET_OUTLINE = "cb-get-outline"; // 大纲点击
-    public static readonly CB_GET_ALL = "cb-get-all"; // 获取所有块
-    public static readonly CB_GET_BACKLINK = "cb-get-backlink"; // 悬浮窗为传递型需展示上下文
-    public static readonly CB_GET_UNUNDO = "cb-get-unundo"; // 不需要记录历史
-    public static readonly CB_GET_SCROLL = "cb-get-scroll"; // 滚动到指定位置，用于直接打开文档，必有 rootID
-    public static readonly CB_GET_SEARCH = "cb-get-search"; // 通过搜索打开
-    public static readonly CB_GET_CONTEXT = "cb-get-context"; // 包含上下文
-    public static readonly CB_GET_ROOTSCROLL = "cb-get-rootscroll"; // 如果为 rootID 就滚动到指定位置，必有 rootID
-    public static readonly CB_GET_HTML = "cb-get-html"; // 直接渲染，不需要再 /api/block/getDocInfo，否则搜索表格无法定位
-    public static readonly CB_GET_HISTORY = "cb-get-history"; // 历史渲染
-    public static readonly CB_GET_OPENNEW = "cb-get-opennew"; // 编辑器只读后新建文件需为临时解锁状态 & https://github.com/siyuan-note/siyuan/issues/12197
-    public static readonly CB_GET_AV_NO_CREATE = "cb-get-av-no-create"; // 属性视图不自动创建
+    public static readonly CB_GET_APPEND = "cb-get-append"; // Load by scrolling down
+    public static readonly CB_GET_BEFORE = "cb-get-before"; // Load by scrolling up
+    public static readonly CB_GET_UNCHANGEID = "cb-get-unchangeid"; // Scroll up/down, don't change the blockid when positioning
+    public static readonly CB_GET_HL = "cb-get-hl"; // Highlight
+    public static readonly CB_GET_FOCUS = "cb-get-focus"; // Cursor positioning
+    public static readonly CB_GET_FOCUSFIRST = "cb-get-focusfirst"; // Dynamically position to the first block
+    public static readonly CB_GET_SETID = "cb-get-setid"; // Reset the blockid when clicking an unfolded outline
+    public static readonly CB_GET_OUTLINE = "cb-get-outline"; // Outline click
+    public static readonly CB_GET_ALL = "cb-get-all"; // Get all blocks
+    public static readonly CB_GET_BACKLINK = "cb-get-backlink"; // The floating window needs to show context for transferred content
+    public static readonly CB_GET_UNUNDO = "cb-get-unundo"; // No need to record history
+    public static readonly CB_GET_SCROLL = "cb-get-scroll"; // Scroll to a specific position, used when directly opening a document, rootID is required
+    public static readonly CB_GET_SEARCH = "cb-get-search"; // Opened via search
+    public static readonly CB_GET_CONTEXT = "cb-get-context"; // Includes context
+    public static readonly CB_GET_ROOTSCROLL = "cb-get-rootscroll"; // If it's rootID, scroll to the specific position, rootID is required
+    public static readonly CB_GET_HTML = "cb-get-html"; // Render directly without calling /api/block/getDocInfo again, otherwise searching tables can't be positioned
+    public static readonly CB_GET_HISTORY = "cb-get-history"; // History rendering
+    public static readonly CB_GET_OPENNEW = "cb-get-opennew"; // Creating a new file after the editor is read-only requires a temporarily unlocked state & https://github.com/siyuan-note/siyuan/issues/12197
+    public static readonly CB_GET_AV_NO_CREATE = "cb-get-av-no-create"; // Don't auto-create the attribute view
 
     // localstorage
     public static readonly LOCAL_ZOOM = "local-zoom";
@@ -191,119 +191,119 @@ export abstract class Constants {
     public static readonly DIALOG_GLOBALSEARCH = "dialog-globalsearch";
     public static readonly DIALOG_HISTORYCOMPARE = "dialog-historycompare";
 
-    public static readonly DIALOG_ACCESSAUTHCODE = "dialog-accessauthcode"; // 锁屏密码
-    public static readonly DIALOG_AICUSTOMACTION = "dialog-aicustomaction"; // AI 自定义操作
-    public static readonly DIALOG_AIUPDATECUSTOMACTION = "dialog-aiupdatecustomaction"; // 更新 AI 自定义操作
-    public static readonly DIALOG_AIPROVIDER = "dialog-aiprovider"; // AI 提供商设置
-    public static readonly DIALOG_AIMODEL = "dialog-aimodel"; // AI 模型设置
-    public static readonly DIALOG_AIMCPSERVER = "dialog-aimcpserver"; // AI MCP 服务设置
-    public static readonly DIALOG_BACKGROUNDLINK = "dialog-backgroundlink"; // 题头图-随机
-    public static readonly DIALOG_BACKGROUNDRANDOM = "dialog-backgroundrandom"; // 题头图-链接
-    public static readonly DIALOG_CHANGELOG = "dialog-changelog"; // 更新日志
-    public static readonly DIALOG_COMMANDPANEL = "dialog-commandpanel"; // 插件命令面板
-    public static readonly DIALOG_DEACTIVATEUSER = "dialog-deactivateuser"; // 注销账户
-    public static readonly DIALOG_EMOJIS = "dialog-emojis"; // 文档、笔记本图表
-    public static readonly DIALOG_EXPORTIMAGE = "dialog-exportimage"; // 导出为图片
-    public static readonly DIALOG_EXPORTTEMPLATE = "dialog-exporttemplate"; // 导出为模板
-    public static readonly DIALOG_EXPORTWORD = "dialog-exportword"; // 导出为 word
-    public static readonly DIALOG_EXPORTMARKDOWN = "dialog-exportmarkdown"; // 导出为 Markdown
-    public static readonly DIALOG_HISTORY = "dialog-history"; // 数据历史(Alt + H)
-    public static readonly DIALOG_HISTORYDOC = "dialog-historydoc"; // 文档历史
-    public static readonly DIALOG_MOVEPATHTO = "dialog-movepathto"; // 移动文档
-    public static readonly DIALOG_RENAME = "dialog-rename"; // 重命名
-    public static readonly DIALOG_RENAMEASSETS = "dialog-renameassets"; // 重命名资源文件
-    public static readonly DIALOG_RENAMEBOOKMARK = "dialog-renamebookmark"; // 重命名书签
-    public static readonly DIALOG_RENAMETAG = "dialog-renametag"; // 重命名标签
-    public static readonly DIALOG_REPLACETYPE = "dialog-replacetype"; // 替换 - 替换类型
-    public static readonly DIALOG_SAVECRITERION = "dialog-savecriterion"; // 保存查询条件
-    public static readonly DIALOG_SEARCHTYPE = "dialog-searchtype"; // 搜索 - 类型
-    public static readonly DIALOG_SEARCHASSETSTYPE = "dialog-searchassetstype"; // 搜索资源文件 - 类型
-    public static readonly DIALOG_SETTING = "dialog-setting"; // 设置面板
-    public static readonly DIALOG_SNAPSHOTTAG = "dialog-snapshottag"; // 标记快照
-    public static readonly DIALOG_SNAPSHOTMEMO = "dialog-snapshotmemo"; // 快照备注
-    public static readonly DIALOG_SNIPPETS = "dialog-snippets"; // 代码片段
-    public static readonly DIALOG_SYNCADDCLOUDDIR = "dialog-syncaddclouddir"; // 新建云端同步目录
-    public static readonly DIALOG_SYNCCHOOSEDIR = "dialog-syncchoosedir"; // 选择云端同步目录
-    public static readonly DIALOG_SYNCCHOOSEDIRECTION = "dialog-syncchoosedirection"; // 选择云端同步方向
-    public static readonly DIALOG_TRANSFERBLOCKREF = "dialog-transferblockref"; // 转移引用
-    public static readonly DIALOG_WECHATREMINDER = "dialog-wechatreminder"; // 微信提醒
-    public static readonly DIALOG_PASSWORD = "dialog-password"; // 导入同步密钥
-    public static readonly DIALOG_SETPASSWORD = "dialog-setpassword"; // 设置同步密钥
-    public static readonly DIALOG_BOOTSYNCFAILED = "dialog-bootsyncfailed"; // 启动时同步数据失败
-    public static readonly DIALOG_KERNELFAULT = "dialog-kernelfault"; // 内核退出
-    public static readonly DIALOG_STATEEXCEPTED = "dialog-stateexcepted"; // 状态异常
-    public static readonly DIALOG_ATTR = "dialog-attr"; // 设置块属性
-    public static readonly DIALOG_SETCUSTOMATTR = "dialog-setcustomattr"; // 设置自定义属性
-    public static readonly DIALOG_CREATENOTEBOOK = "dialog-createnotebook"; // 创建笔记本
-    public static readonly DIALOG_NOTEBOOKCONF = "dialog-notebookconf"; // 笔记本设置
-    public static readonly DIALOG_CREATEWORKSPACE = "dialog-createworkspace"; // 创建工作空间
-    public static readonly DIALOG_OPENWORKSPACE = "dialog-openworkspace"; // 打开工作空间
-    public static readonly DIALOG_SAVEWORKSPACE = "dialog-saveworkspace"; // 保存工作空间
+    public static readonly DIALOG_ACCESSAUTHCODE = "dialog-accessauthcode"; // Lock screen password
+    public static readonly DIALOG_AICUSTOMACTION = "dialog-aicustomaction"; // AI custom action
+    public static readonly DIALOG_AIUPDATECUSTOMACTION = "dialog-aiupdatecustomaction"; // Update AI custom action
+    public static readonly DIALOG_AIPROVIDER = "dialog-aiprovider"; // AI provider settings
+    public static readonly DIALOG_AIMODEL = "dialog-aimodel"; // AI model settings
+    public static readonly DIALOG_AIMCPSERVER = "dialog-aimcpserver"; // AI MCP service settings
+    public static readonly DIALOG_BACKGROUNDLINK = "dialog-backgroundlink"; // Header image - random
+    public static readonly DIALOG_BACKGROUNDRANDOM = "dialog-backgroundrandom"; // Header image - link
+    public static readonly DIALOG_CHANGELOG = "dialog-changelog"; // Changelog
+    public static readonly DIALOG_COMMANDPANEL = "dialog-commandpanel"; // Plugin command panel
+    public static readonly DIALOG_DEACTIVATEUSER = "dialog-deactivateuser"; // Deactivate account
+    public static readonly DIALOG_EMOJIS = "dialog-emojis"; // Document/notebook icons
+    public static readonly DIALOG_EXPORTIMAGE = "dialog-exportimage"; // Export as image
+    public static readonly DIALOG_EXPORTTEMPLATE = "dialog-exporttemplate"; // Export as template
+    public static readonly DIALOG_EXPORTWORD = "dialog-exportword"; // Export as Word
+    public static readonly DIALOG_EXPORTMARKDOWN = "dialog-exportmarkdown"; // Export as Markdown
+    public static readonly DIALOG_HISTORY = "dialog-history"; // Data history (Alt + H)
+    public static readonly DIALOG_HISTORYDOC = "dialog-historydoc"; // Document history
+    public static readonly DIALOG_MOVEPATHTO = "dialog-movepathto"; // Move document
+    public static readonly DIALOG_RENAME = "dialog-rename"; // Rename
+    public static readonly DIALOG_RENAMEASSETS = "dialog-renameassets"; // Rename asset file
+    public static readonly DIALOG_RENAMEBOOKMARK = "dialog-renamebookmark"; // Rename bookmark
+    public static readonly DIALOG_RENAMETAG = "dialog-renametag"; // Rename tag
+    public static readonly DIALOG_REPLACETYPE = "dialog-replacetype"; // Replace - replace type
+    public static readonly DIALOG_SAVECRITERION = "dialog-savecriterion"; // Save query criteria
+    public static readonly DIALOG_SEARCHTYPE = "dialog-searchtype"; // Search - type
+    public static readonly DIALOG_SEARCHASSETSTYPE = "dialog-searchassetstype"; // Search asset files - type
+    public static readonly DIALOG_SETTING = "dialog-setting"; // Settings panel
+    public static readonly DIALOG_SNAPSHOTTAG = "dialog-snapshottag"; // Tag snapshot
+    public static readonly DIALOG_SNAPSHOTMEMO = "dialog-snapshotmemo"; // Snapshot memo
+    public static readonly DIALOG_SNIPPETS = "dialog-snippets"; // Code snippets
+    public static readonly DIALOG_SYNCADDCLOUDDIR = "dialog-syncaddclouddir"; // Create a new cloud sync directory
+    public static readonly DIALOG_SYNCCHOOSEDIR = "dialog-syncchoosedir"; // Choose the cloud sync directory
+    public static readonly DIALOG_SYNCCHOOSEDIRECTION = "dialog-syncchoosedirection"; // Choose the cloud sync direction
+    public static readonly DIALOG_TRANSFERBLOCKREF = "dialog-transferblockref"; // Transfer reference
+    public static readonly DIALOG_WECHATREMINDER = "dialog-wechatreminder"; // WeChat reminder
+    public static readonly DIALOG_PASSWORD = "dialog-password"; // Import sync key
+    public static readonly DIALOG_SETPASSWORD = "dialog-setpassword"; // Set sync key
+    public static readonly DIALOG_BOOTSYNCFAILED = "dialog-bootsyncfailed"; // Data sync failed on startup
+    public static readonly DIALOG_KERNELFAULT = "dialog-kernelfault"; // Kernel exited
+    public static readonly DIALOG_STATEEXCEPTED = "dialog-stateexcepted"; // Abnormal state
+    public static readonly DIALOG_ATTR = "dialog-attr"; // Set block attributes
+    public static readonly DIALOG_SETCUSTOMATTR = "dialog-setcustomattr"; // Set custom attribute
+    public static readonly DIALOG_CREATENOTEBOOK = "dialog-createnotebook"; // Create notebook
+    public static readonly DIALOG_NOTEBOOKCONF = "dialog-notebookconf"; // Notebook settings
+    public static readonly DIALOG_CREATEWORKSPACE = "dialog-createworkspace"; // Create workspace
+    public static readonly DIALOG_OPENWORKSPACE = "dialog-openworkspace"; // Open workspace
+    public static readonly DIALOG_SAVEWORKSPACE = "dialog-saveworkspace"; // Save workspace
 
     // menu
-    public static readonly MENU_BAR_WORKSPACE = "barWorkspace"; // 顶栏主菜单
-    public static readonly MENU_BAR_PLUGIN = "topBarPlugin"; // 顶栏插件菜单
-    public static readonly MENU_BAR_ZOOM = "barZoom"; // 顶栏缩放菜单
-    public static readonly MENU_BAR_MODE = "barmode"; // 顶栏外观菜单
-    public static readonly MENU_BAR_MORE = "barmore"; // 顶栏更多菜单
-    public static readonly MENU_STATUS_HELP = "statusHelp"; // 状态栏帮助菜单
-    public static readonly MENU_STATUS_BACKGROUND_TASK = "statusBackgroundTask"; // 状态栏后台任务菜单
-    public static readonly MENU_DOCK = "menu-dock"; // 桌面端 dock 图标菜单
-    public static readonly MENU_DOCK_MOBILE = "dockMobileMenu"; // 移动端侧栏插件选项菜单
+    public static readonly MENU_BAR_WORKSPACE = "barWorkspace"; // Top bar main menu
+    public static readonly MENU_BAR_PLUGIN = "topBarPlugin"; // Top bar plugin menu
+    public static readonly MENU_BAR_ZOOM = "barZoom"; // Top bar zoom menu
+    public static readonly MENU_BAR_MODE = "barmode"; // Top bar appearance menu
+    public static readonly MENU_BAR_MORE = "barmore"; // Top bar more menu
+    public static readonly MENU_STATUS_HELP = "statusHelp"; // Status bar help menu
+    public static readonly MENU_STATUS_BACKGROUND_TASK = "statusBackgroundTask"; // Status bar background task menu
+    public static readonly MENU_DOCK = "menu-dock"; // Desktop dock icon menu
+    public static readonly MENU_DOCK_MOBILE = "dockMobileMenu"; // Mobile sidebar plugin option menu
 
-    public static readonly MENU_BLOCK_SINGLE = "block-single"; // 单选块菜单
-    public static readonly MENU_BLOCK_MULTI = "block-multi"; // 多选块菜单
-    public static readonly MENU_TITLE = "titleMenu"; // 文档块菜单
-    public static readonly MENU_FROM_TITLE_PROTYLE = "title-protyle"; // 在 Protyle 触发的文档块菜单
-    public static readonly MENU_FROM_TITLE_BREADCRUMB = "title-breadcrumb"; // 在面包屑触发的文档块菜单
-    public static readonly MENU_BREADCRUMB_MORE = "breadcrumbMore"; // 面包屑更多菜单
-    public static readonly MENU_BREADCRUMB_MOBILE_PATH = "breadcrumb-mobile-path"; // 移动端面包屑菜单
+    public static readonly MENU_BLOCK_SINGLE = "block-single"; // Single-block-selection menu
+    public static readonly MENU_BLOCK_MULTI = "block-multi"; // Multi-block-selection menu
+    public static readonly MENU_TITLE = "titleMenu"; // Document block menu
+    public static readonly MENU_FROM_TITLE_PROTYLE = "title-protyle"; // Document block menu triggered in Protyle
+    public static readonly MENU_FROM_TITLE_BREADCRUMB = "title-breadcrumb"; // Document block menu triggered in the breadcrumb
+    public static readonly MENU_BREADCRUMB_MORE = "breadcrumbMore"; // Breadcrumb more menu
+    public static readonly MENU_BREADCRUMB_MOBILE_PATH = "breadcrumb-mobile-path"; // Mobile breadcrumb menu
 
-    public static readonly MENU_DOC_TREE_MORE = "docTreeMore"; // 侧栏文档树右键菜单
-    public static readonly MENU_FROM_DOC_TREE_MORE_NOTEBOOK = "tree-notebook"; // 侧栏文档树右键菜单，单个笔记本
-    public static readonly MENU_FROM_DOC_TREE_MORE_DOC = "tree-doc"; // 侧栏文档树右键菜单，单个文档
-    public static readonly MENU_FROM_DOC_TREE_MORE_ITEMS = "tree-items"; // 侧栏文档树右键菜单，多个文档或笔记本
-    public static readonly MENU_TAG = "tagMenu"; // 侧栏标签菜单
-    public static readonly MENU_BOOKMARK = "bookmarkMenu"; // 侧栏书签菜单
-    public static readonly MENU_OUTLINE_CONTEXT = "outline-context"; // 大纲标题右键菜单
-    public static readonly MENU_OUTLINE_EXPAND_LEVEL = "outline-expand-level"; // 大纲展开层级菜单
+    public static readonly MENU_DOC_TREE_MORE = "docTreeMore"; // Sidebar document tree context menu
+    public static readonly MENU_FROM_DOC_TREE_MORE_NOTEBOOK = "tree-notebook"; // Sidebar document tree context menu, single notebook
+    public static readonly MENU_FROM_DOC_TREE_MORE_DOC = "tree-doc"; // Sidebar document tree context menu, single document
+    public static readonly MENU_FROM_DOC_TREE_MORE_ITEMS = "tree-items"; // Sidebar document tree context menu, multiple documents or notebooks
+    public static readonly MENU_TAG = "tagMenu"; // Sidebar tag menu
+    public static readonly MENU_BOOKMARK = "bookmarkMenu"; // Sidebar bookmark menu
+    public static readonly MENU_OUTLINE_CONTEXT = "outline-context"; // Outline heading context menu
+    public static readonly MENU_OUTLINE_EXPAND_LEVEL = "outline-expand-level"; // Outline expand level menu
 
-    public static readonly MENU_AV_VIEW = "av-view"; // 数据库视图标题菜单
-    public static readonly MENU_AV_HEADER_CELL = "av-header-cell"; // 数据库字段标题菜单
-    public static readonly MENU_AV_HEADER_ADD = "av-header-add"; // 数据库添加字段菜单
-    public static readonly MENU_AV_ADD_FILTER = "av-add-filter"; // 数据库添加筛选条件菜单
-    public static readonly MENU_AV_ADD_SORT = "av-add-sort"; // 数据库添加排序条件菜单
-    public static readonly MENU_AV_COL_OPTION = "av-col-option"; // 数据库单选多选字段的选项编辑菜单
-    public static readonly MENU_AV_COL_FORMAT_NUMBER = "av-col-format-number"; // 数据库数字字段格式化菜单
-    public static readonly MENU_AV_GROUP_DATE = "avGroupDate"; // 数据库日期字段分组菜单的日期菜单
-    public static readonly MENU_AV_GROUP_SORT = "avGroupSort"; // 数据库日期字段分组菜单的排序菜单
-    public static readonly MENU_AV_ASSET_EDIT = "av-asset-edit"; // 数据库资源字段链接或资源文件菜单
-    public static readonly MENU_AV_CALC = "av-calc"; // 数据库计算菜单
-    public static readonly MENU_AV_PAGE_SIZE = "av-page-size"; // 数据库条目数菜单
+    public static readonly MENU_AV_VIEW = "av-view"; // Database view title menu
+    public static readonly MENU_AV_HEADER_CELL = "av-header-cell"; // Database field title menu
+    public static readonly MENU_AV_HEADER_ADD = "av-header-add"; // Database add field menu
+    public static readonly MENU_AV_ADD_FILTER = "av-add-filter"; // Database add filter condition menu
+    public static readonly MENU_AV_ADD_SORT = "av-add-sort"; // Database add sort condition menu
+    public static readonly MENU_AV_COL_OPTION = "av-col-option"; // Option editing menu for database single/multi-select fields
+    public static readonly MENU_AV_COL_FORMAT_NUMBER = "av-col-format-number"; // Database number field formatting menu
+    public static readonly MENU_AV_GROUP_DATE = "avGroupDate"; // The date submenu of the database date field grouping menu
+    public static readonly MENU_AV_GROUP_SORT = "avGroupSort"; // The sort submenu of the database date field grouping menu
+    public static readonly MENU_AV_ASSET_EDIT = "av-asset-edit"; // Database asset field link or asset file menu
+    public static readonly MENU_AV_CALC = "av-calc"; // Database calculation menu
+    public static readonly MENU_AV_PAGE_SIZE = "av-page-size"; // Database item count menu
 
-    public static readonly MENU_SEARCH_MORE = "searchMore"; // 搜索更多菜单
-    public static readonly MENU_SEARCH_METHOD = "searchMethod"; // 搜索方式菜单
-    public static readonly MENU_SEARCH_ASSET_MORE = "searchAssetMore"; // 资源文件搜索更多菜单
-    public static readonly MENU_SEARCH_ASSET_METHOD = "searchAssetMethod"; // 资源文件搜索方式菜单
-    public static readonly MENU_SEARCH_UNREF_MORE = "searchUnRefMore"; // 列出引用失效的块的更多菜单
-    public static readonly MENU_SEARCH_HISTORY = "search-history"; // 搜索历史菜单
-    public static readonly MENU_SEARCH_REPLACE_HISTORY = "search-replace-history"; // 替换历史菜单
-    public static readonly MENU_SEARCH_ASSET_HISTORY = "search-asset-history"; // 资源文件搜索历史菜单
-    public static readonly MENU_MOVE_PATH_HISTORY = "move-path-history"; // 移动文档窗口搜索历史菜单
-    public static readonly MENU_CALLOUT_SELECT = "callout-select"; // 提示选择菜单
+    public static readonly MENU_SEARCH_MORE = "searchMore"; // Search more menu
+    public static readonly MENU_SEARCH_METHOD = "searchMethod"; // Search method menu
+    public static readonly MENU_SEARCH_ASSET_MORE = "searchAssetMore"; // Asset file search more menu
+    public static readonly MENU_SEARCH_ASSET_METHOD = "searchAssetMethod"; // Asset file search method menu
+    public static readonly MENU_SEARCH_UNREF_MORE = "searchUnRefMore"; // More menu for listing blocks with broken references
+    public static readonly MENU_SEARCH_HISTORY = "search-history"; // Search history menu
+    public static readonly MENU_SEARCH_REPLACE_HISTORY = "search-replace-history"; // Replace history menu
+    public static readonly MENU_SEARCH_ASSET_HISTORY = "search-asset-history"; // Asset file search history menu
+    public static readonly MENU_MOVE_PATH_HISTORY = "move-path-history"; // Move document window search history menu
+    public static readonly MENU_CALLOUT_SELECT = "callout-select"; // Callout selection menu
 
-    public static readonly MENU_BACKGROUND_ASSET = "background-asset"; // 资源文件选择器菜单
-    public static readonly MENU_AI = "ai"; // 块 AI 菜单
-    public static readonly MENU_TAB = "tab"; // 页签右键菜单
-    public static readonly MENU_TAB_LIST = "tabList"; // 页签切换菜单
+    public static readonly MENU_BACKGROUND_ASSET = "background-asset"; // Asset file picker menu
+    public static readonly MENU_AI = "ai"; // Block AI menu
+    public static readonly MENU_TAB = "tab"; // Tab context menu
+    public static readonly MENU_TAB_LIST = "tabList"; // Tab switch menu
 
-    public static readonly MENU_INLINE_CONTEXT = "inline-context"; // 文本右键菜单
-    public static readonly MENU_INLINE_IMG = "inline-img"; // 图片元素菜单
-    public static readonly MENU_INLINE_FILE_ANNOTATION_REF = "inline-file-annotation-ref"; // PDF 标注元素菜单
-    public static readonly MENU_INLINE_REF = "inline-block-ref"; // 块引用元素菜单
-    public static readonly MENU_INLINE_A = "inline-a"; // 超链接元素菜单
-    public static readonly MENU_INLINE_TAG = "inline-tag"; // 行级标签元素菜单
-    public static readonly MENU_INLINE_MATH = "inline-math"; // 行级公式元素菜单
+    public static readonly MENU_INLINE_CONTEXT = "inline-context"; // Text context menu
+    public static readonly MENU_INLINE_IMG = "inline-img"; // Image element menu
+    public static readonly MENU_INLINE_FILE_ANNOTATION_REF = "inline-file-annotation-ref"; // PDF annotation element menu
+    public static readonly MENU_INLINE_REF = "inline-block-ref"; // Block reference element menu
+    public static readonly MENU_INLINE_A = "inline-a"; // Hyperlink element menu
+    public static readonly MENU_INLINE_TAG = "inline-tag"; // Inline tag element menu
+    public static readonly MENU_INLINE_MATH = "inline-math"; // Inline formula element menu
 
     // timeout
     public static readonly TIMEOUT_OPENDIALOG = 50;
@@ -312,7 +312,9 @@ export abstract class Constants {
     public static readonly TIMEOUT_INPUT = 256;
     public static readonly TIMEOUT_LOAD = 300;
     public static readonly TIMEOUT_LONGPRESS = 400;
-    // 鼠标拖拽启动的短暂时间下限：平板鼠标合成 touch 拖拽文件树/画廊/列表操作等元素时，按下后需经过该时间才进拖拽，避免点击 + 号/箭头时抖动误触发 dragstart
+    // Minimum delay before a mouse drag starts: when a tablet's synthesized-mouse touch drags elements such as
+    // the file tree/gallery/list, this much time must pass after pressing down before the drag begins, to avoid
+    // jitter accidentally triggering dragstart when clicking the + button/arrow
     public static readonly TIMEOUT_MOUSE_DRAG_DELAY = 150;
     public static readonly TIMEOUT_MULTIPLE_SELECT = 1500;
     public static readonly TIMEOUT_TRANSITION = 300;
@@ -436,11 +438,11 @@ export abstract class Constants {
         221: "]",
         222: "'",
     });
-    // 冲突不使用 "⌘S/Q"
+    // Avoid conflicts, don't use "⌘S/Q"
     // "⌘", "⇧", "⌥", "⌃"
     // "⌘A", "⌘X", "⌘C", "⌘V", "⌘-", "⌘=", "⌘0", "⇧⌘V", "⌘/", "⇧↑", "⇧↓", "⇧→", "⇧←", "⇧⇥", "⌃D", "⇧⌘→", "⇧⌘←",
-    // "⌘Home", "⌘End", "⇧↩", "↩", "PageUp", "PageDown", "⌫", "⌦", "Escape" 不可自定义
-    // "⌥↩" 写死，但可自定义
+    // "⌘Home", "⌘End", "⇧↩", "↩", "PageUp", "PageDown", "⌫", "⌦", "Escape" cannot be customized
+    // "⌥↩" is hardcoded, but can be customized
     public static readonly SIYUAN_KEYMAP: Config.IKeymap = {
         general: {
             mainMenu: {default: "⌥\\", custom: "⌥\\"},

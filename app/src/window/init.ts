@@ -54,7 +54,7 @@ export const init = (app: App) => {
             adjustLayout(window.siyuan.layout.centerLayout);
         }
         afterLayout(app);
-        // 等待 dock 面板动画结束
+        // Wait for the dock panel animation to finish
         setTimeout(() => {
             setTabPosition();
         }, Constants.TIMEOUT_TRANSITION);

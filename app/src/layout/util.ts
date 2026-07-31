@@ -170,7 +170,7 @@ export const saveLayout = () => {
             if (!window.siyuan.config.readonly) {
                 fetchPost("/api/system/setUILayout", {
                     layout: layoutJSON,
-                    errorExit: false    // 后台不接受该参数，用于请求发生错误时退出程序
+                    errorExit: false    // Not accepted by the backend; used on the frontend to exit the program when the request errors
                 });
             }
         }
@@ -212,7 +212,7 @@ export const exportLayout = async (options: {
     } else {
         fetchPost("/api/system/setUILayout", {
             layout: layoutJSON,
-            errorExit: options.errorExit    // 后台不接受该参数，用于请求发生错误时退出程序
+            errorExit: options.errorExit    // Not accepted by the backend; used on the frontend to exit the program when the request errors
         }, () => {
             options.cb();
         });
@@ -233,7 +233,7 @@ export const getAllLayout = () => {
 
 const DOCK_KEYS = ["left", "right", "bottom"] as const;
 
-// agentChat 停靠按钮：已存在则去重，不存在则按默认布局补全
+// agentChat dock button: dedupe if it already exists, otherwise fill it in per the default layout
 const ensureAgentChatDock = (layout: Pick<Config.IUiLayout, "left" | "right" | "bottom">) => {
     let hasAgentChat = false;
     for (const key of DOCK_KEYS) {
@@ -325,7 +325,8 @@ export const JSONToCenter = (
 ) => {
     let child: Layout | Wnd | Tab | Model;
     if (json.instance === "Layout") {
-        // TabA 向右分屏后向下分屏，依次关闭右侧、上侧分屏无法移除 layout 嵌套，故在此解决 https://github.com/siyuan-note/siyuan/issues/12196
+        // After TabA splits right then splits down, closing the right split and then the top split in
+        // sequence cannot remove the layout nesting, so it is resolved here instead https://github.com/siyuan-note/siyuan/issues/12196
         while (json.children.length === 1 && json.children[0].instance === "Layout" &&
         json.children[0].type === "normal" && json.children[0].children.length === 1) {
             json.children = json.children[0].children;
@@ -470,7 +471,7 @@ export const JSONToCenter = (
 export const JSONToLayout = (app: App, isStart: boolean) => {
     JSONToCenter(app, window.siyuan.config.uiLayout.layout, undefined);
     JSONToDock(window.siyuan.config.uiLayout, app);
-    // 启动时不打开页签，需要移除没有钉住的页签
+    // Do not open tabs at startup; unpinned tabs need to be removed
     if (window.siyuan.config.fileTree.closeTabsOnStart) {
         /// #if BROWSER
         if (!sessionStorage.getItem(Constants.LOCAL_SESSION_FIRSTLOAD)) {
@@ -491,7 +492,7 @@ export const JSONToLayout = (app: App, isStart: boolean) => {
         }
         /// #endif
     }
-    // 移除没有插件的 tab
+    // Remove tabs that have no plugin
     document.querySelectorAll('li[data-type="tab-header"]').forEach((item: HTMLElement) => {
         const initData = item.getAttribute("data-initdata");
         if (initData) {
@@ -554,12 +555,12 @@ export const JSONToLayout = (app: App, isStart: boolean) => {
         if (latestTabHeaderElement) {
             setPanelFocus(latestTabHeaderElement.parentElement.parentElement.parentElement, false);
         }
-        // 移除没有数据的页签 https://github.com/siyuan-note/siyuan/issues/13390
+        // Remove tabs that have no data https://github.com/siyuan-note/siyuan/issues/13390
         removedTabs.forEach(item => {
             item.parent.removeTab(item.id, false, false, false);
         });
     }
-    // 需放在 tab.parent.switchTab 后，否则当前 tab 永远为最后一个
+    // Must come after tab.parent.switchTab, otherwise the current tab would always end up last
     afterLayoutReady(app);
     saveLayout();
     // https://github.com/siyuan-note/siyuan/issues/17779
@@ -575,7 +576,7 @@ export const JSONToLayout = (app: App, isStart: boolean) => {
         window.siyuan.layout.bottomDock.layout.children[1].element.classList.contains("fn__none")) {
         window.siyuan.layout.bottomDock.layout.element.style.height = "0px";
     }
-    // 等待 dock 面板动画结束
+    // Wait for the dock panel animation to finish
     setTimeout(() => {
         setTabPosition();
     }, Constants.TIMEOUT_TRANSITION);
@@ -678,7 +679,7 @@ export const layoutToJSON = (layout: Layout | Wnd | Tab | Model, json: any, brea
     if (layout instanceof Layout || layout instanceof Wnd) {
         if (layout instanceof Layout &&
             (layout.type === "bottom" || layout.type === "left" || layout.type === "right")) {
-            // 四周布局使用默认值，清空内容，重置时使用 dock 数据
+            // The surrounding (top/bottom/left/right) layouts use default values with empty content; dock data is used when resetting
             if (layout.type === "bottom") {
                 json.children = [{
                     "instance": "Wnd",
@@ -711,10 +712,10 @@ export const layoutToJSON = (layout: Layout | Wnd | Tab | Model, json: any, brea
             json.children = {};
             layoutToJSON(layout.model, json.children, breakObj);
         } else if (layout.headElement) {
-            // 当前页签没有激活时编辑器没有初始化
+            // The editor is not initialized while the current tab is not active
             json.children = JSON.parse(layout.headElement.getAttribute("data-initdata") || "{}");
         } else {
-            // 关闭所有页签
+            // Close all tabs
             json.children = {};
         }
     }
@@ -742,8 +743,9 @@ export const resizeTopBar = () => {
     let afterDragElement = dragElement.nextElementSibling;
     const hideIds: string[] = [];
     while (toolbarElement.scrollWidth > toolbarElement.clientWidth + 2) {
-        // 跳过默认即隐藏的元素（如桌面端 #barExit），它们本就不占溢出空间，
-        // 若为其打上 data-hide，最大化后恢复阶段会误将其显示出来
+        // Skip elements that are hidden by default (e.g. the desktop #barExit), since they never took up
+        // overflow space to begin with; tagging them with data-hide would wrongly reveal them during the
+        // restore-after-maximize step
         if (!afterDragElement.classList.contains("fn__none")) {
             hideIds.push(afterDragElement.id);
             afterDragElement.classList.add("fn__none");
@@ -791,7 +793,7 @@ export const resizeTopBar = () => {
     });
 };
 
-// TODO: 需支持所有页签类型，避免其他类型页签没有使用到而加载
+// TODO: needs to support all tab types, to avoid loading tab types that end up unused
 export const newModelByInitData = (app: App, tab: Tab, json: any) => {
     let model: Model;
     if (json.instance === "Custom") {
@@ -924,7 +926,7 @@ export const addResize = (obj: Layout | Wnd, after = true) => {
             const documentSelf = document;
             const nextElement = resizeElement.nextElementSibling as HTMLElement;
             const previousElement = resizeElement.previousElementSibling as HTMLElement;
-            nextElement.style.overflow = "auto"; // 拖动时 layout__resize 会出现 https://github.com/siyuan-note/siyuan/issues/6221
+            nextElement.style.overflow = "auto"; // layout__resize appears while dragging https://github.com/siyuan-note/siyuan/issues/6221
             previousElement.style.overflow = "auto";
             nextElement.style.transition = "none";
             previousElement.style.transition = "none";
@@ -938,7 +940,7 @@ export const addResize = (obj: Layout | Wnd, after = true) => {
             const nextSize = direction === "lr" ? nextElement.clientWidth : nextElement.clientHeight;
 
             documentSelf.ondragstart = () => {
-                // 文件树拖拽会产生透明效果
+                // Dragging in the file tree produces a transparency effect
                 document.querySelectorAll(".sy__file .b3-list-item").forEach((item: HTMLElement) => {
                     if (item.style.opacity === "0.38") {
                         item.style.opacity = "";

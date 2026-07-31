@@ -24,10 +24,13 @@ import (
 	"github.com/siyuan-note/siyuan/kernel/util"
 )
 
-// HTTPRequestTool 通用 HTTP 调用工具，供智能体访问需要鉴权的 REST API（如微信读书网关）。
-// 与 web_fetch 的区别：支持自定义 method/headers/body，且文本类响应（含 JSON）原样返回而非转 Markdown。
-// 用 action 承载 method（get/post/put/delete/patch），从而零改动复用 agent 的确认机制——
-// GET 命中 safeActions["get"] 免确认，POST 等写操作触发 UI 确认 + 写前快照。
+// HTTPRequestTool is a generic HTTP call tool for the agent to access REST APIs that require authentication
+// (such as the WeChat Reading gateway).
+// The difference from web_fetch: it supports a custom method/headers/body, and text-based responses
+// (including JSON) are returned as-is rather than converted to Markdown.
+// The method (get/post/put/delete/patch) is carried in action, which lets this reuse the agent's confirmation
+// mechanism with zero changes -- GET matches safeActions["get"] and skips confirmation, while POST and other
+// write operations trigger UI confirmation + a pre-write snapshot.
 var HTTPRequestTool = &Tool{
 	Name:        "http_request",
 	Description: "Send an HTTP request to a REST API and return the raw text response (JSON is kept as-is). action (HTTP method): get (default)/post/put/delete/patch. url (http/https), headers (object), body (string). Use this instead of web_fetch when you need POST, custom headers (e.g. Authorization), or raw JSON responses.",
@@ -69,8 +72,8 @@ func httpRequestHandler(args map[string]any) (CallToolResult, error) {
 	}
 	body, _ := args["body"].(string)
 
-	// 对 url/headers/body 中的 {{secrets.NAME}}、{{vars.NAME}} 占位符插值，
-	// 密钥/变量明文只进入出站请求，不进入 LLM 上下文。
+	// Interpolate {{secrets.NAME}} and {{vars.NAME}} placeholders in url/headers/body;
+	// the plaintext secret/variable value only enters the outbound request, never the LLM context.
 	resolve := func(s string) string {
 		return conf.ResolveSecretsVars(model.Conf.Secrets, model.Conf.Variables, s)
 	}

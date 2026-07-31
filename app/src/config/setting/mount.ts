@@ -4,7 +4,7 @@ import {Constants} from "../../constants";
 import type {SettingTabMountContext} from "./builder";
 import {getSettingTab, type TSettingTab} from "./tabs";
 
-/** 首次挂载：渲染全部注册项并执行 afterMount */
+/** First mount: renders every registered item and runs their afterMount hooks */
 export const mountSettingTab = async (tabId: string, root: HTMLElement) => {
     const {html, items} = buildGroupedItemsView(tabId);
     root.innerHTML = html;
@@ -14,7 +14,7 @@ export const mountSettingTab = async (tabId: string, root: HTMLElement) => {
     }
 };
 
-/** 设置面板已打开且对应 Tab 已挂载时，重新 register 并整页替换 */
+/** Registers the items again and replaces the whole page, for when the setting dialog is open and the tab is mounted */
 export const remountOpenSettingTab = async (tabId: TSettingTab) => {
     const dialogElement = window.siyuan.dialogs.find((d) => d.element.getAttribute("data-key") === Constants.DIALOG_SETTING)?.element;
     if (!dialogElement) {
@@ -59,7 +59,7 @@ export const applySettingTabSearchVisibility = (
                 lastVisibleItem = itemEl;
             }
         });
-        // 标记每组最后一个未隐藏条目，不显示 border-bottom
+        // Mark the last item of each group that is not hidden, so that it gets no border-bottom
         lastVisibleItem?.classList.add("config-item--last-visible");
     });
 };
@@ -70,7 +70,7 @@ export const clearSettingTabSearch = (root: HTMLElement) => {
     });
 };
 
-/** 面板型 SettingTab：根据全局搜索关键词切换 layout-tab-bar 子 Tab */
+/** Panel style SettingTab: switches the layout-tab-bar sub tab according to the global search keywords */
 export const switchSettingPanelSubTab = (
     root: HTMLElement,
     keywords: string,

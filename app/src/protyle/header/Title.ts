@@ -43,27 +43,28 @@ export class Title {
         if (protyle.options.render?.titleShowTop) {
             this.element.innerHTML = '<div class="protyle-attr"></div>';
         } else {
-            // 标题内需要一个空格，避免首次加载出现`请输入文档名`干扰
+            // A space is needed inside the title, to avoid the "Please enter document name"
+            // placeholder interfering on first load
             this.element.innerHTML = `<span aria-label="${isMac() ? window.siyuan.languages.gutterTip2 : window.siyuan.languages.gutterTip2.replace("⇧", "Shift+")}" data-position="west" class="protyle-title__icon ariaLabel"><svg><use xlink:href="#iconFile"></use></svg></span>
 <div contenteditable="true" spellcheck="${window.siyuan.config.editor.spellcheck}" class="protyle-title__input" data-tip="${window.siyuan.languages._kernel[16]}"> </div><div class="protyle-attr"></div>`;
             this.editElement = this.element.querySelector(".protyle-title__input");
             this.editElement.addEventListener("paste", (event: ClipboardEvent) => {
                 event.stopPropagation();
                 event.preventDefault();
-                // 不能使用 range.insertNode，否则无法撤销
+                // Cannot use range.insertNode, otherwise it cannot be undone
                 let text = event.clipboardData.getData("text/siyuan");
                 if (text) {
                     try {
                         JSON.parse(text);
                         text = event.clipboardData.getData("text/plain");
                     } catch (e) {
-                        // 不为数据库，保持 text 不变
+                        // Not a database, keep text unchanged
                     }
                     text = protyle.lute.BlockDOM2Content(text);
                 } else {
                     text = event.clipboardData.getData("text/plain");
                 }
-                // 阻止右键复制菜单报错
+                // Prevent an error from the right-click copy menu
                 setTimeout(function () {
                     document.execCommand("insertText", false, replaceFileName(text));
                 }, 0);
@@ -104,16 +105,16 @@ export class Title {
                     event.stopPropagation();
                     let textPlain = await readText() || "";
                     if (textPlain) {
-                        // 对 <<assets/...>> 进行内部转义 https://github.com/siyuan-note/siyuan/issues/11992
+                        // Internally escape <<assets/...>> https://github.com/siyuan-note/siyuan/issues/11992
                         textPlain = textPlain.replace(/<<assets\//g, "__@lt2assets/@__").replace(/>>/g, "__@gt2@__");
-                        // 对 HTML 标签进行内部转义，避免被 Lute 解析以后变为小写 https://github.com/siyuan-note/siyuan/issues/10620
+                        // Internally escape HTML tags, to avoid them being lowercased after Lute parses them https://github.com/siyuan-note/siyuan/issues/10620
                         textPlain = textPlain.replace(/</g, ";;;lt;;;").replace(/>/g, ";;;gt;;;");
-                        // 反转义 <<assets/...>>
+                        // Unescape <<assets/...>>
                         textPlain = textPlain.replace(/__@lt2assets\/@__/g, "<<assets/").replace(/__@gt2@__/g, ">>");
                         enableLuteMarkdownSyntax(protyle);
                         let content = protyle.lute.BlockDOM2EscapeMarkerContent(protyle.lute.Md2BlockDOM(textPlain));
                         restoreLuteMarkdownSyntax(protyle);
-                        // 移除 ;;;lt;;; 和 ;;;gt;;; 转义及其包裹的内容
+                        // Remove the ;;;lt;;; and ;;;gt;;; escapes along with the content they wrap
                         content = content.replace(/;;;lt;;;[^;]+;;;gt;;;/g, "");
                         document.execCommand("insertText", false, replaceFileName(content));
                         this.rename(protyle);
@@ -141,7 +142,7 @@ export class Title {
                 if (event.key === "ArrowDown") {
                     const rects = getSelection().getRangeAt(0).getClientRects();
                     // https://github.com/siyuan-note/siyuan/issues/11729
-                    if (rects.length === 0 // 标题为空时时
+                    if (rects.length === 0 // When the title is empty
                         || this.editElement.getBoundingClientRect().bottom - rects[rects.length - 1].bottom < 25) {
                         const noContainerElement = getNoContainerElement(protyle.wysiwyg.element.firstElementChild);
                         // https://github.com/siyuan-note/siyuan/issues/4923
@@ -156,7 +157,7 @@ export class Title {
                     const editElement = getContenteditableElement(firstElement);
                     if (editElement && editElement.textContent === "" && editElement.getAttribute("placeholder") ||
                         firstElement.classList.contains("li")) {
-                        // 配合提示文本使用，避免提示文本挤压到第二个块中
+                        // Used together with the placeholder text, to avoid the placeholder text getting squeezed into the second block
                         focusBlock(firstElement, protyle.wysiwyg.element);
                     } else {
                         const newId = Lute.NewNodeID();
@@ -195,7 +196,8 @@ export class Title {
             });
             const iconElement = this.element.querySelector(".protyle-title__icon") as HTMLElement;
             iconElement.addEventListener("click", (event) => {
-                // 不使用 window.siyuan.shiftIsPressed ，否则窗口未激活时按 Shift 点击块标无法打开属性面板 https://github.com/siyuan-note/siyuan/issues/15075
+                // Don't use window.siyuan.shiftIsPressed, otherwise Shift-clicking the gutter can't
+                // open the attribute panel when the window isn't focused https://github.com/siyuan-note/siyuan/issues/15075
                 if (event.shiftKey) {
                     const docInfoParam: IObject = {
                         id: protyle.block.rootID
@@ -293,7 +295,7 @@ export class Title {
                         enableLuteMarkdownSyntax(protyle);
                         let content = protyle.lute.BlockDOM2EscapeMarkerContent(protyle.lute.Md2BlockDOM(textPlain));
                         restoreLuteMarkdownSyntax(protyle);
-                        // 移除 ;;;lt;;; 和 ;;;gt;;; 转义及其包裹的内容
+                        // Remove the ;;;lt;;; and ;;;gt;;; escapes along with the content they wrap
                         content = content.replace(/;;;lt;;;[^;]+;;;gt;;;/g, "");
                         document.execCommand("insertText", false, replaceFileName(content));
                         this.rename(protyle);
@@ -330,7 +332,7 @@ export class Title {
     private rename(protyle: IProtyle) {
         clearTimeout(this.timeout);
         if (!validateName(this.editElement.textContent, this.editElement)) {
-            // 字数过长会导致滚动
+            // Too many characters would cause scrolling
             const offset = getSelectionOffset(this.editElement);
             this.setTitle(this.editElement.textContent.substring(0, Constants.SIZE_TITLE));
             focusByOffset(this.editElement, offset.start, offset.end);
@@ -420,7 +422,7 @@ export class Title {
         if (response.data.refCount !== 0) {
             this.element.querySelector(".protyle-attr").insertAdjacentHTML("beforeend", `<div class="protyle-attr--refcount popover__block">${response.data.refCount}</div>`);
         }
-        // 存在设置新建文档名模板，不能使用 Untitled 进行判断，https://ld246.com/article/1649301009888
+        // A new document name template may be configured, so "Untitled" cannot be used for the check, https://ld246.com/article/1649301009888
         if (this.editElement && Date.now() - dayjs(response.data.id.split("-")[0]).toDate().getTime() < 2000) {
             const range = this.editElement.ownerDocument.createRange();
             range.selectNodeContents(this.editElement);

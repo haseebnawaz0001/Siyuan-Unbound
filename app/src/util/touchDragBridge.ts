@@ -1,32 +1,41 @@
 import {stopScrollAnimation} from "../boot/globalEvent/dragover";
 import {Constants} from "../constants";
 
-// 长按门槛共享状态：触摸后短时间内滑动视为滚动放行原生滚动，长按静止后再滑动才进入拖拽
+// Shared long-press gate state: sliding shortly after a touch counts as scrolling and yields to
+// native scroll; only sliding after the long press has settled enters drag mode
 interface LongPressGate {
     startX: number;
     startY: number;
     touchStartTime: number;
     requireLongPress: boolean;
     longPressCancelled: boolean;
-    // 输入源为鼠标：部分平板 WebView 会把鼠标合成成 touch 事件，鼠标无滚动冲突（滚动走滚轮），跳过时间门槛
-    // 仅保留位移门槛以区分点击与拖拽，避免点击 + 号/箭头等操作时因抖动误入拖拽
+    // The input source is a mouse: some tablet WebViews synthesize mouse input as touch events; a
+    // mouse has no scroll conflict (scrolling uses the wheel), so the time gate is skipped and only
+    // the displacement gate is kept to distinguish a click from a drag, avoiding jitter on a click
+    // of a + button/arrow etc. mistakenly entering drag mode
     isMouse: boolean;
 }
 
-// 判定一次滑动是否应放行原生滚动（而非进入拖拽）：位移超阈值且在长按门槛内移动，则标记为滚动
-// 返回 true 表示应放行滚动（不拖拽），false 表示可进入拖拽
+// Decide whether a slide should yield to native scrolling (instead of entering drag mode): if the
+// displacement exceeds the threshold and it moves within the long-press gate window, mark it as
+// a scroll.
+// Returns true to yield to scrolling (no drag), false to allow entering drag mode
 const shouldYieldToScroll = (gate: LongPressGate, clientX: number, clientY: number): boolean => {
     const dx = clientX - gate.startX;
     const dy = clientY - gate.startY;
     if (Math.abs(dx) < Constants.SIZE_DRAG_THRESHOLD && Math.abs(dy) < Constants.SIZE_DRAG_THRESHOLD) {
-        // 位移过小，继续等待长按判定
+        // Displacement too small, keep waiting for the long-press decision
         return true;
     }
     if (gate.isMouse) {
-        // 鼠标无滚动冲突（滚动走滚轮），跳过手指的 400ms 长按门槛
-        // 但文件树/画廊/列表操作等元素同一手势既可能点击（+ 号、箭头）也可能拖拽，需短暂时间下限区分
-        // 避免点击抖动误触发 dragstart → 文档树加 disablehover → + 号消失、子元素 pointer-events:none
-        // 块标等 requireLongPress=false 的元素本就是要拖的，按下即拖，与桌面原生一致
+        // A mouse has no scroll conflict (scrolling uses the wheel), so the finger's 400ms long-press
+        // gate is skipped. But for elements like the file tree/gallery/list actions, the same
+        // gesture can be either a click (+ button, arrow) or a drag, so a short minimum time is
+        // still needed to tell them apart, avoiding click jitter mistakenly firing dragstart ->
+        // the file tree adding disablehover -> the + button disappearing, children getting
+        // pointer-events:none.
+        // Elements such as the gutter marker with requireLongPress=false are meant to be dragged
+        // right away on press, matching native desktop behavior
         if (gate.requireLongPress) {
             return Date.now() - gate.touchStartTime < Constants.TIMEOUT_MOUSE_DRAG_DELAY;
         }
@@ -36,11 +45,11 @@ const shouldYieldToScroll = (gate: LongPressGate, clientX: number, clientY: numb
         return false;
     }
     if (gate.longPressCancelled) {
-        // 已判定为滚动
+        // Already decided to be a scroll
         return true;
     }
     if (Date.now() - gate.touchStartTime < Constants.TIMEOUT_LONGPRESS) {
-        // 短时间内滑动，判定为滚动
+        // Sliding within a short time counts as a scroll
         gate.longPressCancelled = true;
         return true;
     }
@@ -60,32 +69,41 @@ let lastDragOverElement: Element | null = null;
 
 let manualState: (LongPressGate) | null = null;
 
-// 最近一次 pointerdown 的输入源，pointerType 是唯一可靠区分 mouse/touch/pen 的字段
+// The input source of the most recent pointerdown; pointerType is the only reliable field to
+// distinguish mouse/touch/pen
 let lastPointerType: string = "";
 
-// 判定当前输入源是否为鼠标：部分平板 WebView 会把鼠标合成成 touch 事件
-// pointerType === "mouse" 且接触面积为 0（radiusX/radiusY 为 0）时判定为鼠标
-// radiusX > 0 单向可信：非零一定是真手指，据此否决鼠标判断，避免把手指误判成鼠标跳过长按
-// 不用 force（iOS 真手指常报 0）、不用 sourceCapabilities（WebKit 不支持）
+// Decide whether the current input source is a mouse: some tablet WebViews synthesize mouse
+// input as touch events.
+// Treated as a mouse when pointerType === "mouse" and the contact area is 0 (radiusX/radiusY are 0).
+// radiusX > 0 is reliable in one direction only: a nonzero value definitely means a real finger, so
+// this vetoes the mouse decision, preventing a finger from being mistaken for a mouse and skipping
+// the long press.
+// force is not used (a real finger on iOS often reports 0), nor is sourceCapabilities (unsupported
+// in WebKit)
 const isMouseInput = (touch: Touch): boolean => {
     const hasContactArea = (touch.radiusX ?? 0) > 0 || (touch.radiusY ?? 0) > 0;
     return !hasContactArea && lastPointerType === "mouse";
 };
 
-// 最近一次输入源是否为鼠标，供 event.ts 的长按菜单合成判断使用
-// 鼠标左键长按不应触发右键菜单（触屏长按出菜单的手势专属逻辑），鼠标的菜单由右键触发
+// Whether the most recent input source was a mouse, used by event.ts to decide whether to
+// synthesize a long-press context menu.
+// A long left-mouse-button press should not trigger the context menu (that gesture is specific to
+// touchscreen long-press-to-open-menu); a mouse's menu is triggered by the right button
 export const isLastPointerMouse = (): boolean => {
     return lastPointerType === "mouse";
 };
 
-// 触摸起始：先判断是否命中原生 Drag API（draggable="true"），命中则走原生路径；否则判断手动 mousedown 白名单
+// Touch start: first check whether it hits the native Drag API (draggable="true"); if so, take
+// the native path, otherwise check the manual mousedown allowlist
 const handleTouchStart = (e: TouchEvent) => {
     if (dragState || manualState) return;
     if (e.touches.length !== 1) return;
 
     const target = e.target as HTMLElement;
 
-    // 原生 Drag 路径：元素有 draggable="true" 祖先（如文件树、列表标记、AV 行拖拽），优先走 Drag API
+    // Native Drag path: the element has a draggable="true" ancestor (e.g. the file tree, list
+    // markers, AV row dragging), prefer the Drag API
     if (!target.classList.contains("av__widthdrag")) {
         const draggable = getDraggableAncestor(target);
         if (draggable) {
@@ -99,7 +117,7 @@ const handleTouchStart = (e: TouchEvent) => {
                 startX: touch.clientX,
                 startY: touch.clientY,
                 touchStartTime: Date.now(),
-                // 文件树、画廊、页签和列表操作需长按，以避免与滚动冲突
+                // The file tree, gallery, tabs, and list actions require a long press, to avoid conflicting with scrolling
                 requireLongPress: draggable.closest(".sy__file") !== null ||
                     draggable.closest(".sy__outline") !== null ||
                     draggable.closest(".av__gallery-item") !== null ||
@@ -112,14 +130,16 @@ const handleTouchStart = (e: TouchEvent) => {
         }
     }
 
-    // 原生 <select> 下拉层由 WebView 以系统 overlay 绘制，合成 mousedown 会干扰其触摸序列导致下拉层闪退
+    // The native <select> dropdown is drawn by the WebView as a system overlay; synthesizing a
+    // mousedown would interfere with its touch sequence and cause the dropdown to flash and close
     // https://github.com/siyuan-note/siyuan/issues/17953
     if (target.tagName === "SELECT" || target.tagName === "OPTION" || target.closest("select")) {
         return;
     }
-    // 手动 mousedown 路径：dock / outline / resize 把手等自实现拖拽的区域
+    // Manual mousedown path: areas that implement their own dragging, such as the dock / outline / resize handles
     if (!target.closest(".dock") &&
-        // 弹窗内不能按整个 .b3-dialog 匹配，否则导致闪卡文本扩选失效 https://github.com/siyuan-note/siyuan/issues/18055
+        // Inside a dialog, matching the whole .b3-dialog is not allowed, otherwise it breaks text
+        // range-selection on flashcards https://github.com/siyuan-note/siyuan/issues/18055
         !(target.closest(".b3-dialog") &&  ["resize__move", "resize__rd", "resize__r", "resize__rt",
             "resize__d", "resize__l", "resize__ld", "resize__lt", "resize__t"].some(cls => target.closest("." + cls))) &&
         !target.closest(".sy__outline") &&
@@ -157,13 +177,13 @@ const handleTouchStart = (e: TouchEvent) => {
     };
 };
 
-// 触摸移动：根据 dragState/manualState 谁存在分流到原生 Drag 或手动 mousedown 路径
+// Touch move: route to the native Drag or manual mousedown path depending on whether dragState or manualState is set
 const handleTouchMove = (e: TouchEvent) => {
-    // 原生 Drag 路径
+    // Native Drag path
     if (dragState) {
         const touch = e.touches[0];
         if (!dragState.isDragging) {
-            // 长按门槛：文件树、画廊、列表标记等触摸后短时间滑动视为滚动，放行原生滚动
+            // Long-press gate: for the file tree, gallery, list markers, etc, sliding shortly after a touch counts as scrolling and yields to native scroll
             if (shouldYieldToScroll(dragState, touch.clientX, touch.clientY)) {
                 return;
             }
@@ -176,18 +196,20 @@ const handleTouchMove = (e: TouchEvent) => {
         return;
     }
 
-    // 手动 mousedown 路径
+    // Manual mousedown path
     if (!manualState) return;
     const touch = e.touches[0];
     if (!document.onmousemove || typeof document.onmousemove !== "function") return;
 
-    // 长按门槛：可滚动列表（如大纲）触摸后短时间滑动视为滚动，放行原生滚动，避免滚动变拖拽
+    // Long-press gate: for a scrollable list (e.g. the outline), sliding shortly after a touch
+    // counts as scrolling and yields to native scroll, preventing scrolling from turning into a drag
     if (shouldYieldToScroll(manualState, touch.clientX, touch.clientY)) {
         return;
     }
 
     e.preventDefault();
-    // 已进入拖拽：置标记使松手时 event.ts 的长按菜单判定提前返回，避免拖拽与菜单同时触发
+    // Already in drag mode: set the flag so that on release, event.ts's long-press menu decision
+    // returns early, avoiding drag and the menu both firing
     window.siyuan.touchDragActive = true;
     const elementUnderFinger = document.elementFromPoint(touch.clientX, touch.clientY);
     if (elementUnderFinger) {
@@ -200,7 +222,7 @@ const handleTouchMove = (e: TouchEvent) => {
     }
 };
 
-// 触摸结束：原生路径派发 drop/dragend，手动路径派发 mouseup 清理
+// Touch end: the native path dispatches drop/dragend, the manual path dispatches mouseup to clean up
 const handleTouchEnd = (e: TouchEvent) => {
     if (dragState) {
         if (dragState.isDragging) {
@@ -211,7 +233,8 @@ const handleTouchEnd = (e: TouchEvent) => {
         return;
     }
     if (!manualState) return;
-    // 派发 mouseup 触发组件（如 Outline.bindSort）注册的 onmouseup 清理回调，并复位状态
+    // Dispatch mouseup to trigger the onmouseup cleanup callback registered by components (e.g.
+    // Outline.bindSort), and reset the state
     cancelManualTouch();
 };
 
@@ -391,13 +414,18 @@ const cleanupDrag = () => {
 };
 
 const handleCancel = () => {
-    // touchcancel 时两条路径都需无条件清理（cleanupDrag/cancelManualTouch 内部均做空状态处理）
+    // On touchcancel both paths must be cleaned up unconditionally (cleanupDrag/cancelManualTouch
+    // both handle the empty-state case internally)
     cleanupDrag();
     cancelManualTouch();
 };
 
-// 取消手动桥接（mousedown）路径：派发 mouseup 以触发各组件注册的清理回调（如 Outline.bindSort 的 mouseup 会清空 document.onmousemove 等），并复位状态
-// event.ts 的 touchend 会无条件前置调用它，确保 Outline.bindSort 等注册的 onmousemove/onmouseup 不残留，避免被后续事件误触发（创建拖拽 ghost、启动滚动动画等）
+// Cancel the manual bridge (mousedown) path: dispatch mouseup to trigger the cleanup callbacks
+// registered by each component (e.g. Outline.bindSort's mouseup clears document.onmousemove etc.),
+// and reset the state.
+// event.ts's touchend unconditionally calls this first, ensuring onmousemove/onmouseup registered
+// by things like Outline.bindSort do not linger and get mistakenly triggered by later events
+// (creating a drag ghost, starting a scroll animation, etc.)
 export const cancelManualTouch = () => {
     if (manualState && document.onmouseup && typeof document.onmouseup === "function") {
         document.onmouseup(new MouseEvent("mouseup", {bubbles: true}));
@@ -407,12 +435,14 @@ export const cancelManualTouch = () => {
 };
 
 export const initTouchDragBridge = () => {
-    // 记录输入源，供 touchstart 回调区分鼠标合成 touch 的场景（部分平板把鼠标合成成 touch 事件）
+    // Record the input source, so the touchstart callback can distinguish the case of a mouse
+    // synthesized as touch (some tablets synthesize mouse input as touch events)
     document.addEventListener("pointerdown", (e: PointerEvent) => {
         lastPointerType = e.pointerType;
     }, {passive: true});
 
-    // 触摸事件桥接：原生 Drag API（draggable="true"）与手动 mousedown 拖拽（dock/outline/resize 把手）统一入口
+    // Touch event bridge: a unified entry point for the native Drag API (draggable="true") and
+    // manual mousedown dragging (dock/outline/resize handles)
     document.addEventListener("touchstart", handleTouchStart, {passive: false});
     document.addEventListener("touchmove", handleTouchMove, {passive: false});
     document.addEventListener("touchend", handleTouchEnd);

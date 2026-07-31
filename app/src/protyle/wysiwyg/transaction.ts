@@ -36,8 +36,8 @@ import {isEncryptedBox} from "../../util/pathName";
 import {queueTransaction} from "../util/transactionQueue";
 
 const removeTopElement = (updateElement: Element, protyle: IProtyle) => {
-    // 移动到其他文档中，该块需移除
-    // TODO 文档没有打开时，需要通过后台获取 getTopAloneElement
+    // The block needs to be removed once it's moved into another document
+    // TODO when the document isn't open, getTopAloneElement needs to be fetched from the backend
     const topAloneElement = getTopAloneElement(updateElement);
     const doOperations: IOperation[] = [];
     if (topAloneElement !== updateElement) {
@@ -87,7 +87,7 @@ const syncFoldAttr = (element: Element, operation: IOperation) => {
     });
 };
 
-// 用于执行操作，外加处理当前编辑器中块引用、嵌入块的更新
+// Used to execute operations, plus handle updates to block references and embed blocks in the current editor
 const promiseTransaction = (options: {
     protyle: IProtyle,
     doOperations: IOperation[],
@@ -96,7 +96,8 @@ const promiseTransaction = (options: {
     callback?: () => void,
 }) => {
     const protyle = options.protyle;
-    // 受影响的嵌入块需推迟到事务提交后再渲染，否则其查询请求会早于写入到达内核而拿到旧数据
+    // Affected embed blocks must defer rendering until after the transaction commits, otherwise their query
+    // would reach the kernel before the write and return stale data
     const pendingEmbedElements = new Set<Element>();
     /// #if MOBILE
     if (((0 !== window.siyuan.config.sync.provider && isPaidUser()) ||
@@ -113,13 +114,14 @@ const promiseTransaction = (options: {
     if (!options.skipSync) {
         options.doOperations.forEach((operation: IOperation) => {
             if (operation.action === "update") {
-                // 当前编辑器中的其他块
+                // Other blocks in the current editor
                 let updatedEmbed = false;
 
                 const updateElements = Array.from(
                     protyle.wysiwyg.element.querySelectorAll(`[data-node-id="${operation.id}"]`)
                 );
-                // updateTransaction 会在本地编辑元素上设置该属性，用于在存在同 ID 副本时保留当前 DOM 和光标。
+                // updateTransaction sets this attribute on the locally edited element, to preserve the current
+                // DOM and caret when a copy with the same ID exists.
                 const currentUpdateElement = updateElements.find(item =>
                     item.getAttribute(Constants.ATTRIBUTE_EDITING) === "true" && getEmbedChildOperationContext(item));
                 const currentEmbedContext = currentUpdateElement && getEmbedChildOperationContext(currentUpdateElement);
@@ -148,17 +150,19 @@ const promiseTransaction = (options: {
                 updateElements.forEach((item) => {
                     if ((currentEmbedElement && isInEmbedBlock(item, false) === currentEmbedElement) ||
                         (range && (item === range.startContainer || item.contains(range.startContainer)))) {
-                        // 正在编辑的块不能进行更新
+                        // A block currently being edited must not be updated
                         item.removeAttribute(Constants.ATTRIBUTE_EDITING);
                     } else {
-                        // 从可编辑嵌入块发起更新时，同 ID 的普通副本可能带有其他事务遗留的编辑标记，仍需同步。
+                        // When an update originates from an editable embed block, a plain copy with the same ID
+                        // may still carry an editing marker left over from another transaction, so it still
+                        // needs to be synced.
                         updateHTML(item, operation.data, !!currentEmbedElement && !isInEmbedBlock(item));
                     }
                 });
                 protyle.wysiwyg.element.querySelectorAll(".protyle-wysiwyg__embed").forEach(item => {
                     if (item === currentEmbedContext?.resultElement ||
                         (range && (item === range.startContainer || item.contains(range.startContainer)))) {
-                        // 正在编辑的块不能进行更新
+                        // A block currently being edited must not be updated
                         item.removeAttribute(Constants.ATTRIBUTE_EDITING);
                     } else {
                         // https://github.com/siyuan-note/siyuan/issues/14495
@@ -178,7 +182,8 @@ const promiseTransaction = (options: {
                 return;
             }
             if (operation.action === "delete" || operation.action === "append") {
-                // 普通编辑流程自行维护本地 DOM；仅嵌入块编辑需要额外删除外层同 ID 副本。
+                // The normal editing flow maintains its own local DOM; only embed-block editing needs to
+                // additionally remove the outer copy with the same ID.
                 if ((operation.action === "delete" && isEmbedChildOperation) || protyle.options.backlinkData) {
                     Array.from(protyle.wysiwyg.element.querySelectorAll(`[data-node-id="${operation.id}"]`)).forEach(item => {
                         if (!isInEmbedBlock(item) && (!range || !item.contains(range.startContainer))) {
@@ -186,7 +191,7 @@ const promiseTransaction = (options: {
                         }
                     });
                 }
-                // 更新嵌入块
+                // Update embed blocks
                 protyle.wysiwyg.element.querySelectorAll('[data-type="NodeBlockQueryEmbed"]').forEach((item) => {
                     if (item.querySelector(`[data-node-id="${operation.id}"]`)) {
                         pendingEmbedElements.add(item);
@@ -202,12 +207,14 @@ const promiseTransaction = (options: {
                         if (!isInEmbedBlock(item)) {
                             const topElement = hasTopClosestByAttribute(item, "data-node-id", null);
                             if (topElement && !topElement.contains(range.startContainer)) {
-                                // 当前操作块不再进行操作，否则光标丢失 https://github.com/siyuan-note/siyuan/issues/13946
+                                // The block currently being operated on is skipped, otherwise the caret would be
+                                // lost https://github.com/siyuan-note/siyuan/issues/13946
                                 updateElements.push(item);
                             }
                         }
                     });
-                    // 移动前记录源块所在的超级块，移动后刷新其拖拽手柄（移出后手柄需清理）
+                    // Record the superblock the source block belongs to before the move, so its drag handle can
+                    // be refreshed after the move (the handle needs cleaning up once the block leaves)
                     const originSbs: Element[] = [];
                     updateElements.forEach(item => {
                         const sb = item.closest('[data-type="NodeSuperBlock"]');
@@ -227,7 +234,7 @@ const promiseTransaction = (options: {
                         Array.from(protyle.wysiwyg.element.querySelectorAll(`[data-node-id="${operation.parentID}"]`)).forEach(item => {
                             if (!isInEmbedBlock(item) && !getFirstBlock(item).contains(range.startContainer)) {
                                 const cloneElement = processClonePHElement(updateElements[0].cloneNode(true) as Element);
-                                // 列表特殊处理
+                                // Special handling for lists
                                 if (item.firstElementChild?.classList.contains("protyle-action")) {
                                     item.firstElementChild.after(cloneElement);
                                 } else if (item.classList.contains("callout")) {
@@ -246,16 +253,18 @@ const promiseTransaction = (options: {
                             removeTopElement(item, protyle);
                         }
                     });
-                    // 块移出后刷新源超级块的手柄（originSb 在元素被移除前捕获）
+                    // Refresh the source superblock's handle once the block has left (originSb was captured
+                    // before the element was removed)
                     refreshSbs(...originSbs);
                 }
-                // 更新嵌入块
+                // Update embed blocks
                 protyle.wysiwyg.element.querySelectorAll('[data-type="NodeBlockQueryEmbed"]').forEach((item) => {
                     if (item.querySelector(`[data-node-id="${operation.id}"],[data-node-id="${operation.parentID}"],[data-node-id="${operation.previousID}"]`)) {
                         pendingEmbedElements.add(item);
                     }
                 });
-                // 移动块（含撤销移动）后刷新相关超级块的拖拽手柄，避免手柄残留/缺失
+                // After moving a block (including undoing a move), refresh the drag handles of the affected
+                // superblocks, so handles aren't left stale or missing
                 const moveEls = [operation.id, operation.parentID, operation.previousID]
                     .map(id => id ? protyle.wysiwyg.element.querySelector(`[data-node-id="${id}"]`) : null)
                     .filter(Boolean) as Element[];
@@ -263,7 +272,8 @@ const promiseTransaction = (options: {
                 return;
             }
             if (operation.action === "insert") {
-                // 块已被本地 DOM 操作插入时仍需同步其他普通副本，并跳过当前副本避免重复
+                // Even when the block has already been inserted by a local DOM operation, other plain copies
+                // still need to be synced, while skipping the current copy to avoid duplication
                 // https://github.com/siyuan-note/siyuan/issues/17890
                 const insertedElement = protyle.wysiwyg.element.querySelector(`[data-node-id="${operation.id}"]`);
                 const currentEmbedElement = insertedElement && isInEmbedBlock(insertedElement, false);
@@ -291,10 +301,10 @@ const promiseTransaction = (options: {
                             return;
                         }
                         if (getNextBlockSibling(item)?.getAttribute("data-node-id") !== operation.id &&
-                            (!range || !item.contains(range.startContainer)) && // 当前操作块不再进行操作
-                            // 段落转列表会在段落后插入新列表
+                            (!range || !item.contains(range.startContainer)) && // the block currently being operated on is skipped
+                            // Converting a paragraph to a list inserts the new list right after the paragraph
                             !hasClosestByAttribute(item, "data-node-id", operation.id) &&
-                            // 嵌入块后不能插入
+                            // Can't insert right after an embed block
                             !item.parentElement.classList.contains("protyle-wysiwyg__embed")) {
                             item.insertAdjacentHTML("afterend", operation.data);
                             cursorElements.push(item.nextElementSibling);
@@ -327,7 +337,7 @@ const promiseTransaction = (options: {
                             return;
                         }
                         if (!range || !item.contains(range.startContainer)) {
-                            // 列表特殊处理
+                            // Special handling for lists
                             if (item.firstElementChild && item.firstElementChild.classList.contains("protyle-action") &&
                                 item.firstElementChild.nextElementSibling?.getAttribute("data-node-id") !== operation.id) {
                                 item.firstElementChild.insertAdjacentHTML("afterend", operation.data);
@@ -367,7 +377,8 @@ const promiseTransaction = (options: {
                 protyle.wysiwyg.element.querySelectorAll("[parent-heading]").forEach(item => {
                     item.remove();
                 });
-                // 插入块后刷新所在超级块的拖拽手柄（本地新块已在 DOM 跳过插入时也需刷新）
+                // After inserting a block, refresh the drag handle of its superblock (also needed when the new
+                // block was already in the DOM and insertion was skipped locally)
                 const insertedEl = protyle.wysiwyg.element.querySelector(`[data-node-id="${operation.id}"]`);
                 refreshSbs(insertedEl);
                 return;
@@ -378,7 +389,7 @@ const promiseTransaction = (options: {
                 if (gutterFoldElement) {
                     gutterFoldElement.removeAttribute("disabled");
                 }
-                // 仅在 alt+click 箭头折叠时才会触发
+                // Only triggered when folding via alt+click on the arrow
                 protyle.wysiwyg.element.querySelectorAll('[data-type="NodeBlockQueryEmbed"]').forEach((item) => {
                     if (item.querySelector(`[data-node-id="${operation.id}"]`)) {
                         pendingEmbedElements.add(item);
@@ -386,9 +397,10 @@ const promiseTransaction = (options: {
                 });
             }
         });
-        // 删除仅有的折叠标题后展开内容为空
+        // Expanding content is empty after deleting the only fold heading
         if (protyle.wysiwyg.element.childElementCount === 0 &&
-            // 聚焦时不需要新增块，否则会导致 https://github.com/siyuan-note/siyuan/issues/12326 第一点
+            // No new block is needed when focused, otherwise it would cause point 1 of
+            // https://github.com/siyuan-note/siyuan/issues/12326
             !protyle.block.showAll) {
             const newID = Lute.NewNodeID();
             const emptyElement = genEmptyElement(false, true, newID);
@@ -399,7 +411,7 @@ const promiseTransaction = (options: {
                 id: newID,
                 parentID: protyle.block.parentID
             }]);
-            // 不能撤销，否则就无限循环了
+            // This can't be undone, otherwise it would loop forever
             focusByWbr(emptyElement, range);
         }
     }
@@ -408,7 +420,7 @@ const promiseTransaction = (options: {
         app: Constants.SIYUAN_APPID,
         transactions: [{
             doOperations: options.doOperations,
-            undoOperations: options.undoOperations,// 目前用于 ws 推送更新大纲
+            undoOperations: options.undoOperations,// currently used for the ws push to update the outline
         }]
     }, (response) => {
         const ids: string[] = [];
@@ -424,7 +436,8 @@ const promiseTransaction = (options: {
                 }
             });
         }
-        // 事务提交后再渲染嵌入块，避免其查询请求早于写入到达内核而拿到旧数据
+        // Render embed blocks only after the transaction commits, to avoid their query reaching the kernel
+        // before the write and returning stale data
         pendingEmbedElements.forEach(item => {
             if (item.isConnected) {
                 item.removeAttribute("data-render");
@@ -457,7 +470,7 @@ const getDocumentEmbedResults = (element: Element, targetID?: string) => {
     )).filter(item => item.getAttribute("data-id") === targetID && !getEmbedChildOperationContext(item)?.targetElement);
 };
 
-// 刷新一组块元素所在超级块的拖拽手柄（自动去重，跳过已脱离 DOM 的）
+// Refresh the drag handles of the superblocks containing a set of block elements (auto-dedupes, skips ones no longer in the DOM)
 const refreshSbs = (...elements: (Element | undefined | null)[]) => {
     const sbs = new Set<Element>();
     elements.forEach(el => {
@@ -475,7 +488,7 @@ const deleteBlock = (updateElements: Element[], id: string, protyle: IProtyle, i
     if (isUndo && updateElements[0]) {
         focusSideBlock(updateElements[0]);
     }
-    // 删除前记录所在超级块，删除后刷新其拖拽手柄
+    // Record the containing superblock before deletion, then refresh its drag handle afterward
     const sbParents: Element[] = [];
     updateElements.forEach(item => {
         const sbAncestor = item.closest('[data-type="NodeSuperBlock"]');
@@ -486,21 +499,23 @@ const deleteBlock = (updateElements: Element[], id: string, protyle: IProtyle, i
             // https://github.com/siyuan-note/siyuan/issues/13617
             item.remove();
         } else {
-            // 需移除顶层，否则删除唯一的列表项后列表无法清除干净 https://github.com/siyuan-note/siyuan/issues/12326 第一点
+            // The top-level element must be removed, otherwise deleting the only list item leaves the list not
+            // fully cleaned up (see point 1 of https://github.com/siyuan-note/siyuan/issues/12326)
             const topElement = getTopAloneElement(item);
             if (topElement) {
                 topElement.remove();
             }
         }
     });
-    // 更新 ws 嵌入块
+    // Update ws embed blocks
     protyle.wysiwyg.element.querySelectorAll('[data-type="NodeBlockQueryEmbed"]').forEach((item) => {
         if (item.querySelector(`[data-node-id="${id}"]`)) {
             item.removeAttribute("data-render");
             blockRender(protyle, item);
         }
     });
-    // 删除块后刷新所在超级块的拖拽手柄（被删块两侧的手柄需移除/重建，即使只剩 0/1 块也清残留）
+    // After deleting a block, refresh the drag handle of its superblock (handles on either side of the deleted
+    // block need to be removed/rebuilt, and stale handles cleaned up even when only 0/1 blocks remain)
     refreshSbs(...sbParents);
 };
 
@@ -511,8 +526,9 @@ const updateBlock = (updateElements: Element[], protyle: IProtyle, operation: IO
         if (range && item.contains(range.startContainer)) {
             isRangeBlock = true;
         }
-        // 表格的横向、纵向滚动均发生在首个子节点（contenteditable 容器，overflow:auto）上，
-        // 更新块后需一并还原，否则固定表头长表格撤销/重做会跳回开头
+        // A table's horizontal/vertical scrolling both happen on the first child node (the contenteditable
+        // container with overflow:auto), so it needs to be restored together after updating the block,
+        // otherwise undo/redo on a long table with a sticky header would jump back to the top
         // https://github.com/siyuan-note/siyuan/issues/3650 https://github.com/siyuan-note/siyuan/issues/18035
         // https://github.com/siyuan-note/siyuan/issues/18235
         let tableScrollLeft: number;
@@ -526,7 +542,7 @@ const updateBlock = (updateElements: Element[], protyle: IProtyle, operation: IO
             }
         }
         item.insertAdjacentHTML("afterend",
-            // 图标撤销后无法渲染
+            // The chart can't render after undo
             item.getAttribute("data-subtype") === "echarts" ? protyle.lute.SpinBlockDOM(operation.data) : operation.data);
         item = item.nextElementSibling;
         item.previousElementSibling.remove();
@@ -540,7 +556,8 @@ const updateBlock = (updateElements: Element[], protyle: IProtyle, operation: IO
             }
         }
         wbrElement?.remove();
-        // update 操作会生成新表格并替换旧节点，聚焦后需还原滚动，避免表格跳回开头
+        // The update operation generates a new table and replaces the old node, so the scroll position needs
+        // to be restored after focusing, to avoid the table jumping back to the top
         if (tableScrollLeft > 0) {
             (item.firstElementChild as HTMLElement).scrollLeft = tableScrollLeft;
         }
@@ -559,7 +576,8 @@ const updateBlock = (updateElements: Element[], protyle: IProtyle, operation: IO
     });
 };
 
-// 用于推送和撤销；普通模式在内核事务完成后回放，lite 模式仅更新本地 DOM。
+// Used for ws pushes and undo; normal mode replays after the kernel transaction completes, lite mode only
+// updates the local DOM.
 export const onTransaction = (protyle: IProtyle, operations: IOperation[], isUndo: boolean) => {
     if (protyle.wysiwyg.element.firstElementChild?.classList.contains("protyle-password")) {
         return;
@@ -577,7 +595,8 @@ export const onTransaction = (protyle: IProtyle, operations: IOperation[], isUnd
             protyle.wysiwyg.element.querySelectorAll(`[data-node-id="${operation.id}"]`).forEach(item => {
                 item.removeAttribute("fold");
                 if (isUndo) {
-                    // kernel 权威撤销：retData 已由 doUnfoldHeading 填充，需要插入子块 HTML 恢复折叠的内容
+                    // Kernel-authoritative undo: retData has already been filled in by doUnfoldHeading, so the
+                    // child block HTML needs to be inserted to restore the folded content
                     if (operation.retData) {
                         removeUnfoldRepeatBlock(operation.retData, protyle);
                         item.insertAdjacentHTML("afterend", operation.retData);
@@ -606,7 +625,8 @@ export const onTransaction = (protyle: IProtyle, operations: IOperation[], isUnd
                 highlightRender(protyle.wysiwyg.element);
                 avRender(protyle.wysiwyg.element, protyle);
                 blockRender(protyle, protyle.wysiwyg.element);
-                // 展开标题插入的块可能落在超级块内，刷新手柄避免与既有手柄重复/错位
+                // Blocks inserted by unfolding a heading may land inside a superblock, so refresh the handle to
+                // avoid duplicating or misaligning it with an existing handle
                 refreshSbs(...Array.from(protyle.wysiwyg.element.querySelectorAll(`[data-node-id="${operation.id}"]`)));
             }
             return;
@@ -628,13 +648,14 @@ export const onTransaction = (protyle: IProtyle, operations: IOperation[], isUnd
                         }
                         itemElement.remove();
                     });
-                    // 折叠嵌入块的父级
+                    // The embed block's ancestor is folded
                     if (embedElement) {
                         embedElement.removeAttribute("data-render");
                         blockRender(protyle, embedElement);
                     }
                 });
-                // 折叠移除子块后，刷新折叠标题所在超级块的拖拽手柄（子块数变化）
+                // After folding removes child blocks, refresh the drag handle of the folded heading's
+                // superblock (the child count has changed)
                 refreshSbs(...Array.from(protyle.wysiwyg.element.querySelectorAll(`[data-node-id="${operation.id}"]`)));
                 if (protyle.wysiwyg.element.childElementCount === 0) {
                     zoomOut({
@@ -669,7 +690,7 @@ export const onTransaction = (protyle: IProtyle, operations: IOperation[], isUnd
             return;
         }
         if (operation.action === "update") {
-            // 缩放后仅更新局部 https://github.com/siyuan-note/siyuan/issues/14326
+            // Only a partial update after zooming https://github.com/siyuan-note/siyuan/issues/14326
             if (updateElements.length === 0) {
                 const newUpdateElement = protyle.wysiwyg.element.querySelector("[data-node-id]");
                 if (newUpdateElement) {
@@ -709,7 +730,7 @@ export const onTransaction = (protyle: IProtyle, operations: IOperation[], isUnd
             }
             return;
         }
-        if (operation.action === "updateAttrs") { // 调用接口才推送
+        if (operation.action === "updateAttrs") { // only pushed when the API is called
             const data = operation.data as any;
             const attrsResult: Record<string, string> = {};
             let bookmarkHTML = "";
@@ -734,7 +755,7 @@ export const onTransaction = (protyle: IProtyle, operations: IOperation[], isUnd
             });
             let nodeAttrHTML = bookmarkHTML + nameHTML + aliasHTML + memoHTML + avHTML;
             if (protyle.block.rootID === operation.id) {
-                // 文档
+                // Document
                 if (protyle.title) {
                     if (data.new["custom-avs"] && !data.new["av-names"]) {
                         nodeAttrHTML += protyle.title.element.querySelector(".protyle-attr--av")?.outerHTML || "";
@@ -798,7 +819,7 @@ export const onTransaction = (protyle: IProtyle, operations: IOperation[], isUnd
                 }
                 Object.keys(data.new).forEach(key => {
                     if ("id" === key) {
-                        // 设置属性以后不应该给块元素添加 id 属性 No longer add the `id` attribute to block elements after setting the attribute https://github.com/siyuan-note/siyuan/issues/15327
+                        // No longer add the `id` attribute to block elements after setting the attribute https://github.com/siyuan-note/siyuan/issues/15327
                         return;
                     }
 
@@ -839,7 +860,8 @@ export const onTransaction = (protyle: IProtyle, operations: IOperation[], isUnd
             }
             /// #if !MOBILE
             if (updateElements.length === 0) {
-                // 打开两个相同的文档 A、A1，从 A 拖拽块 B 到 A1，在后续 ws 处理中，无法获取到拖拽出去的 B
+                // The same document is open twice as A and A1; dragging block B from A into A1 means the
+                // subsequent ws handling can no longer find the B that was dragged away
                 getAllModels().editor.forEach(editor => {
                     const updateCloneElement = editor.editor.protyle.wysiwyg.element.querySelector(`[data-node-id="${operation.id}"]`);
                     if (updateCloneElement) {
@@ -848,7 +870,7 @@ export const onTransaction = (protyle: IProtyle, operations: IOperation[], isUnd
                 });
             }
             if (updateElements.length === 0) {
-                // 页签拖入浮窗 https://github.com/siyuan-note/siyuan/issues/6647
+                // Dragging a tab into a floating window https://github.com/siyuan-note/siyuan/issues/6647
                 window.siyuan.blockPanels.forEach((item) => {
                     const updateCloneElement = item.element.querySelector(`[data-node-id="${operation.id}"]`);
                     if (updateCloneElement) {
@@ -857,7 +879,7 @@ export const onTransaction = (protyle: IProtyle, operations: IOperation[], isUnd
                 });
             }
             /// #endif
-            // 折叠标题移动到横向超级块的第一个块上后撤销
+            // Undoing after a fold heading is moved onto the first block of a row-layout superblock
             if (updateElements.length === 0) {
                 const tempEl = document.createElement("div");
                 tempEl.setAttribute("data-node-id", operation.id);
@@ -888,7 +910,8 @@ export const onTransaction = (protyle: IProtyle, operations: IOperation[], isUnd
                 }
             }
             let hasFind = false;
-            // 移动前记录源块所在的超级块，移动后刷新其拖拽手柄（移出后手柄需清理）
+            // Record the superblock the source block belongs to before the move, so its drag handle can be
+            // refreshed after the move (the handle needs cleaning up once the block leaves)
             // https://github.com/siyuan-note/siyuan/issues/9521
             const originSbs: Element[] = [];
             updateElements.forEach(item => {
@@ -900,7 +923,7 @@ export const onTransaction = (protyle: IProtyle, operations: IOperation[], isUnd
             if (operation.previousID && updateElements.length > 0) {
                 const previousElement = protyle.wysiwyg.element.querySelectorAll(`[data-node-id="${operation.previousID}"]`);
                 if (previousElement.length === 0 && protyle.options.backlinkData && isUndo && getSelection().rangeCount > 0) {
-                    // 反链面板删除超级块中的最后一个段落块后撤销重做
+                    // Undo then redo after deleting the last paragraph block in a superblock from the backlink panel
                     const blockElement = hasTopClosestByAttribute(range.startContainer, "data-node-id", null);
                     if (blockElement) {
                         blockElement.before(processClonePHElement(updateElements[0].cloneNode(true) as Element));
@@ -920,7 +943,8 @@ export const onTransaction = (protyle: IProtyle, operations: IOperation[], isUnd
                     protyle.wysiwyg.element.prepend(processClonePHElement(updateElements[0].cloneNode(true) as Element));
                     hasFind = true;
                 } else if (parentElement.length === 0 && protyle.options.backlinkData && isUndo && getSelection().rangeCount > 0) {
-                    // 反链面板删除超级块中的段落块后撤销再重做 https://github.com/siyuan-note/siyuan/issues/14496#issuecomment-2771372486
+                    // Undo then redo after deleting a paragraph block in a superblock from the backlink panel
+                    // https://github.com/siyuan-note/siyuan/issues/14496#issuecomment-2771372486
                     const topBlockElement = hasTopClosestByAttribute(getSelection().getRangeAt(0).startContainer, "data-node-id", null);
                     if (topBlockElement) {
                         topBlockElement.before(processClonePHElement(updateElements[0].cloneNode(true) as Element));
@@ -930,7 +954,7 @@ export const onTransaction = (protyle: IProtyle, operations: IOperation[], isUnd
                     parentElement.forEach(item => {
                         if (!isInEmbedBlock(item)) {
                             const cloneElement = processClonePHElement(updateElements[0].cloneNode(true) as Element);
-                            // 列表特殊处理
+                            // Special handling for lists
                             if (item.firstElementChild?.classList.contains("protyle-action")) {
                                 item.firstElementChild.after(cloneElement);
                             } else if (item.classList.contains("callout")) {
@@ -952,7 +976,7 @@ export const onTransaction = (protyle: IProtyle, operations: IOperation[], isUnd
             });
             if (isUndo && range) {
                 if (operation.data === "focus") {
-                    // 标记需要 focus，https://ld246.com/article/1650018446988/comment/1650081404993?r=Vanessa#comments
+                    // Marked as needing focus, see https://ld246.com/article/1650018446988/comment/1650081404993?r=Vanessa#comments
                     Array.from(protyle.wysiwyg.element.querySelectorAll(`[data-node-id="${operation.id}"]`)).find(item => {
                         if (!isInEmbedBlock(item)) {
                             focusBlock(item);
@@ -966,19 +990,21 @@ export const onTransaction = (protyle: IProtyle, operations: IOperation[], isUnd
                     focusByWbr(protyle.wysiwyg.element, range);
                 }
             }
-            // 更新嵌入块。undo 已由 kernel 执行事务后广播，查询能拿到最新数据，无竞态。
+            // Update embed blocks. undo is already broadcast after the kernel executes the transaction, so the
+            // query can get the latest data with no race condition.
             protyle.wysiwyg.element.querySelectorAll('[data-type="NodeBlockQueryEmbed"]').forEach((item) => {
                 if (item.querySelector(`[data-node-id="${operation.id}"],[data-node-id="${operation.parentID}"],[data-node-id="${operation.previousID}"]`)) {
                     item.removeAttribute("data-render");
                     blockRender(protyle, item);
                 }
             });
-            // 移动块（含重做/同步）后刷新相关超级块的拖拽手柄
+            // After moving a block (including redo/sync), refresh the drag handles of the affected superblocks
             const moveEls = [operation.id, operation.parentID, operation.previousID]
                 .map(id => id ? protyle.wysiwyg.element.querySelector(`[data-node-id="${id}"]`) : null)
                 .filter(Boolean) as Element[];
             refreshSbs(...moveEls);
-            // 块移出后刷新源超级块的手柄（originSb 在元素被移除前捕获，仅含移出侧的超级块）
+            // Refresh the source superblock's handle once the block has left (originSb was captured before the
+            // element was removed, and only contains the superblock on the departing side)
             // https://github.com/siyuan-note/siyuan/issues/9521
             refreshSbs(...originSbs);
             return;
@@ -991,11 +1017,11 @@ export const onTransaction = (protyle: IProtyle, operations: IOperation[], isUnd
             if (operation.previousID) {
                 const previousElement = protyle.wysiwyg.element.querySelectorAll(`[data-node-id="${operation.previousID}"]`);
                 if (previousElement.length === 0 && isUndo && protyle.wysiwyg.element.childElementCount === 0) {
-                    // https://github.com/siyuan-note/siyuan/issues/15396 操作后撤销
+                    // Undo after an operation https://github.com/siyuan-note/siyuan/issues/15396
                     protyle.wysiwyg.element.innerHTML = operation.data;
                     cursorElements.push(protyle.wysiwyg.element.firstElementChild);
                 } else if (previousElement.length === 0 && protyle.options.backlinkData && isUndo && getSelection().rangeCount > 0) {
-                    // 反链面板删除超级块中的最后一个段落块后撤销
+                    // Undo after deleting the last paragraph block in a superblock from the backlink panel
                     const blockElement = hasClosestBlock(getSelection().getRangeAt(0).startContainer);
                     if (blockElement) {
                         blockElement.insertAdjacentHTML("beforebegin", operation.data);
@@ -1039,7 +1065,7 @@ export const onTransaction = (protyle: IProtyle, operations: IOperation[], isUnd
                     protyle.wysiwyg.element.insertAdjacentHTML("afterbegin", operation.data);
                     cursorElements.push(protyle.wysiwyg.element.firstElementChild);
                 } else if (parentElement.length === 0 && protyle.options.backlinkData && isUndo && getSelection().rangeCount > 0) {
-                    // 反链面板删除超级块中的段落块后撤销
+                    // Undo after deleting a paragraph block in a superblock from the backlink panel
                     const blockElement = hasClosestBlock(getSelection().getRangeAt(0).startContainer);
                     if (blockElement) {
                         blockElement.insertAdjacentHTML("beforebegin", operation.data);
@@ -1052,7 +1078,7 @@ export const onTransaction = (protyle: IProtyle, operations: IOperation[], isUnd
                             embedElement.removeAttribute("data-render");
                             blockRender(protyle, embedElement);
                         } else {
-                            // 列表特殊处理
+                            // Special handling for lists
                             if (item.firstElementChild?.classList.contains("protyle-action")) {
                                 item.firstElementChild.insertAdjacentHTML("afterend", operation.data);
                                 cursorElements.push(item.firstElementChild.nextElementSibling);
@@ -1089,7 +1115,7 @@ export const onTransaction = (protyle: IProtyle, operations: IOperation[], isUnd
                 highlightRender(item);
                 avRender(item, protyle);
                 blockRender(protyle, item);
-                // 插入块后刷新所在超级块的拖拽手柄（撤销/重做/同步）
+                // After inserting a block, refresh the drag handle of its superblock (undo/redo/sync)
                 refreshSbs(item);
                 const wbrElement = item.querySelector("wbr");
                 if (isUndo) {
@@ -1111,7 +1137,7 @@ export const onTransaction = (protyle: IProtyle, operations: IOperation[], isUnd
             return;
         }
         if (operation.action === "append") {
-            // 目前只有移动块的时候会调用，反连面板就自己点击刷新处理。
+            // Currently only called when moving a block; the backlink panel refreshes itself on click.
             if (!protyle.options.backlinkData) {
                 reloadProtyle(protyle, false);
             }
@@ -1130,11 +1156,12 @@ export const onTransaction = (protyle: IProtyle, operations: IOperation[], isUnd
             "foldAttrViewGroup", "hideAttrViewAllGroups", "setAttrViewFitImage", "setAttrViewDisplayFieldName",
             "insertAttrViewBlock", "setAttrViewColDateFillSpecificTime", "setAttrViewFillColBackgroundColor", "setAttrViewUpdatedIncludeTime",
             "setAttrViewCreatedIncludeTime"].includes(operation.action)) {
-            // 撤销 transaction 会进行推送，需使用推送来进行刷新最新数据 https://github.com/siyuan-note/siyuan/issues/13607
+            // Undoing the transaction triggers a push, so the push is used to refresh with the latest data
+            // https://github.com/siyuan-note/siyuan/issues/13607
             if (!isUndo) {
                 refreshAV(protyle, operation);
             } else if (operation.action === "setAttrViewName") {
-                // setAttrViewName 同文档不会推送，需手动刷新
+                // setAttrViewName doesn't push within the same document, so it must be refreshed manually
                 Array.from(protyle.wysiwyg.element.querySelectorAll(`.av[data-av-id="${operation.id}"]`)).forEach((item: HTMLElement) => {
                     const titleElement = item.querySelector(".av__title") as HTMLElement;
                     if (!titleElement) {
@@ -1167,7 +1194,8 @@ export const turnsIntoOneTransaction = async (options: {
     const id = Lute.NewNodeID();
     if (options.type === "BlocksMergeSuperBlock") {
         parentElement = genSBElement(options.level, id);
-        // 回车生成竖排超级块时，将横向超级块子块的宽度迁移到新超级块，并清除子块宽度
+        // When Enter creates a col-layout superblock, migrate the row-layout superblock child's width to the
+        // new superblock and clear the child's width
         // https://github.com/siyuan-note/siyuan/issues/9521
         const firstChild = options.selectsElement[0] as HTMLElement;
         if (firstChild.style.width) {
@@ -1274,17 +1302,17 @@ export const turnsIntoOneTransaction = async (options: {
                 id,
             });
         }
-        // 超级块内嵌入块无面包屑，需重新渲染 https://github.com/siyuan-note/siyuan/issues/7574
+        // An embed block inside a superblock has no breadcrumb, so it needs to be re-rendered https://github.com/siyuan-note/siyuan/issues/7574
         if (item.getAttribute("data-type") === "NodeBlockQueryEmbed") {
             item.removeAttribute("data-render");
             blockRender(options.protyle, item);
         }
     });
-    // 子块移入完成后刷新超级块拖拽手柄
+    // Refresh the superblock's drag handle once the child block has moved in
     if (parentElement.classList.contains("sb")) {
         refreshSbs(parentElement);
     } else if (parentElement.parentElement?.classList.contains("sb")) {
-        // 引述/列表/标注嵌入超级块时刷新父超级块
+        // Refresh the parent superblock when a quote/list/callout is embedded inside a superblock
         refreshSbs(parentElement.parentElement);
     }
     if ((["Blocks2Blockquote", "Blocks2Callout"].includes(options.type) || options.type.endsWith("Ls")) &&
@@ -1328,7 +1356,7 @@ export const turnsIntoTransaction = (options: {
     options.protyle.observerLoad?.disconnect();
     let selectsElement: Element[] = options.selectsElement;
     let range: Range;
-    // 通过快捷键触发
+    // Triggered via a hotkey
     if (options.nodeElement) {
         range = getSelection().getRangeAt(0);
         range.insertNode(document.createElement("wbr"));
@@ -1356,7 +1384,7 @@ export const turnsIntoTransaction = (options: {
         if (selectsElement.length === 1 && options.type === "Blocks2Hs" &&
             selectsElement[0].getAttribute("data-type") === "NodeHeading" &&
             options.level === parseInt(selectsElement[0].getAttribute("data-subtype").substr(1))) {
-            // 快捷键同级转换，消除标题
+            // Converting to the same heading level via hotkey removes the heading
             options.type = "Blocks2Ps";
         }
         options.isContinue = isContinue;
@@ -1607,7 +1635,7 @@ export const transaction = (protyle: IProtyle, doOperations: IOperation[], undoO
         return;
     }
     if (!protyle) {
-        // 文档树中点开属性->数据库后的变更操作 & 文档树添加到数据库
+        // Change operations after opening attribute -> database from the file tree, and adding to a database from the file tree
         fetchPost("/api/transactions", {
             session: Constants.SIYUAN_APPID,
             app: Constants.SIYUAN_APPID,
@@ -1634,7 +1662,7 @@ export const transaction = (protyle: IProtyle, doOperations: IOperation[], undoO
         skipSync: options?.skipSync,
         callback: options?.callback,
     });
-    // 插入块后会导致高度变化，从而产生再次定位 https://github.com/siyuan-note/siyuan/issues/11798
+    // Inserting a block causes a height change, which triggers repositioning https://github.com/siyuan-note/siyuan/issues/11798
     doOperations.find(item => {
         if (item.action === "insert") {
             protyle.observerLoad?.disconnect();
@@ -1680,7 +1708,8 @@ const processFold = (operation: IOperation, protyle: IProtyle) => {
             highlightRender(protyle.wysiwyg.element);
             avRender(protyle.wysiwyg.element, protyle);
             blockRender(protyle, protyle.wysiwyg.element);
-            // 展开标题插入的块可能落在超级块内，刷新手柄避免与既有手柄重复/错位
+            // Blocks inserted by unfolding a heading may land inside a superblock, so refresh the handle to
+            // avoid duplicating or misaligning it with an existing handle
             refreshSbs(...Array.from(protyle.wysiwyg.element.querySelectorAll(`[data-node-id="${operation.id}"]`)));
             if (operation.context?.focusId) {
                 const focusElement = protyle.wysiwyg.element.querySelector(`[data-node-id="${operation.context.focusId}"]`);
@@ -1702,9 +1731,10 @@ const processFold = (operation: IOperation, protyle: IProtyle) => {
                 removeFoldHeading(item);
             }
         });
-        // 折叠移除子块后，刷新折叠标题所在超级块的拖拽手柄（子块数变化）
+        // After folding removes child blocks, refresh the drag handle of the folded heading's superblock (the
+        // child count has changed)
         refreshSbs(...Array.from(protyle.wysiwyg.element.querySelectorAll(`[data-node-id="${operation.id}"]`)));
-        // 折叠标题后未触发动态加载 https://github.com/siyuan-note/siyuan/issues/4168
+        // Dynamic loading wasn't triggered after folding the heading https://github.com/siyuan-note/siyuan/issues/4168
         if (protyle.wysiwyg.element.lastElementChild.getAttribute("data-eof") !== "2" &&
             !protyle.scroll.element.classList.contains("fn__none") &&
             protyle.contentElement.scrollHeight - protyle.contentElement.scrollTop < protyle.contentElement.clientHeight * 2    // https://github.com/siyuan-note/siyuan/issues/7785

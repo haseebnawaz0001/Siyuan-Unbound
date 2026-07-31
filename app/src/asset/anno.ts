@@ -32,7 +32,7 @@ export const initAnno = (element: HTMLElement, pdf: any) => {
     const rectResizeElement = pdfConfig.mainContainer.lastElementChild;
     pdfConfig.mainContainer.addEventListener("mousedown", (event: MouseEvent) => {
         if (event.button === 2 || !rectAnnoElement.classList.contains("toggled")) {
-            // 右键
+            // Right click
             return;
         }
         let canvasRect = pdf.pdfViewer._getVisiblePages().first.view.canvas.getBoundingClientRect();
@@ -60,20 +60,20 @@ export const initAnno = (element: HTMLElement, pdf: any) => {
             let newHeight = 0;
             if (moveEvent.clientX < x) {
                 if (moveEvent.clientX < mostLeft) {
-                    // 向左越界
+                    // Out of bounds to the left
                     newLeft = mostLeft;
                 } else {
-                    // 向左
+                    // Moving left
                     newLeft = moveEvent.clientX;
                 }
                 newWidth = x - newLeft;
             } else {
                 if (moveEvent.clientX > mostRight) {
-                    // 向右越界
+                    // Out of bounds to the right
                     newLeft = x;
                     newWidth = mostRight - newLeft;
                 } else {
-                    // 向右
+                    // Moving right
                     newLeft = x;
                     newWidth = moveEvent.clientX - x;
                 }
@@ -81,20 +81,20 @@ export const initAnno = (element: HTMLElement, pdf: any) => {
 
             if (moveEvent.clientY > y) {
                 if (moveEvent.clientY > mostBottom) {
-                    // 向下越界
+                    // Out of bounds downward
                     newTop = y;
                     newHeight = mostBottom - y;
                 } else {
-                    // 向下
+                    // Moving down
                     newTop = y;
                     newHeight = moveEvent.clientY - y;
                 }
             } else {
                 if (moveEvent.clientY < mostTop) {
-                    // 向上越界
+                    // Out of bounds upward
                     newTop = mostTop;
                 } else {
-                    // 向上
+                    // Moving up
                     newTop = moveEvent.clientY;
                 }
                 newHeight = y - newTop;
@@ -377,7 +377,7 @@ const hideToolbar = (element: HTMLElement) => {
 let rectElement: HTMLElement;
 const showToolbar = (element: HTMLElement, range: Range, target?: HTMLElement) => {
     if (target) {
-        // 阻止 popover
+        // Prevent the popover
         target.setAttribute("prevent-popover", "true");
         setTimeout(() => {
             target.removeAttribute("prevent-popover");
@@ -443,7 +443,7 @@ const getHightlightCoordsByRange = (pdf: any, color: string) => {
                 if (previousText.endsWith("-")) {
                     item.previousElementSibling.textContent = previousText.substring(0, previousText.length - 1);
                 } else {
-                    // 中文情况不能添加 https://github.com/siyuan-note/siyuan/issues/8152
+                    // Should not be added for Chinese text https://github.com/siyuan-note/siyuan/issues/8152
                     item.insertAdjacentText("afterend", " ");
                 }
             }
@@ -733,7 +733,7 @@ const copyAnno = (idPath: string, fileName: string, pdf: any) => {
     const content = rectElement.getAttribute("data-content");
     setTimeout(() => {
         if (mode === "rect" ||
-            (mode === "" && rectElement.childElementCount === 1 && content.startsWith(fileName)) // 兼容历史，以前没有 mode
+            (mode === "" && rectElement.childElementCount === 1 && content.startsWith(fileName)) // Compatibility with old data, which had no mode
         ) {
             getRectImgData(pdf).then((imageData) => {
                 fetch(imageData.url).then((response) => {
@@ -773,7 +773,7 @@ async function getRectImgData(pdfObj: any) {
         return;
     }
 
-    // PDF 截图时的缩放倍数，用于提高截图清晰度
+    // The scale factor used when capturing PDF screenshots, to improve capture sharpness
     const CAPTURE_SCALE_RATIO = 1.5;
 
     const pdfPage = await pdfObj.pdfDocument.getPage(pageNumber);
@@ -802,19 +802,19 @@ async function getRectImgData(pdfObj: any) {
     const resultCanvas = document.createElement("canvas");
     resultCanvas.width = captureImageData.width;
     resultCanvas.height = captureImageData.height;
-    // 页面实际旋转角度 = 用户旋转 + PDF 本身旋转
+    // Actual page rotation angle = user rotation + the PDF's own rotation
     const totalRotation = (pageView.rotation + pageView.pdfPageRotate) % 360;
     const resultCtx = resultCanvas.getContext("2d");
     if (totalRotation === 0) {
         resultCtx.putImageData(captureImageData, 0, 0);
     } else {
-        // 交换宽高
+        // Swap width and height
         if (totalRotation === 90 || totalRotation === 270) {
             [resultCanvas.width, resultCanvas.height] = [resultCanvas.height, resultCanvas.width];
         }
         resultCtx.translate(resultCanvas.width / 2, resultCanvas.height / 2);
         resultCtx.rotate((totalRotation * Math.PI) / 180);
-        // 在旋转后的画布坐标系上绘制图片
+        // Draw the image in the rotated canvas coordinate system
         const tempCanvas = document.createElement("canvas");
         tempCanvas.width = captureImageData.width;
         tempCanvas.height = captureImageData.height;

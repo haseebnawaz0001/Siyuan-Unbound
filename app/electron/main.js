@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// 开发环境下隐藏 Electron 安全清单控制台提示 https://www.electronjs.org/docs/latest/tutorial/security
+// Hide the Electron security checklist console warning in development https://www.electronjs.org/docs/latest/tutorial/security
 process.env.ELECTRON_DISABLE_SECURITY_WARNINGS = "true";
 
 const {
@@ -79,12 +79,12 @@ const isOpenAsHidden = function () {
 
 remote.initialize();
 
-// Electron 相关文件夹名称改为 `SiYuan-Electron` https://github.com/siyuan-note/siyuan/issues/3349
-// getPath("userData") 会创建空的 SiYuan 目录，改为 app.getPath("appData")
+// Rename the Electron-related folder to `SiYuan-Electron` https://github.com/siyuan-note/siyuan/issues/3349
+// getPath("userData") would create an empty SiYuan directory, so use app.getPath("appData") instead
 app.setPath("userData", path.join(app.getPath("appData"), app.getName() + "-Electron"));
 
 if (process.platform === "win32") {
-    // Windows 需要设置 AppUserModelId 才能正确显示应用名称和应用图标 https://github.com/siyuan-note/siyuan/issues/17022
+    // Windows requires setting the AppUserModelId to display the app name and icon correctly https://github.com/siyuan-note/siyuan/issues/17022
     app.setAppUserModelId("org.b3log.siyuan");
 }
 
@@ -93,7 +93,7 @@ if (!app.requestSingleInstanceLock()) {
     return;
 }
 
-// 开发环境下 Windows 需显式传入 Electron 可执行文件路径和 main.js 路径，否则 siyuan:// 会被当作相对路径
+// On Windows in development, explicitly pass the Electron executable path and main.js path, otherwise siyuan:// would be treated as a relative path
 if (isDevEnv && process.defaultApp && process.argv.length >= 2) {
     const mainScript = path.resolve(process.argv[1]);
     if (process.platform === "win32") {
@@ -111,7 +111,7 @@ app.commandLine.appendSwitch("auto-detect", "false");
 app.commandLine.appendSwitch("no-proxy-server");
 app.commandLine.appendSwitch("enable-features", "PlatformHEVCDecoderSupport");
 app.commandLine.appendSwitch("xdg-portal-required-version", "4");
-// 本地 HTTPS 页面加载 HTTP 外链图时，禁止自动升级为 HTTPS
+// Prevent HTTP image links from being auto-upgraded to HTTPS when loaded from a local HTTPS page
 app.commandLine.appendSwitch("disable-features", "AutoupgradeMixedContent");
 
 // Support set Chromium command line arguments on the desktop https://github.com/siyuan-note/siyuan/issues/9696
@@ -124,7 +124,7 @@ if (!app.isPackaged) {
 for (let i = argStart; i < process.argv.length; i++) {
     let arg = process.argv[i];
     if (arg.startsWith("--workspace=") || arg.startsWith("--openAsHidden") || arg.startsWith("--port=") || arg.startsWith("--safe-mode=") || arg.startsWith("--lang=") || arg.startsWith("siyuan://")) {
-        // 跳过内置参数
+        // Skip built-in arguments
         if (arg.startsWith("--openAsHidden")) {
             openAsHidden = true;
             writeLog("open as hidden");
@@ -147,7 +147,7 @@ try {
     app.exit();
 }
 
-// 解析命令行参数，参数需以 `name=value` 形式传入 https://github.com/siyuan-note/siyuan/issues/14748
+// Parse command line arguments, which must be passed in `name=value` form https://github.com/siyuan-note/siyuan/issues/14748
 const getArg = (name) => {
     for (let i = 0; i < process.argv.length; i++) {
         if (process.argv[i].startsWith(name)) {
@@ -156,12 +156,12 @@ const getArg = (name) => {
     }
 };
 
-// 检测上次打开的工作空间是否丢失 https://github.com/siyuan-note/siyuan/issues/14748
+// Detect whether the last opened workspace is missing https://github.com/siyuan-note/siyuan/issues/14748
 let lastWorkspaceMissing = false;
 let missingWorkspacePath = "";
 let availableWorkspaces = [];
 if (!firstOpen && !getArg("--workspace")) {
-    // 显式通过命令行指定工作空间时尊重用户参数，跳过检测
+    // Respect the user's argument and skip detection when the workspace is explicitly specified on the command line
     try {
         const wsFile = path.join(confDir, "workspace.json");
         if (fs.existsSync(wsFile)) {
@@ -181,7 +181,7 @@ if (!firstOpen && !getArg("--workspace")) {
     }
 }
 
-// 读取上次打开的工作空间路径，用于崩溃恢复时默认选中该工作空间
+// Read the last opened workspace path, used as the default selection during crash recovery
 let lastWorkspacePath = "";
 if (!firstOpen && !getArg("--workspace")) {
     try {
@@ -212,7 +212,7 @@ const windowNavigate = (currentWindow, windowType) => {
                 return;
             }
         }
-        // 其他链接使用浏览器打开
+        // Open other links in the browser
         event.preventDefault();
         shell.openExternal(url);
     });
@@ -250,56 +250,15 @@ const hotKey2Electron = (key) => {
 };
 
 /**
- * 将 RFC 5646 格式的语言标签解析为应用支持的语言代码
- * https://www.rfc-editor.org/info/rfc5646
- * @param {string[]} languageTags - 语言标签数组（如 ["zh-Hans-CN", "en-US"]）
- * @returns {string} 应用支持的语言代码
+ * Resolve the language code the app should start in.
+ * This build is English-first, so the value is constant rather than derived from the OS locale.
+ * @returns {string} The language code supported by the app
  */
-const resolveAppLanguage = (languageTags) => {
-    if (!languageTags || languageTags.length === 0) {
-        return "en";
-    }
-
-    const tag = languageTags[0].toLowerCase();
-    const parts = tag.replace(/_/g, "-").split("-");
-    const language = parts[0];
-
-    if (language === "zh") {
-        if (tag.includes("hant")) {
-            return "zh-TW";
-        }
-        if (tag.includes("hans") || tag.includes("cn") || tag.includes("sg")) {
-            return "zh-CN";
-        }
-        if (tag.includes("tw") || tag.includes("hk") || tag.includes("mo")) {
-            return "zh-TW";
-        }
-        return "zh-CN";
-    }
-
-    const languageMapping = {
-        "en": "en",
-        "ar": "ar",
-        "de": "de",
-        "es": "es",
-        "fr": "fr",
-        "he": "he",
-        "hi": "hi",
-        "id": "id",
-        "it": "it",
-        "ja": "ja",
-        "ko": "ko",
-        "nl": "nl",
-        "pl": "pl",
-        "pt": "pt-BR",
-        "ru": "ru",
-        "sk": "sk",
-        "th": "th",
-        "tr": "tr",
-        "uk": "uk",
-    };
-
-    return languageMapping[language] || "en";
+const resolveAppLanguage = () => {
+    // English-first build: the OS locale is deliberately ignored so the first-run window and the kernel it launches
+    // always start in English. The language <select> on that window still lists every bundled language, so the user
+    // can switch before the workspace is created, and Settings can change it at any time afterwards.
+    return "en";
 };
 
 const markExpectedRendererExit = (window) => {
@@ -314,7 +273,7 @@ const exitApp = (port, errorWindowId) => {
     const mainWindow = workspace ? workspace.browserWindow : undefined;
     const tray = workspace ? workspace.tray : undefined;
 
-    // 关闭端口相同的所有非主窗口
+    // Close all non-main windows sharing the same port
     BrowserWindow.getAllWindows().forEach((item) => {
         try {
             const currentURL = new URL(item.getURL());
@@ -342,8 +301,10 @@ const exitApp = (port, errorWindowId) => {
             if (resetWindowStateOnRestart) {
                 fs.writeFileSync(windowStatePath, "{}");
             } else {
-                // 保存窗口状态供下次启动恢复。isMaximized 记录关闭时是否最大化；x/y/width/height 须用 getNormalBounds，
-                // 其在任意窗口状态下均返回向下还原时的矩形。而 getBounds 在最大化时返回全屏尺寸，会导致还原时贴边。
+                // Save window state for restoration on next launch. isMaximized records whether the window was
+                // maximized on close; x/y/width/height must use getNormalBounds, which always returns the restored
+                // rectangle regardless of window state, whereas getBounds returns the full-screen size when
+                // maximized, causing the restored window to be flush against the screen edge.
                 // https://github.com/siyuan-note/siyuan/issues/18154
                 // https://www.electronjs.org/docs/latest/api/browser-window#wingetnormalbounds
                 const bounds = mainWindow.getNormalBounds();
@@ -585,7 +546,7 @@ const closeUpdateKernelStage = async (ports, request) => {
     return exitResponses;
 };
 
-// 更新时先退出其他工作空间，再退出发起更新的工作空间，确保安装器启动前所有内核已经停止。
+// When updating, exit other workspaces first, then exit the workspace that initiated the update, ensuring all kernels have stopped before the installer starts.
 // https://github.com/siyuan-note/siyuan/issues/18258
 const coordinateUpdateInstall = async (request) => {
     const ports = Array.from(new Set(getSystemShutdownPorts().map((port) => port.toString())
@@ -758,7 +719,7 @@ const beginForcedSystemShutdown = () => {
 };
 
 if (process.platform === "win32") {
-    // Windows 关机、重启或注销时取消本次会话结束，等待内核安全退出后再关闭思源。
+    // Cancel the session end on Windows shutdown, restart, or logoff, and close SiYuan only after the kernel has exited safely.
     app.on("browser-window-created", (event, window) => {
         window.on("query-session-end", (sessionEvent) => {
             writeLog("query-session-end");
@@ -788,7 +749,7 @@ const showErrorWindow = (titleZh, titleEn, content, emoji = "⚠️") => {
         titleBarStyle: "hidden",
         fullscreenable: false,
         icon: path.join(appDir, "stage", "icon-large.png"),
-        transparent: "darwin" === process.platform, // 避免深色模式关闭窗口时闪现白色背景
+        transparent: "darwin" === process.platform, // Avoid a flash of white background when closing the window in dark mode
         webPreferences: {
             nodeIntegration: true, webviewTag: true, webSecurity: false, contextIsolation: false,
         },
@@ -813,7 +774,7 @@ const initMainWindow = (currentKernelPort = kernelPort) => {
         return;
     }
 
-    // 恢复主窗体状态
+    // Restore the main window state
     let oldWindowState = {};
     try {
         oldWindowState = JSON.parse(fs.readFileSync(windowStatePath, "utf8"));
@@ -855,10 +816,10 @@ const initMainWindow = (currentKernelPort = kernelPort) => {
         y = 0;
     }
     if (workArea) {
-        // 窗口大于 workArea 时缩小会隐藏到左下角，这里使用最小值重置
+        // When the window is bigger than the workArea, shrinking it would hide it in the bottom-left corner, so reset to a minimum size here
         if (windowState.width > workArea.width + 32 || windowState.height > workArea.height + 32) {
-            // 重启后窗口大小恢复默认问题 https://github.com/siyuan-note/siyuan/issues/7755 https://github.com/siyuan-note/siyuan/issues/13732
-            // 这里 +32 是因为在某种情况下窗口大小会比 workArea 大几个像素导致恢复默认，+32 可以避免这种特殊情况
+            // Window size reverting to default after restart https://github.com/siyuan-note/siyuan/issues/7755 https://github.com/siyuan-note/siyuan/issues/13732
+            // The +32 here is because in some cases the window size can be a few pixels larger than the workArea, which triggers the reset to default; +32 avoids this edge case
             windowState.width = Math.min(defaultWidth, workArea.width);
             windowState.height = Math.min(defaultHeight, workArea.height);
             writeLog("reset window size [width=" + windowState.width + ", height=" + windowState.height + "]");
@@ -884,7 +845,7 @@ const initMainWindow = (currentKernelPort = kernelPort) => {
         writeLog("reset window height [376]");
     }
 
-    // 创建主窗体
+    // Create the main window
     const currentWindow = new BrowserWindow({
         title: "SiYuan",
         show: false,
@@ -900,7 +861,7 @@ const initMainWindow = (currentKernelPort = kernelPort) => {
             webviewTag: true,
             webSecurity: false,
             contextIsolation: false,
-            autoplayPolicy: "user-gesture-required" // 桌面端禁止自动播放多媒体 https://github.com/siyuan-note/siyuan/issues/7587
+            autoplayPolicy: "user-gesture-required" // Disable media autoplay on desktop https://github.com/siyuan-note/siyuan/issues/7587
         },
         frame: "darwin" === process.platform,
         titleBarStyle: "hidden",
@@ -916,9 +877,10 @@ const initMainWindow = (currentKernelPort = kernelPort) => {
     }
     currentWindow.webContents.userAgent = "SiYuan/" + appVer + " https://b3log.org/siyuan Electron " + currentWindow.webContents.userAgent;
 
-    // 加载主界面。setProxy 用超时兜底包装：Electron 在某些系统代理配置下 session.setProxy 可能永久
-    // pending（既不 resolve 也不 reject），会导致 loadURL 永不执行，主窗口卡在启动页无法显示。
-    // 这里无论 setProxy 是否完成，最多等待 5 秒后强制加载主界面。
+    // Load the main UI. setProxy is wrapped with a timeout fallback: under some system proxy configurations,
+    // Electron's session.setProxy can stay pending forever (neither resolving nor rejecting), which would keep
+    // loadURL from ever running and leave the main window stuck on the boot page.
+    // Regardless of whether setProxy completes, force-load the main UI after waiting at most 5 seconds.
     const loadMainURL = () => {
         currentWindow.loadURL(getServer(currentKernelPort) + "/stage/build/app/?v=" + Date.now());
     };
@@ -928,33 +890,33 @@ const initMainWindow = (currentKernelPort = kernelPort) => {
         const setProxyDone = setProxy(`${response.data.proxy.scheme}://${response.data.proxy.host}:${response.data.proxy.port}`, currentWindow.webContents);
         Promise.race([
             Promise.resolve(setProxyDone),
-            new Promise((resolve) => setTimeout(resolve, 5000)), // setProxy 永久 pending 时的超时兜底
+            new Promise((resolve) => setTimeout(resolve, 5000)), // Timeout fallback for when setProxy stays pending forever
         ]).then(loadMainURL).catch(() => {
             writeLog("setProxy failed, load main UI without proxy");
             loadMainURL();
         });
     }).catch((e) => {
-        // getNetwork 失败也要继续加载主界面，避免主窗口不加载导致卡在启动页
+        // Continue loading the main UI even if getNetwork fails, to avoid the main window getting stuck on the boot page
         writeLog("getNetwork failed, load main UI without proxy: " + e.message);
         loadMainURL();
     });
 
-    // 发起互联网服务请求时绕过安全策略 https://github.com/siyuan-note/siyuan/issues/5516
+    // Bypass security policy when making internet service requests https://github.com/siyuan-note/siyuan/issues/5516
     currentWindow.webContents.session.webRequest.onBeforeSendHeaders((details, cb) => {
         if (-1 < details.url.toLowerCase().indexOf("bili")) {
-            // B 站不移除 Referer https://github.com/siyuan-note/siyuan/issues/94
+            // Don't strip Referer for Bilibili https://github.com/siyuan-note/siyuan/issues/94
             cb({requestHeaders: details.requestHeaders});
             return;
         }
 
         if (-1 < details.url.toLowerCase().indexOf("douyin")) {
-            // 抖音不移除 Referer，iframe 块内登录依赖 Referer 校验 https://github.com/siyuan-note/siyuan/issues/18070
+            // Don't strip Referer for Douyin, since login inside the iframe block relies on Referer validation https://github.com/siyuan-note/siyuan/issues/18070
             cb({requestHeaders: details.requestHeaders});
             return;
         }
 
         if (-1 < details.url.toLowerCase().indexOf("youtube")) {
-            // YouTube 设置 Referer https://github.com/siyuan-note/siyuan/issues/16319
+            // Set Referer for YouTube https://github.com/siyuan-note/siyuan/issues/16319
             details.requestHeaders["Referer"] = "https://b3log.org/siyuan/";
             cb({requestHeaders: details.requestHeaders});
             return;
@@ -987,7 +949,7 @@ const initMainWindow = (currentKernelPort = kernelPort) => {
                 currentWindow.restore();
             }
             currentWindow.show();
-            setTimeout(() => { // 等待界面js执行完毕
+            setTimeout(() => { // Wait for the UI's JS to finish executing
                 writeLog(siyuanOpenURL);
                 currentWindow.webContents.send("siyuan-open-url", siyuanOpenURL);
             }, 2000);
@@ -998,7 +960,7 @@ const initMainWindow = (currentKernelPort = kernelPort) => {
         currentWindow.webContents.openDevTools({mode: "bottom"});
     }
 
-    // 菜单
+    // Menu
     const productName = "SiYuan";
     const template = [{
         label: productName, submenu: [{
@@ -1018,7 +980,7 @@ const initMainWindow = (currentKernelPort = kernelPort) => {
     },];
     const menu = Menu.buildFromTemplate(template);
     Menu.setApplicationMenu(menu);
-    // 当前页面链接使用浏览器打开
+    // Open links from the current page in the browser
     windowNavigate(currentWindow, "app");
     currentWindow.on("close", (event) => {
         if (currentWindow && !currentWindow.isDestroyed()) {
@@ -1031,8 +993,9 @@ const initMainWindow = (currentKernelPort = kernelPort) => {
         webContentsId: currentWindow.webContents.id,
         port: currentKernelPort,
     });
-    // loadURL 后设置超时兜底：前端 app bundle 加载或初始化异常导致 siyuan-ready-to-show 迟迟不发时，
-    // 强制销毁 boot 窗口并显示主窗口，避免永久卡在启动页
+    // Set a timeout fallback after loadURL: if a frontend app bundle load or init error delays
+    // siyuan-ready-to-show indefinitely, force-destroy the boot window and show the main window
+    // to avoid getting stuck on the boot page forever
     const readyToShowTimeout = setTimeout(() => {
         if (bootWindow && !bootWindow.isDestroyed()) {
             if (!currentWindow.isDestroyed()) {
@@ -1043,7 +1006,7 @@ const initMainWindow = (currentKernelPort = kernelPort) => {
         }
     }, 60000);
     ipcMain.once("siyuan-ready-to-show", () => {
-        clearTimeout(readyToShowTimeout); // 正常收到信号则取消超时兜底
+        clearTimeout(readyToShowTimeout); // Cancel the timeout fallback once the signal is received normally
         if (isOpenAsHidden()) {
             currentWindow.minimize();
         } else {
@@ -1151,7 +1114,7 @@ const initKernel = (workspace, port, lang, safeMode) => {
         writeLog(cmd);
         if (!isDevEnv || workspaces.length > 0) {
             const kernelProcess = childProcess.spawn(kernelPath, cmds, {
-                detached: false, // 桌面端内核进程不再以游离模式拉起 https://github.com/siyuan-note/siyuan/issues/6336
+                detached: false, // The desktop kernel process is no longer spawned in detached mode https://github.com/siyuan-note/siyuan/issues/6336
                 stdio: "ignore",
             },);
 
@@ -1173,7 +1136,7 @@ const initKernel = (workspace, port, lang, safeMode) => {
                         case 21:
                             errorWindowId = showErrorWindow("监听端口 " + currentKernelPort + " 失败", "Failed to listen to port " + currentKernelPort, "<div>监听 " + currentKernelPort + " 端口失败，请确保程序拥有网络权限并不受防火墙和杀毒软件阻止。</div><div>Failed to listen to port " + currentKernelPort + ", please make sure the program has network permissions and is not blocked by firewalls and antivirus software.</div>");
                             break;
-                        case 24: // 工作空间已被锁定，尝试切换到第一个打开的工作空间
+                        case 24: // The workspace is locked, try switching to the first open workspace
                             if (workspaces && 0 < workspaces.length) {
                                 showWindow(workspaces[0].browserWindow);
                             }
@@ -1231,8 +1194,10 @@ const initKernel = (workspace, port, lang, safeMode) => {
             } else {
                 let progressing = false;
                 const bootShowStart = Date.now();
-                // 启动超时兜底，防止内核异常时永久卡在 boot 轮询。数据同步、首次全量索引重建、
-                // 数据库版本变更触发的全表重建都发生在 SetBooted() 之前，会计入此循环，故给足余量
+                // Boot timeout fallback, to prevent staying stuck in the boot polling loop forever if the kernel
+                // misbehaves. Data sync, the first full index rebuild, and full-table rebuilds triggered by a
+                // database version change all happen before SetBooted() and are counted within this loop, so a
+                // generous margin is given.
                 const bootTimeout = 300000;
                 while (!progressing) {
                     if (Date.now() - bootShowStart > bootTimeout) {
@@ -1250,7 +1215,7 @@ const initKernel = (workspace, port, lang, safeMode) => {
                         const progressResult = await net.fetch(getServer(currentKernelPort) + "/api/system/bootProgress");
                         const progressData = await progressResult.json();
                         if (progressData.data.progress >= 100) {
-                            // 内核完成后等待动画快进收尾（200ms）再进入主窗口
+                            // After the kernel finishes, wait for the fast-forwarded animation to end (200ms) before entering the main window
                             await sleep(200);
                             resolve(currentKernelPort);
                             progressing = true;
@@ -1283,7 +1248,7 @@ app.whenReady().then(() => {
         }
     });
 
-    // 渲染进程崩溃监听，只有工作空间主窗口的非预期崩溃才会触发安全模式。
+    // Listen for renderer process crashes; only an unexpected crash of a workspace's main window triggers safe mode.
     app.on("render-process-gone", (event, webContents, details) => {
         writeLog("Render process gone [reason=" + details.reason + ", exitCode=" + details.exitCode + "]");
         if (updateInstallPromise) {
@@ -1318,7 +1283,7 @@ app.whenReady().then(() => {
             force: true,
             setCurrentWorkspace: false,
         });
-        exitApp(workspace.port); // 退出崩溃的工作空间，下次启动时由用户选择启动方式。
+        exitApp(workspace.port); // Exit the crashed workspace; the user will choose how to start it on next launch.
     });
 
     const resetTrayMenu = (tray, lang, mainWindow) => {
@@ -1350,7 +1315,7 @@ app.whenReady().then(() => {
         },];
 
         if ("win32" === process.platform) {
-            // Windows 端支持窗口置顶 https://github.com/siyuan-note/siyuan/issues/6860
+            // Support pinning the window on top on Windows https://github.com/siyuan-note/siyuan/issues/6860
             trayMenuTemplate.splice(1, 0, {
                 label: mainWindow.isAlwaysOnTop() ? lang.cancelWindowTop : lang.setWindowTop, click: () => {
                     if (!mainWindow.isAlwaysOnTop()) {
@@ -1366,9 +1331,9 @@ app.whenReady().then(() => {
         tray.setContextMenu(contextMenu);
     };
     const hideWindow = (wnd) => {
-        // 通过 `Alt+M` 最小化后焦点回到先前的窗口 https://github.com/siyuan-note/siyuan/issues/7275
+        // Focus returns to the previous window after minimizing via `Alt+M` https://github.com/siyuan-note/siyuan/issues/7275
         wnd.minimize();
-        // Mac 隐藏后无法再 Dock 中显示
+        // On Mac, once hidden it can no longer be shown from the Dock
         if ("win32" === process.platform || "linux" === process.platform) {
             wnd.hide();
         }
@@ -1735,7 +1700,7 @@ app.whenReady().then(() => {
                 nodeIntegration: true,
                 webviewTag: true,
                 webSecurity: false,
-                autoplayPolicy: "user-gesture-required" // 桌面端禁止自动播放多媒体 https://github.com/siyuan-note/siyuan/issues/7587
+                autoplayPolicy: "user-gesture-required" // Disable media autoplay on desktop https://github.com/siyuan-note/siyuan/issues/7587
             },
         });
         printWin.center();
@@ -1781,7 +1746,7 @@ app.whenReady().then(() => {
                 nodeIntegration: true,
                 webviewTag: true,
                 webSecurity: false,
-                autoplayPolicy: "user-gesture-required" // 桌面端禁止自动播放多媒体 https://github.com/siyuan-note/siyuan/issues/7587
+                autoplayPolicy: "user-gesture-required" // Disable media autoplay on desktop https://github.com/siyuan-note/siyuan/issues/7587
             },
         });
         remote.enable(win.webContents);
@@ -1845,7 +1810,7 @@ app.whenReady().then(() => {
             workspaceItem.workspaceDir = data.workspaceDir;
             let tray;
             if ("win32" === process.platform || "linux" === process.platform) {
-                // 系统托盘
+                // System tray
                 tray = new Tray(path.join(appDir, "stage", "icon-large.png"));
                 tray.setToolTip(`${path.basename(data.workspaceDir)} - SiYuan v${appVer}`);
                 const mainWindow = getWindowByContentId(event.sender.id);
@@ -1905,7 +1870,7 @@ app.whenReady().then(() => {
                     const mainWindow = currentWorkspace.browserWindow;
                     if (mainWindow.isMinimized()) {
                         mainWindow.restore();
-                        mainWindow.show(); // 按 `Alt+M` 后隐藏窗口，再次按 `Alt+M` 显示窗口后会卡住不能编辑 https://github.com/siyuan-note/siyuan/issues/8456
+                        mainWindow.show(); // After hiding the window with `Alt+M`, showing it again with `Alt+M` can leave it stuck and uneditable https://github.com/siyuan-note/siyuan/issues/8456
                     } else {
                         if (mainWindow.isVisible()) {
                             if (!mainWindow.isFocused()) {
@@ -1962,9 +1927,8 @@ app.whenReady().then(() => {
             initHTMLPath = path.join(appDir, "electron", "init.html");
         }
 
-        // 改进桌面端初始化时使用的外观语言 https://github.com/siyuan-note/siyuan/issues/6803
-        const languages = app.getPreferredSystemLanguages();
-        const language = resolveAppLanguage(languages);
+        // Improve the display language used during desktop initialization https://github.com/siyuan-note/siyuan/issues/6803
+        const language = resolveAppLanguage();
         firstOpenWindow.loadFile(initHTMLPath, {
             query: {
                 lang: language,
@@ -1974,7 +1938,7 @@ app.whenReady().then(() => {
             },
         });
         firstOpenWindow.show();
-        // 初始化启动
+        // Start initialization
         ipcMain.on("siyuan-first-init", (event, data) => {
             initKernel(data.workspace, "", data.lang).then((startedKernelPort) => {
                 if (startedKernelPort) {
@@ -1984,7 +1948,7 @@ app.whenReady().then(() => {
             firstOpenWindow.destroy();
         });
     } else if (appCrashInfo) {
-        // 上次工作空间渲染进程崩溃，弹出安全模式选择窗口。
+        // The last workspace's renderer process crashed; show the safe mode selection window.
         const safeModeWindow = new BrowserWindow({
             width: Math.floor(screen.getPrimaryDisplay().size.width * 0.55),
             height: Math.floor(screen.getPrimaryDisplay().workAreaSize.height * 0.65),
@@ -2002,9 +1966,8 @@ app.whenReady().then(() => {
             safeModeHTMLPath = path.join(appDir, "electron", "workspace.html");
         }
 
-        // 改进桌面端初始化时使用的外观语言 https://github.com/siyuan-note/siyuan/issues/6803
-        const languages = app.getPreferredSystemLanguages();
-        const language = resolveAppLanguage(languages);
+        // Improve the display language used during desktop initialization https://github.com/siyuan-note/siyuan/issues/6803
+        const language = resolveAppLanguage();
         let crashWorkspace = appCrashInfo.workspaceDir || lastWorkspacePath;
         if (!appCrashInfo.workspaceDir && !isDirectory(crashWorkspace)) {
             crashWorkspace = availableWorkspaces[availableWorkspaces.length - 1] || lastWorkspacePath;
@@ -2024,7 +1987,7 @@ app.whenReady().then(() => {
             },
         });
         safeModeWindow.show();
-        // 用户选择启动方式后启动内核，仅在内核启动成功后删除崩溃信息。
+        // Start the kernel after the user chooses a startup mode, and delete the crash info only once the kernel starts successfully.
         ipcMain.on("siyuan-select-workspace", (event, data) => {
             initKernel(data.workspace, "", data.lang, data.safeMode).then((startedKernelPort) => {
                 if (startedKernelPort) {
@@ -2035,7 +1998,7 @@ app.whenReady().then(() => {
             safeModeWindow.destroy();
         });
     } else if (lastWorkspaceMissing) {
-        // 上次使用的工作空间丢失，弹出选择工作空间窗口 https://github.com/siyuan-note/siyuan/issues/14748
+        // The last used workspace is missing; show the workspace selection window https://github.com/siyuan-note/siyuan/issues/14748
         const missingWorkspaceWindow = new BrowserWindow({
             width: Math.floor(screen.getPrimaryDisplay().size.width * 0.55),
             height: Math.floor(screen.getPrimaryDisplay().workAreaSize.height * 0.65),
@@ -2053,9 +2016,8 @@ app.whenReady().then(() => {
             missingWorkspaceHTMLPath = path.join(appDir, "electron", "workspace.html");
         }
 
-        // 改进桌面端初始化时使用的外观语言 https://github.com/siyuan-note/siyuan/issues/6803
-        const languages = app.getPreferredSystemLanguages();
-        const language = resolveAppLanguage(languages);
+        // Improve the display language used during desktop initialization https://github.com/siyuan-note/siyuan/issues/6803
+        const language = resolveAppLanguage();
         missingWorkspaceWindow.loadFile(missingWorkspaceHTMLPath, {
             query: {
                 lang: language,
@@ -2067,7 +2029,7 @@ app.whenReady().then(() => {
             },
         });
         missingWorkspaceWindow.show();
-        // 选择工作空间后启动内核
+        // Start the kernel after the workspace is selected
         ipcMain.on("siyuan-select-workspace", (event, data) => {
             initKernel(data.workspace, "", data.lang).then((startedKernelPort) => {
                 if (startedKernelPort) {
@@ -2100,12 +2062,12 @@ app.whenReady().then(() => {
         });
     }
 
-    // 电源相关事件必须放在 whenReady 里面，否则会导致 Linux 端无法正常启动 Trace/breakpoint trap (core dumped) https://github.com/siyuan-note/siyuan/issues/9347
+    // Power-related events must be registered inside whenReady, otherwise Linux fails to start properly with a Trace/breakpoint trap (core dumped) https://github.com/siyuan-note/siyuan/issues/9347
     powerMonitor.on("suspend", () => {
         writeLog("system suspend");
     });
     powerMonitor.on("resume", async () => {
-        // 桌面端系统休眠唤醒后判断网络连通性后再执行数据同步 https://github.com/siyuan-note/siyuan/issues/6687
+        // On desktop, check network connectivity after the system wakes from sleep before running data sync https://github.com/siyuan-note/siyuan/issues/6687
         writeLog("system resume");
 
         const isOnline = async () => {
@@ -2253,7 +2215,7 @@ app.on("web-contents-created", (webContentsCreatedEvent, contents) => {
         if (details.url.startsWith("file:///") && details.disposition === "foreground-tab") {
             return;
         }
-        // 在编辑器内打开链接的处理，比如 iframe 上的打开链接。
+        // Handle opening links from within the editor, such as links opened from an iframe.
         shell.openExternal(details.url);
         return {action: "deny"};
     });
@@ -2294,7 +2256,7 @@ function writeLog(out) {
     }
 }
 
-// 同步记录工作空间主渲染进程崩溃标记，确保主进程退出前落盘。
+// Record the workspace main renderer process crash marker synchronously, to ensure it's flushed to disk before the main process exits.
 const writeAppCrashMarker = (workspace, details) => {
     const timestamp = new Date().toISOString();
     const marker = {
@@ -2338,7 +2300,7 @@ const isDirectory = (filePath) => {
     }
 };
 
-// 优先读取结构化标记，并兼容旧版本的 app.crash.log。
+// Prefer reading the structured marker, while remaining compatible with the legacy app.crash.log.
 const readAppCrashInfo = () => {
     if (fs.existsSync(appCrashMarkerPath)) {
         try {
@@ -2402,13 +2364,13 @@ const readAppCrashInfo = () => {
     }
 };
 
-// 安全模式选择后内核启动成功，删除本次恢复所使用的崩溃信息。
+// The kernel started successfully after the safe mode selection; delete the crash info used for this recovery.
 const clearAppCrashInfo = () => {
     [appCrashMarkerPath, appCrashLogPath].forEach((filePath) => {
         try {
             fs.unlinkSync(filePath);
         } catch (e) {
-            // 文件不存在等异常忽略。
+            // Ignore errors such as the file not existing.
         }
     });
 };

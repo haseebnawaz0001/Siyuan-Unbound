@@ -33,7 +33,7 @@ import (
 	"golang.org/x/sync/singleflight"
 )
 
-// installedPackageInfo 描述了本地集市包的包与目录名信息
+// installedPackageInfo describes a local bazaar package's package data and directory name
 type installedPackageInfo struct {
 	Pkg     *bazaar.Package
 	DirName string
@@ -57,18 +57,18 @@ func getPackageInstallPath(pkgType, packageName string) (string, string, error) 
 	}
 }
 
-// installMeta 记录安装前后的状态，供安装后处理使用
+// installMeta records the before/after install state, for use by post-install processing
 type installMeta struct {
 	update bool
 }
 
-// batchInstallItem 同类型批量安装时单个包的结果
+// batchInstallItem is the result for a single package during a same-type batch install
 type batchInstallItem struct {
 	name string
 	meta installMeta
 }
 
-// updatePackages 更新一组集市包；同类型批量更新时，安装后处理只执行一次
+// updatePackages updates a group of bazaar packages; for a same-type batch update, post-install processing runs only once
 func updatePackages(packages []*bazaar.Package, pkgType string, successCount *int, planned int) {
 	items := make([]batchInstallItem, 0, len(packages))
 	for _, pkg := range packages {
@@ -85,7 +85,7 @@ func updatePackages(packages []*bazaar.Package, pkgType string, successCount *in
 	finishInstall(pkgType, items, 0)
 }
 
-// filterUpdatableBazaarPackages 过滤出允许更新的集市包
+// filterUpdatableBazaarPackages filters out bazaar packages that are allowed to be updated
 func filterUpdatableBazaarPackages(packages []*bazaar.Package) []*bazaar.Package {
 	updatable := make([]*bazaar.Package, 0, len(packages))
 	for _, pkg := range packages {
@@ -96,7 +96,7 @@ func filterUpdatableBazaarPackages(packages []*bazaar.Package) []*bazaar.Package
 	return updatable
 }
 
-// BatchUpdatePackages 更新所有集市包
+// BatchUpdatePackages updates all bazaar packages
 func BatchUpdatePackages(frontend string) {
 	plugins, widgets, icons, themes, templates := GetUpdatedPackages(frontend)
 	plugins = filterUpdatableBazaarPackages(plugins)
@@ -123,9 +123,9 @@ func BatchUpdatePackages(frontend string) {
 	}
 }
 
-// GetUpdatedPackages 获取所有类型集市包的更新列表
+// GetUpdatedPackages gets the update list for bazaar packages of all types
 //
-//   - frontend 仅用于插件环境兼容性判断
+//   - frontend is used only for plugin environment compatibility checks
 func GetUpdatedPackages(frontend string) (plugins, widgets, icons, themes, templates []*bazaar.Package) {
 	wg := &sync.WaitGroup{}
 
@@ -149,10 +149,10 @@ func GetUpdatedPackages(frontend string) (plugins, widgets, icons, themes, templ
 	return
 }
 
-// getUpdatedPackages 获取单个类型集市包的更新列表
+// getUpdatedPackages gets the update list for a single type of bazaar package
 func getUpdatedPackages(pkgType, frontend string) (updatedPackages []*bazaar.Package) {
 	installedPackages := GetInstalledPackages(pkgType, frontend, "")
-	updatedPackages = []*bazaar.Package{} // 确保返回空切片而非 nil
+	updatedPackages = []*bazaar.Package{} // Ensure an empty slice is returned rather than nil
 	for _, pkg := range installedPackages {
 		if !pkg.Outdated {
 			continue
@@ -162,7 +162,7 @@ func getUpdatedPackages(pkgType, frontend string) (updatedPackages []*bazaar.Pac
 	return
 }
 
-// GetInstalledPackageInfos 获取本地集市包信息，并返回路径相关字段供调用方复用
+// GetInstalledPackageInfos gets local bazaar package info, and returns the path-related fields for the caller to reuse
 func GetInstalledPackageInfos(pkgType string) (installedPackageInfos []installedPackageInfo, basePath, baseURLPathPrefix string, err error) {
 	var jsonFileName string
 	switch pkgType {
@@ -191,7 +191,7 @@ func GetInstalledPackageInfos(pkgType string) (installedPackageInfos []installed
 		return
 	}
 
-	// 过滤内置包
+	// Filter out built-in packages
 	switch pkgType {
 	case "themes":
 		filtered := make([]os.DirEntry, 0, len(dirs))
@@ -226,7 +226,7 @@ func GetInstalledPackageInfos(pkgType string) (installedPackageInfos []installed
 
 var getInstalledPackagesFlight singleflight.Group
 
-// GetInstalledPackages 获取本地集市包列表
+// GetInstalledPackages gets the list of local bazaar packages
 func GetInstalledPackages(pkgType, frontend, keyword string) (installedPackages []*bazaar.Package) {
 	key := "getInstalledPackages:" + pkgType + ":" + frontend + ":" + keyword
 	v, err, _ := getInstalledPackagesFlight.Do(key, func() (any, error) {
@@ -245,7 +245,7 @@ func getInstalledPackages0(pkgType, frontend, keyword string) (installedPackages
 	if err != nil {
 		return
 	}
-	// 本地没有该类型的集市包时，直接返回，避免请求云端数据
+	// Return immediately if there are no local bazaar packages of this type, to avoid requesting cloud data
 	if len(installedInfos) == 0 {
 		return
 	}
@@ -256,7 +256,7 @@ func getInstalledPackages0(pkgType, frontend, keyword string) (installedPackages
 		pkg := info.Pkg
 		installPath := filepath.Join(basePath, info.DirName)
 		baseURLPath := baseURLPathPrefix + info.DirName + "/"
-		// 设置本地集市包的通用元数据
+		// Set common metadata for the local bazaar package
 		if !bazaar.SetInstalledPackageMetadata(pkg, installPath, baseURLPath, pkgType, frontend, bazaarPackagesMap) {
 			continue
 		}
@@ -265,7 +265,7 @@ func getInstalledPackages0(pkgType, frontend, keyword string) (installedPackages
 
 	installedPackages = bazaar.FilterPackages(installedPackages, keyword)
 
-	// 设置本地集市包的额外元数据
+	// Set additional metadata for the local bazaar package
 	var petals []*Petal
 	if pkgType == "plugins" {
 		petals = getPetals()
@@ -294,7 +294,7 @@ func getInstalledPackages0(pkgType, frontend, keyword string) (installedPackages
 	return
 }
 
-// GetBazaarPackages 获取在线集市包列表
+// GetBazaarPackages gets the list of online bazaar packages
 func GetBazaarPackages(pkgType, frontend, keyword string) (bazaarPackages []*bazaar.Package) {
 	bazaarPackages = bazaar.GetBazaarPackages(pkgType, frontend)
 	bazaarPackages = bazaar.FilterPackages(bazaarPackages, keyword)
@@ -328,7 +328,7 @@ func GetBazaarPackageREADME(ctx context.Context, repoURL, repoHash, pkgType stri
 	return
 }
 
-// installBazaarPackage 下载并安装集市包
+// installBazaarPackage downloads and installs a bazaar package
 func installBazaarPackage(pkgType, repoURL, repoHash, packageName string) (meta installMeta, err error) {
 	installPath, jsonFileName, err := getPackageInstallPath(pkgType, packageName)
 	if err != nil {
@@ -345,9 +345,11 @@ func installBazaarPackage(pkgType, repoURL, repoHash, packageName string) (meta 
 	return
 }
 
-// finishInstall 集市包安装后的处理（刷新外观、推送插件重载等）；批量更新时同类型只执行一次
+// finishInstall handles post-install processing for a bazaar package (refreshing appearance, pushing plugin reloads,
+// etc); for a same-type batch update, this runs only once.
 //
-//   - themeMode：0 浅色 / 1 深色，仅在新安装主题（meta.update 为 false）时写入外观；批量覆盖更新不会用到
+//   - themeMode: 0 for light / 1 for dark, only written to appearance when a theme is newly installed
+//     (meta.update is false); not used for batch overwrite updates
 func finishInstall(pkgType string, items []batchInstallItem, themeMode int) {
 	if 1 > len(items) {
 		return
@@ -362,7 +364,7 @@ func finishInstall(pkgType string, items []batchInstallItem, themeMode int) {
 			}
 			petal := GetPetalByName(item.name)
 			if nil != petal && petal.Enabled {
-				_, err := SetPetalEnabled(petal.Name, petal.Enabled) // 重新加载插件内容
+				_, err := SetPetalEnabled(petal.Name, petal.Enabled) // Reload plugin content
 				if err != nil {
 					logging.LogErrorf("reload plugin [%s] after update failed: %s", item.name, err)
 					util.PushErrMsg(err.Error(), 5000)
@@ -377,7 +379,7 @@ func finishInstall(pkgType string, items []batchInstallItem, themeMode int) {
 	case "themes":
 		for _, item := range items {
 			if !item.meta.update {
-				// 新安装主题时才自动切换 https://github.com/siyuan-note/siyuan/issues/4966
+				// Auto-switch only when the theme is newly installed https://github.com/siyuan-note/siyuan/issues/4966
 				if 0 == themeMode {
 					Conf.Appearance.ThemeLight = item.name
 				} else {
@@ -394,7 +396,7 @@ func finishInstall(pkgType string, items []batchInstallItem, themeMode int) {
 	case "icons":
 		for _, item := range items {
 			if !item.meta.update {
-				// 新安装图标时才自动切换
+				// Auto-switch only when the icon set is newly installed
 				Conf.Appearance.Icon = item.name
 				Conf.Save()
 			}
@@ -404,7 +406,7 @@ func finishInstall(pkgType string, items []batchInstallItem, themeMode int) {
 	}
 }
 
-// InstallBazaarPackage 安装集市包，themeMode 仅在 pkgType 为 "themes" 时生效
+// InstallBazaarPackage installs a bazaar package; themeMode only takes effect when pkgType is "themes"
 func InstallBazaarPackage(pkgType, repoURL, repoHash, packageName string, themeMode int) error {
 	meta, err := installBazaarPackage(pkgType, repoURL, repoHash, packageName)
 	if err != nil {
@@ -425,7 +427,7 @@ func UninstallPackage(pkgType, packageName string) error {
 		return fmt.Errorf(Conf.Language(47), err.Error())
 	}
 
-	// 删除集市包的持久化信息
+	// Remove the bazaar package's persisted info
 	bazaar.RemovePackageInfo(pkgType, packageName)
 
 	switch pkgType {
@@ -454,12 +456,12 @@ func UninstallPackage(pkgType, packageName string) error {
 	return nil
 }
 
-// isBuiltInTheme 通过包名或目录名判断是否为内置主题
+// isBuiltInTheme determines whether a package/directory name refers to a built-in theme
 func isBuiltInTheme(name string) bool {
 	return "daylight" == name || "midnight" == name
 }
 
-// isBuiltInIcon 通过包名或目录名判断是否为内置图标
+// isBuiltInIcon determines whether a package/directory name refers to a built-in icon set
 func isBuiltInIcon(name string) bool {
 	return "litheness" == name
 }

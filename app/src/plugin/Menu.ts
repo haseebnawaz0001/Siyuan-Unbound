@@ -41,7 +41,7 @@ export class Menu {
         id?: string,
         ignore?: boolean
     }, ignoreParam = false) {
-        // 兼容 3.1.24 之前的版本  addSeparator(index?: number, ignore?: boolean): HTMLElement;
+        // Compatible with versions before 3.1.24: addSeparator(index?: number, ignore?: boolean): HTMLElement;
         let id: string;
         let index: number;
         let ignore = false;

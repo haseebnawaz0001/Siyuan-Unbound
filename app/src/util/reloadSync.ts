@@ -14,8 +14,8 @@ export const reloadSync = (
     app: App,
     data: { upsertRootIDs: string[], removeRootIDs: string[] },
     hideMsg = true,
-    // 同步的时候需要更新只读状态 https://github.com/siyuan-note/siyuan/issues/11517
-    // 调整大纲的时候需要使用现有状态 https://github.com/siyuan-note/siyuan/issues/11808
+    // The readonly state needs to be updated while syncing https://github.com/siyuan-note/siyuan/issues/11517
+    // The existing state needs to be used while adjusting the outline https://github.com/siyuan-note/siyuan/issues/11808
     updateReadonly = true,
     onlyUpdateDoc = false
 ) => {
@@ -46,7 +46,7 @@ export const reloadSync = (
                 setTitle(response.data.name);
                 window.siyuan.mobile.editor.protyle.title.setTitle(response.data.name, response.data.ial[Constants.CUSTOM_SY_TITLE_EMPTY] === "true");
             });
-            // 同步刷新移动端大纲，避免大纲与重载后的编辑器数据不一致
+            // Synchronously refresh the mobile outline, to avoid it becoming inconsistent with the reloaded editor data
             const outline = window.siyuan.mobile.docks.outline;
             if (outline) {
                 outline.reload();
@@ -110,7 +110,7 @@ export const reloadSync = (
                 id: item.blockId,
                 preview: item.isPreview
             };
-            // 解析大纲面板所属 box：按 blockId 在已打开的编辑器里查找
+            // Resolve the notebook (box) this outline panel belongs to: look it up by blockId among the open editors
             let notebookId: string;
             allModels.editor.some(editorItem => {
                 if (editorItem.editor.protyle.block.rootID === item.blockId) {
@@ -152,7 +152,7 @@ export const reloadSync = (
     allModels.tag.forEach(item => {
         item.update();
     });
-    // NOTE asset 无法获取推送地址，先不处理
+    // NOTE assets cannot obtain a push address, so this is left unhandled for now
     allModels.search.forEach(item => {
         item.parent.panelElement.querySelector("#searchInput").dispatchEvent(new CustomEvent("input"));
     });

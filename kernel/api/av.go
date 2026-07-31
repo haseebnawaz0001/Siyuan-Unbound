@@ -114,8 +114,9 @@ func getAttributeViewBoundBlockIDsByItemIDs(c *gin.Context) {
 	ret.Data = model.GetAttributeViewBoundBlockIDs(avID, itemIDs)
 }
 
-// getAttributeViewAddingBlockDefaultValues 用于获取添加块时的默认值。
-// 存在过滤或分组条件时，添加块时需要填充默认值到过滤字段或分组字段中，前端需要调用该接口来获取这些默认值以便填充。
+// getAttributeViewAddingBlockDefaultValues is used to get the default values to use when adding a block.
+// When filter or grouping conditions exist, adding a block needs to fill default values into the filtered or
+// grouped fields; the frontend calls this API to get those default values so it can fill them in.
 func getAttributeViewAddingBlockDefaultValues(c *gin.Context) {
 	ret := gulu.Ret.NewResult()
 	defer c.JSON(http.StatusOK, ret)
@@ -989,7 +990,7 @@ func renderAttributeView(c *gin.Context) {
 		retDataMap["view"] = model.FilterViewByPublishAccess(c, publishAccess, retDataMap["view"].(av.Viewable))
 	}
 
-	// 大体量响应（如全量数据库视图）用 goccy 序列化后直接写字节，跳过 gin 内部基于标准库的二次序列化
+	// For large responses (such as a full database view), serialize with goccy and write the bytes directly, skipping gin's internal stdlib-based re-serialization
 	marshalBytes, marshalErr := goccyJSON.Marshal(ret)
 	if nil != marshalErr || 0 == len(marshalBytes) {
 		c.JSON(http.StatusOK, ret)
@@ -1135,7 +1136,7 @@ func setAttributeViewBlockAttr(c *gin.Context) {
 	if _, ok := arg["itemID"]; ok {
 		itemID = arg["itemID"].(string)
 	} else if _, ok := arg["rowID"]; ok {
-		// TODO 该参数将于 2026 年 12 月 1 日后删除
+		// TODO this parameter will be removed after December 1, 2026
 		msg := fmt.Sprintf("[%s] parameter [%s] is deprecated, visit [https://github.com/siyuan-note/siyuan/issues/15727] for details",
 			c.Request.RequestURI, "rowID")
 		logging.LogWarn(msg)

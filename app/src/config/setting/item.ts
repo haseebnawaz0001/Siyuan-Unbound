@@ -8,27 +8,27 @@ type SettingItemBase = {
     id: string;
     tabId: string;
     groupId: string;
-    /** 条目检索串（注册时 normalize） */
+    /** Search strings of the item, normalized at registration time */
     searchIndex: readonly string[];
     readValue?: (el: HTMLElement) => unknown;
     save?: (value: unknown) => void | Promise<void>;
     afterMount?: (root: HTMLElement) => void | Promise<void>;
 };
 
-/** 标准控件行：由 rowParts 描述整行 UI，参与 mount、save、搜索 */
+/** Standard control row: rowParts describe the whole row, it takes part in mount, save and search */
 type FullSettingItem = SettingItemBase & {
     kind: "full";
     rowParts: RowPart[];
 };
 
-/** 自定义 HTML 块：参与 mount、搜索 */
+/** Custom HTML block: it takes part in mount and search */
 type RenderSettingItem = SettingItemBase & {
     kind: "render";
     html: () => string;
     searchTexts?: () => string[];
 };
 
-/** 复合块内嵌控件：仅参与 readValue / save 路由 */
+/** Control embedded in a composite block: it only takes part in the readValue / save routing */
 type BindingSettingItem = SettingItemBase & {
     kind: "binding";
     control: SettingControl;
@@ -69,7 +69,7 @@ const getMountableItemsByGroup = (tabId: string): Map<string, MountableSettingIt
     return itemsByGroup;
 };
 
-/** Tab 下按分组注册顺序的条目视图（渲染 / 搜索 / mount 共用） */
+/** View of the items of a tab, grouped and in registration order, shared by rendering, search and mount */
 export const getTabGroupEntries = (tabId: string): TabGroupEntry[] => {
     const itemsByGroup = getMountableItemsByGroup(tabId);
     return getSettingGroupsByTabId(tabId).map((group) => ({
@@ -90,7 +90,7 @@ export const registerSettingItem = (item: RegisterSettingItem) => {
 
 export const getSettingItem = (id: string) => settingItemsById.get(id);
 
-/** 从注册表移除 Tab 条目，供 rebuild 时重新 register 以读取最新 config */
+/** Removes the items of a tab from the registry, so that a rebuild can register them again against the latest config */
 export const removeSettingTabItems = (tabId: string) => {
     for (const [id, item] of settingItemsById) {
         if (item.tabId === tabId) {

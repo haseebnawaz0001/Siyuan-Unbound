@@ -18,6 +18,6 @@
 
 package model
 
-// flushDNS 非 Windows 平台暂不支持刷新系统 DNS 缓存。
+// flushDNS is not yet supported on non-Windows platforms for flushing the system DNS cache.
 func flushDNS() {
 }

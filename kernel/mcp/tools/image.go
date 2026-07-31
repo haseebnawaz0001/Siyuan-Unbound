@@ -207,7 +207,7 @@ func runImageOperation(ctx context.Context, key string, meta imageOperationMeta,
 	}
 	operation.result = execute()
 	if operation.result.ExecutionUnknown {
-		// running 记录表示外部请求可能已经执行，保留它以阻止恢复流程自动重试。
+		// The running record indicates the external request may have already executed; keep it to prevent the recovery flow from automatically retrying.
 	} else if operation.result.IsError {
 		removeImageOperationRecord(key)
 	} else if err := saveImageOperationRecord(key, meta, imageOperationStateCompleted, operation.result); err != nil {

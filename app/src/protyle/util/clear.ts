@@ -33,7 +33,7 @@ export const clearSelect = (types: ("av" | "img" | "cell" | "row" | "galleryItem
             item.querySelector(".av__firstcol use").setAttribute("xlink:href", "#iconUncheck");
             const bodyEl = item.parentElement as HTMLElement;
             if (bodyEl && !clearedBodies.has(bodyEl)) {
-                // 同步清空虚拟滚动选中快照，确保 updateHeader 计数正确
+                // Clear the virtual-scroll selection snapshot in sync, to ensure updateHeader counts correctly
                 resetAVRowSelect(bodyEl, []);
                 clearedBodies.add(bodyEl);
             }

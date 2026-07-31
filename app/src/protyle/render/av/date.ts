@@ -58,9 +58,11 @@ export const bindDateEvent = (options: {
 }) => {
     const inputElements: NodeListOf<HTMLInputElement> = options.menuElement.querySelectorAll("input");
 
-    // <input type="date"> 对非法日期会清空 input.value。原生 date input 不触发 beforeinput，用 keydown 区分删空与非法日输入。
+    // <input type="date"> clears input.value for an invalid date. A native date input doesn't fire
+    // beforeinput, so keydown is used to distinguish a deletion-to-empty from an invalid-date input.
     const lastNonEmptyValue: string[] = [inputElements[0].value, inputElements[1].value];
-    // 输入非法日导致浏览器清空 value 时为 true，提交时按当月最后一天截断重建。
+    // True when typing an invalid day causes the browser to clear value; on submit it's truncated and
+    // rebuilt as the last day of that month.
     const invalidEmpty: boolean[] = [false, false];
     const bindTracking = (index: number) => {
         const input = inputElements[index];
@@ -77,7 +79,7 @@ export const bindDateEvent = (options: {
             if (!isDelete && !isDigit) {
                 return;
             }
-            // date input 的 value 更新晚于 keydown，需推迟到下一个宏任务再读取
+            // A date input's value updates later than keydown, so reading must be deferred to the next macrotask
             setTimeout(() => {
                 if (!input.value) {
                     invalidEmpty[index] = !isDelete;
@@ -87,7 +89,7 @@ export const bindDateEvent = (options: {
         input.addEventListener("input", () => {
             if (input.value) {
                 invalidEmpty[index] = false;
-                // 仅当 input.value 是合法完整日期时才更新
+                // Only update when input.value is a valid, complete date
                 if (input.value.replace(/\D/g, "").length >= 8) {
                     lastNonEmptyValue[index] = input.value;
                 }
@@ -105,7 +107,8 @@ export const bindDateEvent = (options: {
         if (!invalidEmpty[index]) {
             return "";
         }
-        // 如果输入超出日期范围的非法日导致 value 清空，则获取最后一次合法日期，并返回该月最后一天的日期
+        // If typing a day out of the valid date range caused value to be cleared, get the last valid
+        // date and return the last day of that month
         const lastVal = lastNonEmptyValue[index];
         if (!lastVal) {
             return "";

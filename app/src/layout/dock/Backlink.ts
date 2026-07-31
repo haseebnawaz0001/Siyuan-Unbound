@@ -19,7 +19,7 @@ export class Backlink extends Model {
     public inputsElement: NodeListOf<HTMLInputElement>;
     public type: "pin" | "local";
     public blockId: string;
-    public rootId: string; // "local" 必传
+    public rootId: string; // Required when type is "local"
     public tree: Tree;
     private notebookId: string;
     public mTree: Tree;
@@ -32,7 +32,7 @@ export class Backlink extends Model {
             mScrollTop: number,
             backlinkOpenIds: string[],
             backlinkMOpenIds: string[],
-            backlinkMStatus: number // 0 全展开，1 展开一半箭头向下，2 展开一半箭头向上，3 全收起
+            backlinkMStatus: number // 0 fully expanded, 1 half-expanded arrow down, 2 half-expanded arrow up, 3 fully collapsed
         }
     } = {};
 
@@ -223,7 +223,7 @@ export class Backlink extends Model {
                 hlItem.classList.remove("protyle-wysiwyg--hl");
             });
         });
-        // 为了快捷键的 dispatch
+        // For dispatching the keyboard shortcut
         this.element.querySelector('[data-type="collapse"]').addEventListener("click", () => {
             this.tree.element.querySelectorAll(".protyle").forEach(item => {
                 item.classList.add("fn__none");
@@ -374,7 +374,7 @@ export class Backlink extends Model {
     private showSortMenu(type: string, sort: string) {
         const clickEvent = (currentSort: string) => {
             (type === "sort" ? this.tree : this.mTree).element.previousElementSibling.querySelector(`[data-type="${type}"]`).setAttribute("data-sort", currentSort);
-            // 保存排序状态到配置
+            // Save the sort state to the config
             const sortValue = parseInt(currentSort);
             if (type === "sort") {
                 window.siyuan.config.editor.backlinkSort = sortValue;
@@ -519,7 +519,8 @@ export class Backlink extends Model {
             return;
         }
         element.classList.add("fn__rotate");
-        // 解析当前反链面板所属 box：优先用已记录的 notebookId，首次为空时按 rootId 在已打开的编辑器里查找
+        // Resolve the notebook (box) this backlink panel belongs to: prefer the already-recorded
+        // notebookId; if empty the first time, look it up by rootId among the open editors
         let notebookId = this.notebookId;
         if (!notebookId && this.rootId) {
             getAllModels().editor.some(item => {
@@ -555,7 +556,7 @@ export class Backlink extends Model {
             mScrollTop: this.mTree.element.scrollTop,
             backlinkOpenIds: [],
             backlinkMOpenIds: [],
-            backlinkMStatus: 3 // 0 全展开，1 展开一半箭头向下，2 展开一半箭头向上，3 全收起
+            backlinkMStatus: 3 // 0 fully expanded, 1 half-expanded arrow down, 2 half-expanded arrow up, 3 fully collapsed
         };
         this.tree.element.querySelectorAll(".b3-list-item__arrow--open").forEach(item => {
             this.status[this.blockId].backlinkOpenIds.push(item.parentElement.parentElement.getAttribute("data-node-id"));
@@ -675,7 +676,7 @@ export class Backlink extends Model {
                 this.toggleItem(liElement, true);
             }
         });
-        // 0 全展开，1 展开一半箭头向下，2 展开一半箭头向上，3 全收起
+        // 0 fully expanded, 1 half-expanded arrow down, 2 half-expanded arrow up, 3 fully collapsed
         const layoutElement = this.mTree.element.previousElementSibling.querySelector('[data-type="layout"]');
         if (this.status[this.blockId].backlinkMStatus === 2 || this.status[this.blockId].backlinkMStatus === 1) {
             this.tree.element.classList.remove("fn__none");

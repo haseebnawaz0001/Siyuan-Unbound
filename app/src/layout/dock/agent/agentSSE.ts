@@ -77,7 +77,8 @@ export type IEditorContext = {
     visibleBlockIDs?: string[];
 };
 
-// AgentHttpError 承载 HTTP 状态码，调用方可据此区分"互斥拒绝"(409) 等语义错误。
+// AgentHttpError carries the HTTP status code, so callers can distinguish semantic errors such
+// as a "mutual-exclusion rejection" (409).
 export class AgentHttpError extends Error {
     public status: number;
     constructor(message: string, status: number) {
@@ -130,7 +131,8 @@ export async function fetchAgentSSE(
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                // 标识发起者 app，后端据此排除发起者自身的 ws 广播，并做实例级互斥。
+                // Identifies the initiating app; the backend uses this to exclude the initiator's own
+                // ws broadcast and to enforce instance-level mutual exclusion.
                 "X-SiYuan-App-ID": Constants.SIYUAN_APPID,
             },
             body: JSON.stringify(body),
@@ -138,14 +140,15 @@ export async function fetchAgentSSE(
         });
 
         if (!response.ok) {
-            // 409 表示该会话正在其他实例对话中（实例级互斥）。优先用后端返回的 msg，否则用 i18n 兜底。
+            // 409 means this session is being chatted in by another instance (instance-level mutual
+            // exclusion). Prefer the msg returned by the backend, falling back to i18n otherwise.
             let msg = window.siyuan.languages._kernel[28];
             if (response.status === 409) {
                 try {
                     const data = await response.json();
                     if (data && data.msg) { msg = data.msg; }
                 } catch (e) {
-                    // 读取 JSON 失败时使用 i18n
+                    // Fall back to i18n if reading the JSON fails
                 }
                 msg = window.siyuan.languages.agentChatBusy || msg;
             }
@@ -153,8 +156,10 @@ export async function fetchAgentSSE(
             return;
         }
 
-        // 后端在无 provider/无模型等前置错误时返回 HTTP 200 + JSON 包络 {code:-1, msg}（非 SSE 流），
-        // 此时 Content-Type 为 application/json 而非 text/event-stream。检测并转 onError，避免静默卡死。
+        // For pre-flight errors such as no provider / no model, the backend returns HTTP 200 with a
+        // JSON envelope {code:-1, msg} (not an SSE stream); in that case Content-Type is
+        // application/json rather than text/event-stream. Detect this and route it to onError, to
+        // avoid silently hanging.
         const contentType = response.headers.get("Content-Type") || "";
         if (contentType.indexOf("text/event-stream") === -1) {
             try {

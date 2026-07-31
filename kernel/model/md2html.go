@@ -30,7 +30,7 @@ func getMd2HTMLLuteFromPool() *lute.Lute {
 	v := md2HTMLLutePool.Get()
 	if v == nil {
 		e := util.NewLute()
-		// 与 Conf 解耦
+		// Decoupled from Conf
 		e.SetCodeSyntaxHighlightLineNum(false)
 		e.SetChineseParagraphBeginningSpace(false)
 		e.SetProtyleMarkNetImg(false)

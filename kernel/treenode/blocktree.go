@@ -37,14 +37,14 @@ import (
 )
 
 type BlockTree struct {
-	ID       string // 块 ID
-	RootID   string // 根 ID
-	ParentID string // 父 ID
-	BoxID    string // 笔记本 ID
-	Path     string // 文档数据路径
-	HPath    string // 文档可读路径
-	Updated  string // 更新时间
-	Type     string // 类型
+	ID       string // block ID
+	RootID   string // root ID
+	ParentID string // parent ID
+	BoxID    string // notebook ID
+	Path     string // document data path
+	HPath    string // document human-readable path
+	Updated  string // update time
+	Type     string // type
 }
 
 var (
@@ -65,7 +65,8 @@ func initDatabase(forceRebuild bool) {
 		}
 	}
 	if !forceRebuild {
-		// 校验块树表是否可用，避免因上次重建被中断导致数据库文件存在但表缺失
+		// Verify that the block tree table is usable, to guard against a previous rebuild being interrupted,
+		// leaving the database file present but the table missing
 		var table string
 		if err := db.QueryRow("SELECT name FROM sqlite_master WHERE type = ? AND name = ?", "table", "blocktrees").Scan(&table); nil != err {
 			logging.LogWarnf("blocktrees table missing or unreadable [%s], will rebuild blocktree database", err)
@@ -309,7 +310,7 @@ func ExistBlockTree(id string) bool {
 	err := queryRow(sqlStmt, id).Scan(&count)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			// 全局未命中，遍历加密 box
+			// No hit in the global db, iterate over encrypted boxes
 			for _, encBoxID := range GetOpenedEncryptedBoxIDs() {
 				if ExistBlockTreeInBox(id, encBoxID) {
 					return true
@@ -323,7 +324,7 @@ func ExistBlockTree(id string) bool {
 	if 0 < count {
 		return true
 	}
-	// 全局未命中，遍历加密 box
+	// No hit in the global db, iterate over encrypted boxes
 	for _, encBoxID := range GetOpenedEncryptedBoxIDs() {
 		if ExistBlockTreeInBox(id, encBoxID) {
 			return true
@@ -342,7 +343,7 @@ func ExistBlockTrees(ids []string) (ret map[string]bool) {
 		ret[id] = false
 	}
 
-	// 先查全局 blocktree
+	// First query the global blocktree
 	sqlStmt := "SELECT id FROM blocktrees WHERE id IN ('" + strings.Join(ids, "','") + "')"
 	rows, err := query(sqlStmt)
 	if err != nil {
@@ -359,7 +360,7 @@ func ExistBlockTrees(ids []string) (ret map[string]bool) {
 		ret[id] = true
 	}
 
-	// 全局 blocktree 未命中的 id，遍历已打开的加密笔记本查找
+	// For ids not found in the global blocktree, search among already-opened encrypted notebooks
 	var missing []string
 	for id, found := range ret {
 		if !found {
@@ -422,7 +423,7 @@ func GetBlockTrees(ids []string) (ret map[string]*BlockTree) {
 		ret[block.ID] = &block
 	}
 
-	// 全局未命中的 id，遍历已打开的加密笔记本查找
+	// For ids not found in the global db, search among already-opened encrypted notebooks
 	var missing []string
 	for _, id := range ids {
 		if _, ok := ret[id]; !ok {
@@ -460,7 +461,7 @@ func GetBlockTree(id string) (ret *BlockTree) {
 	if err != nil {
 		ret = nil
 		if errors.Is(err, sql.ErrNoRows) {
-			// 全局 blocktree 未命中，遍历已打开的加密笔记本查找
+			// No hit in the global blocktree, search among already-opened encrypted notebooks
 			for _, encBoxID := range GetOpenedEncryptedBoxIDs() {
 				if encBT := GetBlockTreeInBox(id, encBoxID); nil != encBT {
 					return encBT
@@ -474,8 +475,8 @@ func GetBlockTree(id string) (ret *BlockTree) {
 	return
 }
 
-// IsContainerType 按主类型缩写判断块是否为容器块（可合法接收子块）。
-// 入参 abbrType 对应 BlockTree.Type（如 "d"/"h"/"p"），由 TypeAbbr 写入。
+// IsContainerType determines from the type abbreviation whether a block is a container block (legally able to accept children).
+// The abbrType argument corresponds to BlockTree.Type (such as "d"/"h"/"p"), written by TypeAbbr.
 func IsContainerType(abbrType string) bool {
 	switch abbrType {
 	case "d", "b", "l", "i", "s", "callout":
@@ -484,10 +485,11 @@ func IsContainerType(abbrType string) bool {
 	return false
 }
 
-// CheckContainerParent 校验 parentID 指向的块是否允许接收子块。
-// 仅在“通过 parentID 定位插入/移动目标”（即不依赖 previousID/nextID）的场景下调用，
-// 因为一旦带 previousID/nextID，事务层走的是兄弟级 InsertAfter/InsertBefore，天然合法。
-// 返回 nil 表示合法；返回 error 时调用方应拒绝本次操作。
+// CheckContainerParent verifies whether the block pointed to by parentID is allowed to accept children.
+// Called only in the scenario of "locating an insert/move target via parentID" (i.e. not relying on
+// previousID/nextID), because once previousID/nextID is given, the transaction layer goes through sibling-level
+// InsertAfter/InsertBefore, which is inherently valid.
+// Returns nil to mean it's valid; when it returns an error, the caller should reject this operation.
 func CheckContainerParent(parentID string) error {
 	bt := GetBlockTree(parentID)
 	if nil == bt {
@@ -497,21 +499,24 @@ func CheckContainerParent(parentID string) error {
 		return nil
 	}
 	if "h" == bt.Type {
-		// 标题是叶子块，其“子内容”在数据结构上实为后续兄弟节点（由 HeadingChildren 按层级推算）。
-		// 把块挂成标题的 AST 子节点属于非法嵌套，应改用 previousID 定位。
+		// A heading is a leaf block; its "child content" is, in the data structure, actually the following
+		// sibling nodes (computed by HeadingChildren based on level).
+		// Attaching a block as an AST child of a heading is an illegal nesting; use previousID instead.
 		return fmt.Errorf("heading [%s] is a leaf block and cannot have children; to place a block below this heading, pass previousID=<heading id> or previousID=<last block below the heading> instead of parentID", parentID)
 	}
 	return fmt.Errorf("block [%s] type %q is a leaf block and cannot have children; use previousID to place the block as its sibling instead", parentID, bt.Type)
 }
 
-// CheckListItemNesting 校验 parentID 和 childID 是否形成“列表项直含列表项”的非法嵌套。
-// 嵌套列表的正确结构是 ListItem > List > ListItem，列表项不能直接作为另一个列表项的子块。
-// 仅在 move 场景调用（源和目标类型均已知）。
+// CheckListItemNesting verifies whether parentID and childID would form the illegal nesting of "a list item
+// directly containing a list item".
+// The correct structure for nested lists is ListItem > List > ListItem; a list item cannot be a direct child
+// block of another list item.
+// Called only in the move scenario (both the source and target types are known).
 func CheckListItemNesting(parentID, childID string) error {
 	parentBt := GetBlockTree(parentID)
 	childBt := GetBlockTree(childID)
 	if nil == parentBt || nil == childBt {
-		return nil // 查不到就放行，不阻塞未知场景
+		return nil // if not found, allow it -- don't block unknown scenarios
 	}
 	if "i" == parentBt.Type && "i" == childBt.Type {
 		return fmt.Errorf("a list-item cannot directly contain another list-item; to nest, first create a list (NodeList) under the outer list-item, then add the inner list-items to that list")
@@ -683,7 +688,8 @@ func IndexBlockTree(tree *parse.Tree) {
 	indexBlockTreeLock.Lock()
 	defer indexBlockTreeLock.Unlock()
 
-	// 加密笔记本用独立 blocktree db；非加密笔记本用全局 db（两者都可能为 nil——重建过程中）
+	// An encrypted notebook uses its own separate blocktree db; a non-encrypted notebook uses the global db
+	// (both may be nil -- during a rebuild)
 	if nil == db && getEncryptedBlockTreeDB(tree.Box) == nil {
 		logging.LogErrorf("database is nil")
 		return
@@ -717,7 +723,7 @@ func UpsertBlockTree(tree *parse.Tree) {
 
 		if oldBt, found := oldBts[n.ID]; found {
 			if oldBt.Updated != n.IALAttr("updated") || oldBt.Type != TypeAbbr(n.Type.String()) || oldBt.Path != tree.Path || oldBt.BoxID != tree.Box || oldBt.HPath != tree.HPath {
-				children := ChildBlockNodes(n) // 需要考虑子块，因为一些操作（比如移动块）后需要同时更新子块
+				children := ChildBlockNodes(n) // child blocks must be considered too, since some operations (such as moving a block) need to update children as well
 				changedNodes = append(changedNodes, children...)
 			}
 		} else {
@@ -882,17 +888,18 @@ func vacuum() {
 	}
 }
 
-// 加密笔记本的独立 blocktree db 注册表。boxID -> *sql.DB。
+// encryptedBlockTreeDBs is the registry of an encrypted notebook's independent blocktree db. boxID -> *sql.DB.
 var encryptedBlockTreeDBs = &sync.Map{}
 
-// IsEncryptedBoxFn 由 model 层注入，用于判断 boxID 是否为加密笔记本。
-// treenode 包不直接 import model（循环依赖），路由函数据此 fail-closed：
-// 加密笔记本未解锁时绝不回退全局库，避免加密笔记本块树元数据污染全局明文 blocktree.db。
+// IsEncryptedBoxFn is injected by the model layer to determine whether boxID is an encrypted notebook.
+// The treenode package does not import model directly (circular dependency), so the routing functions fail
+// closed based on this: while an encrypted notebook is not unlocked, they never fall back to the global db,
+// to avoid polluting the global plaintext blocktree.db with an encrypted notebook's block tree metadata.
 var IsEncryptedBoxFn func(boxID string) bool
 
-// OpenEncryptedBlockTreeDB 打开加密笔记本的独立 SQLCipher blocktree db。
-// 与 sql.OpenEncryptedDB 配对，UnlockBox 时调用。dek 为该 box 的 32 字节 DEK；
-// 先用 HKDF 派生 blocktree 子密钥（与 content 子密钥分离）。
+// OpenEncryptedBlockTreeDB opens the independent SQLCipher blocktree db for an encrypted notebook.
+// Paired with sql.OpenEncryptedDB, called during UnlockBox. dek is the box's 32-byte DEK; the blocktree
+// subkey is derived from it via HKDF first (kept separate from the content subkey).
 func OpenEncryptedBlockTreeDB(boxID string, dek []byte) (err error) {
 	if _, loaded := encryptedBlockTreeDBs.Load(boxID); loaded {
 		return nil
@@ -917,8 +924,8 @@ func OpenEncryptedBlockTreeDB(boxID string, dek []byte) (err error) {
 	return nil
 }
 
-// CloseEncryptedBlockTreeDB 仅关闭加密 blocktree db 连接（不删文件）。
-// 被 RemoveEncryptedBlockTreeDBFile 复用作为底层关连接实现。
+// CloseEncryptedBlockTreeDB only closes the encrypted blocktree db connection (does not delete the file).
+// Reused by RemoveEncryptedBlockTreeDBFile as the underlying connection-closing implementation.
 func CloseEncryptedBlockTreeDB(boxID string) {
 	if v, ok := encryptedBlockTreeDBs.LoadAndDelete(boxID); ok {
 		if boxDB, ok := v.(*sql.DB); ok {
@@ -927,8 +934,8 @@ func CloseEncryptedBlockTreeDB(boxID string) {
 	}
 }
 
-// GetOpenedEncryptedBoxIDs 返回所有已打开的加密 blocktree db 对应的 boxID。
-// 供 boxID 未知时遍历查找（如通用打开入口 openFileById）。
+// GetOpenedEncryptedBoxIDs returns the boxIDs of all currently opened encrypted blocktree dbs.
+// Used to iterate and search when the boxID is unknown (e.g. the generic open entry point openFileById).
 func GetOpenedEncryptedBoxIDs() (ret []string) {
 	encryptedBlockTreeDBs.Range(func(key, value any) bool {
 		if boxID, ok := key.(string); ok {
@@ -939,7 +946,7 @@ func GetOpenedEncryptedBoxIDs() (ret []string) {
 	return
 }
 
-// RemoveEncryptedBlockTreeDBFile 关闭连接并删除加密 blocktree db 文件。删笔记本、关闭加密笔记本时调用。
+// RemoveEncryptedBlockTreeDBFile closes the connection and deletes the encrypted blocktree db file. Called when deleting a notebook or closing an encrypted notebook.
 func RemoveEncryptedBlockTreeDBFile(boxID string) {
 	CloseEncryptedBlockTreeDB(boxID)
 	dbPath := util.EncryptedBlockTreeDBPath(boxID)
@@ -950,15 +957,16 @@ func RemoveEncryptedBlockTreeDBFile(boxID string) {
 	}
 }
 
-// RemoveAllEncryptedBlockTreeDBFiles 关闭所有已打开的加密 blocktree db 连接并删除其文件（含 WAL/SHM）。
-// 进程退出（CloseDatabase）时调用，避免重启后残留旧索引数据。
+// RemoveAllEncryptedBlockTreeDBFiles closes all currently opened encrypted blocktree db connections and
+// deletes their files (including WAL/SHM).
+// Called on process exit (CloseDatabase), to avoid leaving stale index data behind after a restart.
 func RemoveAllEncryptedBlockTreeDBFiles() {
 	for _, boxID := range GetOpenedEncryptedBoxIDs() {
 		RemoveEncryptedBlockTreeDBFile(boxID)
 	}
 }
 
-// getEncryptedBlockTreeDB 返回加密笔记本的 blocktree db 句柄；未打开返回 nil。
+// getEncryptedBlockTreeDB returns the blocktree db handle for an encrypted notebook; returns nil if not open.
 func getEncryptedBlockTreeDB(boxID string) *sql.DB {
 	if v, ok := encryptedBlockTreeDBs.Load(boxID); ok {
 		if boxDB, ok := v.(*sql.DB); ok {
@@ -968,7 +976,7 @@ func getEncryptedBlockTreeDB(boxID string) *sql.DB {
 	return nil
 }
 
-// initEncryptedBlockTreeTables 在加密 blocktree db 上建表（幂等）。
+// initEncryptedBlockTreeTables creates the tables in the encrypted blocktree db (idempotent).
 func initEncryptedBlockTreeTables(boxDB *sql.DB) (err error) {
 	stmts := []string{
 		"CREATE TABLE IF NOT EXISTS blocktrees (id, root_id, parent_id, box_id, path, hpath, updated, type)",
@@ -983,8 +991,9 @@ func initEncryptedBlockTreeTables(boxDB *sql.DB) (err error) {
 	return
 }
 
-// --- box-scoped wrapper（加密笔记本用独立 db，否则用全局 db）---
-// 加密笔记本未解锁（db 未打开）时 fail-closed：绝不回退全局库，避免加密笔记本块树操作污染全局 blocktree.db。
+// --- box-scoped wrapper (an encrypted notebook uses its own independent db, otherwise the global db) ---
+// Fail closed while an encrypted notebook is not unlocked (db not open): never fall back to the global db, to
+// avoid polluting the global blocktree.db with an encrypted notebook's block tree operations.
 
 func queryForBox(box, stmt string, args ...any) (*sql.Rows, error) {
 	if boxDB := getEncryptedBlockTreeDB(box); boxDB != nil {
@@ -1026,9 +1035,9 @@ func beginTxForBox(box string) (tx *sql.Tx, err error) {
 	return db.Begin()
 }
 
-// --- InBox 读函数（加密笔记本内浏览时调用方传 boxID，路由到加密 db） ---
+// --- InBox read functions (when browsing inside an encrypted notebook the caller passes boxID, routing to the encrypted db) ---
 
-// GetBlockTreeInBox 按 id 在指定 box 的 db 里查块树。boxID 为空则查全局 db。
+// GetBlockTreeInBox looks up the block tree by id in the given box's db. If boxID is empty, queries the global db instead.
 func GetBlockTreeInBox(id, boxID string) (ret *BlockTree) {
 	if boxID == "" {
 		return GetBlockTree(id)
@@ -1037,7 +1046,7 @@ func GetBlockTreeInBox(id, boxID string) (ret *BlockTree) {
 	sqlStmt := "SELECT * FROM blocktrees WHERE id = ?"
 	row := queryRowForBox(boxID, sqlStmt, id)
 	if row == nil {
-		return nil // 加密笔记本未解锁，视作不存在
+		return nil // the encrypted notebook is not unlocked; treat it as not existing
 	}
 	err := row.Scan(&ret.ID, &ret.RootID, &ret.ParentID, &ret.BoxID, &ret.Path, &ret.HPath, &ret.Updated, &ret.Type)
 	if err != nil {
@@ -1050,7 +1059,7 @@ func GetBlockTreeInBox(id, boxID string) (ret *BlockTree) {
 	return
 }
 
-// GetBlockTreesInBox 按 ids 在指定 box 的 db 里批量查块树。
+// GetBlockTreesInBox batch-looks-up block trees by ids in the given box's db.
 func GetBlockTreesInBox(ids []string, boxID string) (ret map[string]*BlockTree) {
 	ret = map[string]*BlockTree{}
 	if 1 > len(ids) {
@@ -1078,18 +1087,18 @@ func GetBlockTreesInBox(ids []string, boxID string) (ret map[string]*BlockTree) 
 	return
 }
 
-// ExistBlockTreeInBox 判断指定 box 的 db 里是否存在该 id 的块树。
+// ExistBlockTreeInBox checks whether a block tree with the given id exists in the given box's db.
 func ExistBlockTreeInBox(id, boxID string) bool {
 	sqlStmt := "SELECT 1 FROM blocktrees WHERE id = ? LIMIT 1"
 	row := queryRowForBox(boxID, sqlStmt, id)
 	if row == nil {
-		return false // 加密笔记本未解锁，视作不存在
+		return false // the encrypted notebook is not unlocked; treat it as not existing
 	}
 	var tmp any
 	return row.Scan(&tmp) == nil
 }
 
-// ExistBlockTreesInBox 按 ids 在指定 box 的 db 里批量查块是否存在。
+// ExistBlockTreesInBox batch-checks whether blocks with the given ids exist in the given box's db.
 func ExistBlockTreesInBox(ids []string, boxID string) (ret map[string]bool) {
 	ret = map[string]bool{}
 	if 1 > len(ids) {
@@ -1116,7 +1125,7 @@ func ExistBlockTreesInBox(ids []string, boxID string) (ret map[string]bool) {
 	return
 }
 
-// GetBlockTreesByRootIDInBox 按 rootID 在指定 box 的 db 里查块树。
+// GetBlockTreesByRootIDInBox looks up block trees by rootID in the given box's db.
 func GetBlockTreesByRootIDInBox(rootID, boxID string) (ret []*BlockTree) {
 	sqlStmt := "SELECT * FROM blocktrees WHERE root_id = ?"
 	rows, err := queryForBox(boxID, sqlStmt, rootID)

@@ -43,7 +43,7 @@ export class Model {
             }
             const logElement = document.getElementById("errorLog");
             if (logElement) {
-                // 内核中断后无法 catch fetch 请求错误，重连会导致无法执行 transactionsTimeout
+                // After the kernel is interrupted, fetch request errors cannot be caught, and reconnecting would prevent transactionsTimeout from running
                 reloadSync(this.app, {upsertRootIDs: [], removeRootIDs: []});
                 window.siyuan.dialogs.find(item => {
                     if (item.element.id === "errorLog") {
@@ -55,7 +55,7 @@ export class Model {
         };
         ws.onmessage = (event) => {
             if (options.msgCallback &&
-                // 等待 config 加载完成才接受推送 https://github.com/siyuan-note/siyuan/issues/17508
+                // Only accept pushes once config has finished loading https://github.com/siyuan-note/siyuan/issues/17508
                 window.siyuan.config) {
                 const data = processMessage(JSON.parse(event.data));
                 options.msgCallback.call(this, data);
@@ -90,7 +90,7 @@ export class Model {
     }
 
     public send(cmd: string, param: Record<string, unknown>, process = false) {
-        if (!this.ws) { // Inbox 无 ws
+        if (!this.ws) { // Inbox has no ws
             return;
         }
         this.reqId = process ? 0 : Date.now();
@@ -99,12 +99,12 @@ export class Model {
             reqId: this.reqId,
             param,
             // pushMode
-            // 0: 所有应用所有会话广播
-            // 1：自我应用会话单播
-            // 2：非自我会话广播
-            // 4：非自我应用所有会话广播
-            // 5：单个应用内所有会话广播
-            // 6：非自我应用主会话广播
+            // 0: broadcast to all sessions of all apps
+            // 1: unicast to the session of this app
+            // 2: broadcast to sessions other than this one
+            // 4: broadcast to all sessions of apps other than this one
+            // 5: broadcast to all sessions within a single app
+            // 6: broadcast to the main session of apps other than this one
         }));
     }
 }

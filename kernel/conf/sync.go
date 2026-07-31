@@ -17,18 +17,18 @@
 package conf
 
 type Sync struct {
-	CloudName           string  `json:"cloudName"`           // 云端同步目录名称
-	Enabled             bool    `json:"enabled"`             // 是否开启同步
-	Perception          bool    `json:"perception"`          // 是否开启感知
-	Mode                int     `json:"mode"`                // 同步模式，0：未设置（为兼容已有配置，initConf 函数中会转换为 1），1：自动，2：手动 https://github.com/siyuan-note/siyuan/issues/5089，3：完全手动 https://github.com/siyuan-note/siyuan/issues/7295
-	Interval            int     `json:"interval"`            // 自动同步间隔，单位：秒
-	Synced              int64   `json:"synced"`              // 最近同步时间
-	Stat                string  `json:"stat"`                // 最近同步统计信息
-	GenerateConflictDoc bool    `json:"generateConflictDoc"` // 云端同步冲突时是否生成冲突文档
-	Provider            int     `json:"provider"`            // 云端存储服务提供者
-	S3                  *S3     `json:"s3"`                  // S3 对象存储服务配置
-	WebDAV              *WebDAV `json:"webdav"`              // WebDAV 服务配置
-	Local               *Local  `json:"local"`               // 本地文件系统 服务配置
+	CloudName           string  `json:"cloudName"`           // Cloud sync directory name
+	Enabled             bool    `json:"enabled"`             // Whether sync is enabled
+	Perception          bool    `json:"perception"`          // Whether perception is enabled
+	Mode                int     `json:"mode"`                // Sync mode, 0: unset (converted to 1 in initConf for compatibility with existing configs), 1: automatic, 2: manual https://github.com/siyuan-note/siyuan/issues/5089, 3: fully manual https://github.com/siyuan-note/siyuan/issues/7295
+	Interval            int     `json:"interval"`            // Auto sync interval, in seconds
+	Synced              int64   `json:"synced"`              // Most recent sync time
+	Stat                string  `json:"stat"`                // Most recent sync stats info
+	GenerateConflictDoc bool    `json:"generateConflictDoc"` // Whether to generate a conflict document on cloud sync conflict
+	Provider            int     `json:"provider"`            // Cloud storage service provider
+	S3                  *S3     `json:"s3"`                  // S3 object storage service configuration
+	WebDAV              *WebDAV `json:"webdav"`              // WebDAV service configuration
+	Local               *Local  `json:"local"`               // Local file system service configuration
 }
 
 func NewSync() *Sync {
@@ -44,37 +44,37 @@ func NewSync() *Sync {
 }
 
 type S3 struct {
-	Endpoint       string `json:"endpoint"`       // 服务端点
+	Endpoint       string `json:"endpoint"`       // Service endpoint
 	AccessKey      string `json:"accessKey"`      // Access Key
 	SecretKey      string `json:"secretKey"`      // Secret Key
-	Bucket         string `json:"bucket"`         // 存储空间
-	Region         string `json:"region"`         // 存储区域
-	PathStyle      bool   `json:"pathStyle"`      // 是否使用路径风格
-	SkipTlsVerify  bool   `json:"skipTlsVerify"`  // 是否跳过 TLS 验证
-	Timeout        int    `json:"timeout"`        // 超时时间，单位：秒
-	ConcurrentReqs int    `json:"concurrentReqs"` // 并发请求数
+	Bucket         string `json:"bucket"`         // Bucket
+	Region         string `json:"region"`         // Storage region
+	PathStyle      bool   `json:"pathStyle"`      // Whether to use path-style addressing
+	SkipTlsVerify  bool   `json:"skipTlsVerify"`  // Whether to skip TLS verification
+	Timeout        int    `json:"timeout"`        // Timeout, in seconds
+	ConcurrentReqs int    `json:"concurrentReqs"` // Number of concurrent requests
 }
 
 type WebDAV struct {
-	Endpoint       string `json:"endpoint"`       // 服务端点
-	Username       string `json:"username"`       // 用户名
-	Password       string `json:"password"`       // 密码
-	SkipTlsVerify  bool   `json:"skipTlsVerify"`  // 是否跳过 TLS 验证
-	Timeout        int    `json:"timeout"`        // 超时时间，单位：秒
-	ConcurrentReqs int    `json:"concurrentReqs"` // 并发请求数
+	Endpoint       string `json:"endpoint"`       // Service endpoint
+	Username       string `json:"username"`       // Username
+	Password       string `json:"password"`       // Password
+	SkipTlsVerify  bool   `json:"skipTlsVerify"`  // Whether to skip TLS verification
+	Timeout        int    `json:"timeout"`        // Timeout, in seconds
+	ConcurrentReqs int    `json:"concurrentReqs"` // Number of concurrent requests
 }
 
 type Local struct {
-	Endpoint       string `json:"endpoint"`       // 服务端点 (本地文件系统目录)
-	Timeout        int    `json:"timeout"`        // 超时时间，单位：秒
-	ConcurrentReqs int    `json:"concurrentReqs"` // 并发请求数
+	Endpoint       string `json:"endpoint"`       // Service endpoint (local file system directory)
+	Timeout        int    `json:"timeout"`        // Timeout, in seconds
+	ConcurrentReqs int    `json:"concurrentReqs"` // Number of concurrent requests
 }
 
 const (
-	ProviderSiYuan = 0 // ProviderSiYuan 为思源官方提供的云端存储服务
-	ProviderS3     = 2 // ProviderS3 为 S3 协议对象存储提供的云端存储服务
-	ProviderWebDAV = 3 // ProviderWebDAV 为 WebDAV 协议提供的云端存储服务
-	ProviderLocal  = 4 // ProviderLocal 为本地文件系统提供的存储服务
+	ProviderSiYuan = 0 // ProviderSiYuan is the cloud storage service officially provided by SiYuan
+	ProviderS3     = 2 // ProviderS3 is the cloud storage service provided via the S3 protocol object storage
+	ProviderWebDAV = 3 // ProviderWebDAV is the cloud storage service provided via the WebDAV protocol
+	ProviderLocal  = 4 // ProviderLocal is the storage service provided by the local file system
 )
 
 func ProviderToStr(provider int) string {

@@ -73,7 +73,7 @@ func performTransactions(c *gin.Context) {
 	}
 	for _, transaction := range transactions {
 		transaction.Timestamp = timestamp
-		transaction.MarkFromAPI() // 标记来自 HTTP 入口，供全局撤销日志捕获判别
+		transaction.MarkFromAPI() // Mark that this came from the HTTP entry point, so the global undo log can tell during capture
 	}
 
 	model.PerformTransactions(&transactions)
@@ -95,7 +95,7 @@ func performTransactions(c *gin.Context) {
 func pushTransactions(app, session string, transactions []*model.Transaction) {
 	pushMode := util.PushModeBroadcastExcludeSelf
 	if 0 < len(transactions) && 0 < len(transactions[0].DoOperations) {
-		model.FlushTxQueue() // 等待文件写入完成，后续渲染才能读取到最新的数据
+		model.FlushTxQueue() // Wait for the file write to finish, so subsequent rendering can read the latest data
 
 		if shouldBroadcastAttrViewTransactions(transactions) {
 			pushMode = util.PushModeBroadcast
@@ -117,8 +117,9 @@ func pushTransactions(app, session string, transactions []*model.Transaction) {
 		tx.WaitForCommit()
 	}
 
-	// 附带每个 rootID 的撤销/重做可用状态，供前端本地镜像同步（多窗口/多端按钮态）
-	// 必须在 WaitForCommit 之后读取，确保 Record 已完成，状态含最新条目
+	// Attach the undo/redo availability state for each rootID, so the frontend can sync its local mirror (button
+	// state across multiple windows/clients)
+	// Must be read after WaitForCommit, to ensure Record has finished and the state includes the latest entries
 	undoStates := map[string]map[string]bool{}
 	for _, rootID := range rootIDs {
 		canUndo, canRedo, _ := model.GlobalUndoLog.State(rootID)
@@ -135,8 +136,9 @@ func pushTransactions(app, session string, transactions []*model.Transaction) {
 	util.PushEvent(evt)
 }
 
-// undoState 查询指定文档的撤销/重做可用性及栈顶关联的 mutatedRootIDs。
-// 前端在打开文档时调用以初始化本地镜像。
+// undoState queries the given document's undo/redo availability and the mutatedRootIDs associated with the top of
+// the stack.
+// Called by the frontend when a document is opened, to initialize its local mirror.
 func undoState(c *gin.Context) {
 	ret := gulu.Ret.NewResult()
 	defer c.JSON(http.StatusOK, ret)
@@ -161,11 +163,15 @@ func undoState(c *gin.Context) {
 	}
 }
 
-// performUndo 撤销指定文档最近一次操作。
-// 弹出 rootID 撤销栈顶，同步执行其逆操作，广播给其它窗口/端。
-// 单文档撤销：发起窗口靠响应数据本地乐观应用，广播排除发起方（ExcludeSelf）。
-// 跨文档撤销：发起窗口无法本地乐观应用（锚点分散），广播含发起方（Broadcast）刷新其 DOM。
-// 逆操作失败时回滚栈状态（UndoRollback）并返回 data.failed=true，前端镜像不动。
+// performUndo undoes the most recent operation on the given document.
+// It pops the top of the rootID's undo stack and synchronously executes its inverse operation, broadcasting it to
+// other windows/clients.
+// Single-document undo: the originating window applies the change optimistically from the response data, and the
+// broadcast excludes the originator (ExcludeSelf).
+// Cross-document undo: the originating window cannot apply it optimistically (the anchors are scattered), so the
+// broadcast includes the originator (Broadcast) to refresh its own DOM.
+// If the inverse operation fails, the stack state is rolled back (UndoRollback) and data.failed=true is returned,
+// leaving the frontend mirror unchanged.
 func performUndo(c *gin.Context) {
 	ret := gulu.Ret.NewResult()
 	defer c.JSON(http.StatusOK, ret)
@@ -186,7 +192,7 @@ func performUndo(c *gin.Context) {
 
 	entry := model.GlobalUndoLog.Undo(rootID)
 	if nil == entry {
-		// 栈空，无可撤销
+		// Stack is empty, nothing to undo
 		ret.Data = map[string]any{
 			"canUndo": false,
 			"canRedo": false,
@@ -200,12 +206,13 @@ func performUndo(c *gin.Context) {
 		UndoOperations: entry.DoOperationsForReplay(),
 	}
 	tx.MarkReplay()
-	// 重放前解决剪切后粘贴造成的块 ID 冲突（已存在的 ID 换新，避免重复）
+	// Before replaying, resolve block ID conflicts caused by cut-then-paste (replace existing IDs with new ones to avoid duplicates)
 	model.ResolveReplayDuplicateIds(tx)
 
 	if err := model.PerformTxSync(tx); nil != err {
-		// 逆操作执行失败，回滚执行栈。返回 code=0 + data.failed=true（而非 code=-1），
-		// 否则前端 processMessage 拦截导致 fetchPost 回调不执行、isUndoing 永不复位。
+		// The inverse operation failed, so roll back the execution stack. Return code=0 + data.failed=true (rather
+		// than code=-1), otherwise the frontend's processMessage would intercept it, the fetchPost callback would
+		// never run, and isUndoing would never reset.
 		model.GlobalUndoLog.UndoRollback(entry, rootID)
 		ret.Data = map[string]any{
 			"failed": true,
@@ -214,14 +221,15 @@ func performUndo(c *gin.Context) {
 		return
 	}
 
-	// 成功：联动从其它关联栈移除该 entry
+	// Success: remove this entry from other associated stacks as well
 	model.GlobalUndoLog.UndoCommit(entry, rootID)
 
 	crossDoc := len(entry.MutatedRootIDs()) > 1
 	pushUndoTransactions(app, session, []*model.Transaction{tx}, true, crossDoc)
 
 	canUndo, canRedo, _ := model.GlobalUndoLog.State(rootID)
-	// 返回重放后（已解决 ID 冲突）的 tx 操作，前端乐观应用与 kernel 落盘一致
+	// Return the tx operations after replay (with ID conflicts already resolved), so the frontend's optimistic
+	// application matches what the kernel persisted
 	ret.Data = map[string]any{
 		"doOperations":   tx.DoOperations,
 		"undoOperations": tx.UndoOperations,
@@ -232,7 +240,7 @@ func performUndo(c *gin.Context) {
 	}
 }
 
-// performRedo 重做指定文档最近一次撤销的操作。
+// performRedo redoes the most recently undone operation on the given document.
 func performRedo(c *gin.Context) {
 	ret := gulu.Ret.NewResult()
 	defer c.JSON(http.StatusOK, ret)
@@ -266,11 +274,11 @@ func performRedo(c *gin.Context) {
 		UndoOperations: entry.UndoOperationsForReplay(),
 	}
 	tx.MarkReplay()
-	// 重放前解决剪切后粘贴造成的块 ID 冲突（已存在的 ID 换新，避免重复）
+	// Before replaying, resolve block ID conflicts caused by cut-then-paste (replace existing IDs with new ones to avoid duplicates)
 	model.ResolveReplayDuplicateIds(tx)
 
 	if err := model.PerformTxSync(tx); nil != err {
-		// 重做失败，回滚执行栈。返回 code=0 + data.failed=true（避免前端 isUndoing 死锁）。
+		// Redo failed, so roll back the execution stack. Return code=0 + data.failed=true (to avoid a frontend isUndoing deadlock).
 		model.GlobalUndoLog.RedoRollback(entry, rootID)
 		ret.Data = map[string]any{
 			"failed": true,
@@ -279,14 +287,15 @@ func performRedo(c *gin.Context) {
 		return
 	}
 
-	// 成功：联动把 entry 重新挂到其它关联栈
+	// Success: reattach this entry to other associated stacks as well
 	model.GlobalUndoLog.RedoCommit(entry, rootID)
 
 	crossDoc := len(entry.MutatedRootIDs()) > 1
 	pushUndoTransactions(app, session, []*model.Transaction{tx}, true, crossDoc)
 
 	canUndo, canRedo, _ := model.GlobalUndoLog.State(rootID)
-	// 返回重放后（已解决 ID 冲突）的 tx 操作，前端乐观应用与 kernel 落盘一致
+	// Return the tx operations after replay (with ID conflicts already resolved), so the frontend's optimistic
+	// application matches what the kernel persisted
 	ret.Data = map[string]any{
 		"doOperations":   tx.DoOperations,
 		"undoOperations": tx.UndoOperations,
@@ -297,7 +306,8 @@ func performRedo(c *gin.Context) {
 	}
 }
 
-// clearHistory 清理撤销日志。rootID 非空时清该文档栈并联动移除其它栈相关条目；为空时清空全部。
+// clearHistory clears the undo log. When rootID is non-empty, it clears that document's stack and also removes
+// related entries from other stacks; when empty, it clears everything.
 func clearHistory(c *gin.Context) {
 	ret := gulu.Ret.NewResult()
 	defer c.JSON(http.StatusOK, ret)
@@ -315,11 +325,13 @@ func clearHistory(c *gin.Context) {
 	model.GlobalUndoLog.Clear(rootID)
 }
 
-// pushUndoTransactions 广播 undo/redo 重放事务。
-// isReplay=true 时 context 标记 isUndoReplay（前端据此重置 lastHTMLs）。
-// includeSelf=true 时用 PushModeBroadcast（含发起方），用于跨文档撤销/重做——
-// 此时 undoOperations 锚点分散在多个文档，发起方无法本地乐观应用，需靠广播刷新自身 DOM；
-// includeSelf=false 时用 PushModeBroadcastExcludeSelf，发起方靠响应数据本地乐观应用。
+// pushUndoTransactions broadcasts replayed undo/redo transactions.
+// When isReplay=true, the context is marked with isUndoReplay (the frontend uses this to reset lastHTMLs).
+// When includeSelf=true, PushModeBroadcast is used (including the originator), for cross-document undo/redo --
+// in that case the undoOperations' anchors are scattered across multiple documents, so the originator cannot
+// apply them optimistically and must rely on the broadcast to refresh its own DOM;
+// when includeSelf=false, PushModeBroadcastExcludeSelf is used, and the originator applies the change
+// optimistically from the response data.
 func pushUndoTransactions(app, session string, transactions []*model.Transaction, isReplay, includeSelf bool) {
 	pushMode := util.PushModeBroadcastExcludeSelf
 	if includeSelf {

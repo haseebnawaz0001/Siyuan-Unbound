@@ -28,7 +28,7 @@ export const openNewWindow = (tab: Tab, options: windowOptions = {}) => {
         width: options.width,
         height: options.height,
         alwaysOnTop: !!options.alwaysOnTop,
-        // 需要 encode， 否则 https://github.com/siyuan-note/siyuan/issues/9343
+        // Must be encoded, otherwise https://github.com/siyuan-note/siyuan/issues/9343
         url: `${window.location.protocol}//${window.location.host}/stage/build/app/window.html?v=${Constants.SIYUAN_VERSION}&json=${encodeURIComponent(JSON.stringify([json]))}`
     });
     /// #endif

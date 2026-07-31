@@ -36,8 +36,8 @@ export const onGet = (options: {
     }
     options.protyle.wysiwyg.element.removeAttribute("data-top");
     if (options.data.code === 1) {
-        // 其他报错
-        if (!options.action.includes(Constants.CB_GET_APPEND)) {    // 向下加载时块可能还没有创建 https://github.com/siyuan-note/siyuan/issues/10851
+        // Other errors
+        if (!options.action.includes(Constants.CB_GET_APPEND)) {    // The block may not have been created yet when loading downward https://github.com/siyuan-note/siyuan/issues/10851
             if (options.protyle.model) {
                 options.protyle.model.parent.parent.removeTab(options.protyle.model.parent.id);
             } else {
@@ -73,14 +73,14 @@ export const onGet = (options: {
     options.protyle.block.scroll = options.data.data.scroll;
     options.protyle.block.action = options.action;
     if (!options.action.includes(Constants.CB_GET_UNCHANGEID)) {
-        options.protyle.block.id = options.data.data.id;    // 非缩放情况时不一定是 rootID（搜索打开页签）；缩放时必为缩放 id，否则需查看代码
+        options.protyle.block.id = options.data.data.id;    // Not necessarily rootID when not zoomed (e.g. opening a tab from search); always the zoomed id when zoomed, otherwise check the code
         options.protyle.scroll.lastScrollTop = 0;
         options.protyle.contentElement.scrollTop = 0;
         options.protyle.wysiwyg.element.setAttribute("data-doc-type", options.data.data.type);
     }
 
     if (options.protyle.options.render.title && options.protyle.title.element.getAttribute("data-render") !== "true") {
-        // 文档A的大纲，关闭文档A后，点击大纲无法渲染头部
+        // Document A's outline: after closing document A, clicking the outline can't render the header
     } else if (options.action.includes(Constants.CB_GET_APPEND) || options.action.includes(Constants.CB_GET_BEFORE) || options.action.includes(Constants.CB_GET_HTML)) {
         if (options.protyle.options.render.title && options.protyle.options.render.hideTitleOnZoom) {
             if (options.protyle.block.showAll) {
@@ -89,7 +89,7 @@ export const onGet = (options: {
                 options.protyle.title.element.classList.remove("fn__none");
             }
         }
-        // 防止动态加载加载过多的内容
+        // Prevent dynamic loading from loading too much content
         setHTML({
             content: options.data.data.content,
             expand: options.data.data.isBacklinkExpand,
@@ -112,7 +112,7 @@ export const onGet = (options: {
     }
     fetchPost("/api/block/getDocInfo", docInfoParam, (response) => {
         if (options.protyle.options.render.title) {
-            // 页签没有打开
+            // The tab isn't open
             options.protyle.title.render(options.protyle, response);
         } else {
             if (options.protyle.options.render.background) {
@@ -162,7 +162,7 @@ const setHTML = (options: {
     const REMOVED_OVER_HEIGHT = protyle.contentElement.clientHeight * 8;
     const updateReadonly = typeof options.updateReadonly === "undefined" ? protyle.wysiwyg.element.innerHTML === "" : options.updateReadonly;
     if (options.action.includes(Constants.CB_GET_APPEND)) {
-        // 动态加载移除
+        // Removal from dynamic loading
         if (!protyle.wysiwyg.element.querySelector(".protyle-wysiwyg--select") && !protyle.scroll.keepLazyLoad && protyle.contentElement.scrollHeight > REMOVED_OVER_HEIGHT) {
             let removeElement = protyle.wysiwyg.element.firstElementChild as HTMLElement;
             const removeElements = [];
@@ -190,7 +190,7 @@ const setHTML = (options: {
         protyle.wysiwyg.element.insertAdjacentHTML("afterbegin", options.content);
         protyle.contentElement.scrollTop = protyle.contentElement.scrollTop + (firstElement.getBoundingClientRect().top - lastTop);
         protyle.scroll.lastScrollTop = protyle.contentElement.scrollTop;
-        // 动态加载移除
+        // Removal from dynamic loading
         if (!protyle.wysiwyg.element.querySelector(".protyle-wysiwyg--select") && !protyle.scroll.keepLazyLoad) {
             const removeElements: Element[] = [];
             let childCount = protyle.wysiwyg.element.childElementCount;
@@ -200,7 +200,7 @@ const setHTML = (options: {
                 removeElements.push(lastElement);
                 lastElement = lastElement.previousElementSibling;
                 childCount--;
-                scrollHeight -= lastElement.clientHeight + 8;   // 大部分元素的 margin
+                scrollHeight -= lastElement.clientHeight + 8;   // margin for most elements
             }
             removeElements.forEach((item) => {
                 item.remove();
@@ -209,7 +209,8 @@ const setHTML = (options: {
         }
     } else {
         protyle.wysiwyg.element.innerHTML = options.content;
-        // 设置 innerHTML 会导致浏览器将 scrollTop 重置为 0，此处立即恢复以避免页面跳转到开头
+        // Setting innerHTML causes the browser to reset scrollTop to 0; restore it immediately here to avoid
+        // the page jumping to the top
         // https://github.com/siyuan-note/siyuan/issues/17886
         if (options.scrollAttr && typeof options.scrollAttr.scrollTop === "number") {
             protyle.contentElement.scrollTop = options.scrollAttr.scrollTop;
@@ -252,7 +253,7 @@ const setHTML = (options: {
         protyle.scroll.update(protyle);
     }
     if (options.action.includes(Constants.CB_GET_FOCUSFIRST)) {
-        // settimeout 时间需短一点，否则定位后快速滚动无效
+        // The setTimeout delay needs to be short, otherwise a quick scroll right after positioning won't work
         const headerHeight = protyle.wysiwyg.element.offsetTop - 16;
         preventScroll(protyle, headerHeight, Constants.TIMEOUT_INPUT);
         protyle.contentElement.scrollTop = headerHeight;
@@ -279,7 +280,8 @@ const setHTML = (options: {
     focusElementById(protyle, options.action, options.scrollAttr, options.scrollPosition);
 
     if (options.action.includes(Constants.CB_GET_SETID)) {
-        // 点击大纲后，如果需要动态加载，在定位后，需要重置 block.id https://github.com/siyuan-note/siyuan/issues/4487
+        // After clicking the outline, if dynamic loading is needed, block.id must be reset after positioning
+        // https://github.com/siyuan-note/siyuan/issues/4487
         protyle.block.id = protyle.block.rootID;
         protyle.wysiwyg.element.setAttribute("data-doc-type", "NodeDocument");
     }
@@ -312,13 +314,13 @@ const setHTML = (options: {
     if (options.afterCB) {
         options.afterCB();
     }
-    // 需等待 afterCB 执行后 resize 计算出高度后再进行计算
-    // 屏幕太高的页签 https://github.com/siyuan-note/siyuan/issues/5018
+    // This must wait for afterCB to run and resize to compute the height before proceeding
+    // For tabs on very tall screens https://github.com/siyuan-note/siyuan/issues/5018
     if (options.scrollAttr && !protyle.scroll.element.classList.contains("fn__none") &&
-        !protyle.element.classList.contains("block__edit") &&   // 不能为浮窗，否则悬浮为根文档无法打开整个文档 https://github.com/siyuan-note/siyuan/issues/9082
+        !protyle.element.classList.contains("block__edit") &&   // Must not be a floating window, otherwise a floating root document can't open the full document https://github.com/siyuan-note/siyuan/issues/9082
         protyle.wysiwyg.element.lastElementChild.getAttribute("data-eof") !== "2" &&
-        protyle.contentElement.scrollHeight > 0 && // 没有激活的页签 https://github.com/siyuan-note/siyuan/issues/5255
-        !options.action.includes(Constants.CB_GET_FOCUSFIRST) && // 防止 eof 为true https://github.com/siyuan-note/siyuan/issues/5291
+        protyle.contentElement.scrollHeight > 0 && // No active tab https://github.com/siyuan-note/siyuan/issues/5255
+        !options.action.includes(Constants.CB_GET_FOCUSFIRST) && // Prevent eof from being true https://github.com/siyuan-note/siyuan/issues/5291
         protyle.contentElement.scrollHeight <= protyle.contentElement.clientHeight) {
         const getDocParam: IObject = {
             id: protyle.wysiwyg.element.lastElementChild.getAttribute("data-node-id"),
@@ -332,7 +334,7 @@ const setHTML = (options: {
             onGet({data: getResponse, protyle, action: [Constants.CB_GET_APPEND, Constants.CB_GET_UNCHANGEID]});
         });
     }
-    // 动态滚动条拖拽到最后几个块时需多加载一点块 https://github.com/siyuan-note/siyuan/issues/16906
+    // A few more blocks need to be loaded when the dynamic scrollbar is dragged to the last few blocks https://github.com/siyuan-note/siyuan/issues/16906
     if (options.action.includes(Constants.CB_GET_FOCUSFIRST) &&
         protyle.wysiwyg.element.getBoundingClientRect().top > protyle.breadcrumb.element.getBoundingClientRect().bottom) {
         const getDocParam: IObject = {
@@ -352,7 +354,8 @@ const setHTML = (options: {
         });
     }
     if (options.scrollAttr && !protyle.scroll.element.classList.contains("fn__none") && !protyle.element.classList.contains("fn__none")) {
-        // 使用动态滚动条定位到最后一个块，重启后无法触发滚动事件，需要再次更新 index
+        // Using the dynamic scrollbar to position at the last block, the scroll event can't be triggered after
+        // a restart, so the index needs to be updated again
         const startId = options.scrollAttr.startId || protyle.wysiwyg.element.firstElementChild?.getAttribute("data-node-id");
         if (startId) {
             protyle.scroll.updateIndex(protyle, startId, (index) => {
@@ -395,7 +398,7 @@ export const disabledWYSIWYG = (element: HTMLElement) => {
     });
     element.style.userSelect = "text";
     element.setAttribute("contenteditable", "false");
-    // 用于区分移动端样式
+    // Used to distinguish mobile styling
     element.setAttribute("data-readonly", "true");
     element.querySelectorAll('[contenteditable="true"][spellcheck]').forEach(item => {
         item.setAttribute("contenteditable", "false");
@@ -405,7 +408,7 @@ export const disabledWYSIWYG = (element: HTMLElement) => {
     });
 };
 
-/** 禁用编辑器 */
+/** Disable the editor */
 export const disabledProtyle = (protyle: IProtyle) => {
     window.siyuan.menus.menu.remove();
     hideElements(["gutter", "toolbar", "select", "hint", "util"], protyle);
@@ -438,21 +441,22 @@ export const disabledProtyle = (protyle: IProtyle) => {
     hideTooltip();
 };
 
-/** 解除编辑器禁用 */
+/** Re-enable the editor */
 export const enableProtyle = (protyle: IProtyle) => {
     if (protyle.element.getAttribute("disabled-forever") === "true") {
         return;
     }
     protyle.disabled = false;
     if (isMobile()) {
-        // Android 端空块输入法弹出会收起 https://ld246.com/article/1689713888289
-        // iPhone，iPad 端 protyle.wysiwyg.element contenteditable 为 true 时，输入会在块中间插入 span 导致保存失败 https://ld246.com/article/1643473862873/comment/1643813765839#comments
+        // On Android, an empty block collapses when the IME popup appears https://ld246.com/article/1689713888289
+        // On iPhone/iPad, when protyle.wysiwyg.element's contenteditable is true, typing inserts a span in the
+        // middle of the block, causing the save to fail https://ld246.com/article/1643473862873/comment/1643813765839#comments
         document.getElementById("toolbarName").removeAttribute("readonly");
     } else {
         protyle.wysiwyg.element.setAttribute("contenteditable", "true");
         protyle.wysiwyg.element.style.userSelect = "";
     }
-    // 用于区分移动端样式
+    // Used to distinguish mobile styling
     protyle.wysiwyg.element.setAttribute("data-readonly", "false");
     if (protyle.title && protyle.title.editElement) {
         protyle.title.editElement.setAttribute("contenteditable", "true");
@@ -518,7 +522,7 @@ const focusElementById = (protyle: IProtyle, action: string[], scrollAttr?: IScr
         focusElement = protyle.wysiwyg.element.firstElementChild;
     }
     if (action.includes(Constants.CB_GET_HL)) {
-        preventScroll(protyle); // 搜索页签滚动会导致再次请求
+        preventScroll(protyle); // Scrolling from a search tab would trigger another request
         bgFade(focusElement);
     }
     if (action.includes(Constants.CB_GET_FOCUS) || action.includes(Constants.CB_GET_FOCUSFIRST)) {
@@ -540,7 +544,8 @@ const focusElementById = (protyle: IProtyle, action: string[], scrollAttr?: IScr
     if (hasScrollTop) {
         protyle.contentElement.scrollTop = scrollAttr.scrollTop;
     }
-    // 下一个请求过来前需断开，否则 observerLoad 重新赋值后无法 disconnect https://ld246.com/article/1704612002446
+    // Must disconnect before the next request comes in, otherwise observerLoad can't be disconnected after
+    // being reassigned https://ld246.com/article/1704612002446
     protyle.observerLoad?.disconnect();
     if (action.includes(Constants.CB_GET_FOCUS) || action.includes(Constants.CB_GET_SCROLL) || action.includes(Constants.CB_GET_HL) || action.includes(Constants.CB_GET_FOCUSFIRST)) {
         if (!hasScrollTop) {
@@ -549,8 +554,10 @@ const focusElementById = (protyle: IProtyle, action: string[], scrollAttr?: IScr
     } else {
         return;
     }
-    // 加强定位
-    // 使用 AbortController 监听用户手势（滚轮/触摸/方向键），一旦用户主动滚动即停止强制定位，否则顶部为数据库等异步渲染块撑高内容时会反复重置滚动位置
+    // Reinforce positioning
+    // Use an AbortController to listen for user gestures (wheel/touch/arrow keys); once the user scrolls on
+    // their own, stop forcing the position, otherwise repeatedly resetting the scroll position would fight
+    // content growing taller at the top from async-rendered blocks like databases
     const userScrollAbort = new AbortController();
     const onUserScroll = () => userScrollAbort.abort();
     protyle.contentElement.addEventListener("wheel", onUserScroll, {
@@ -569,14 +576,14 @@ const focusElementById = (protyle: IProtyle, action: string[], scrollAttr?: IScr
         signal: userScrollAbort.signal
     });
     protyle.contentElement.addEventListener("keydown", (event: KeyboardEvent) => {
-        // 仅拦截会触发滚动的按键，避免影响正常编辑输入
+        // Only intercept keys that trigger scrolling, to avoid affecting normal editing input
         if (["PageUp", "PageDown", "Home", "End", "ArrowUp", "ArrowDown", " "].includes(event.key)) {
             userScrollAbort.abort();
         }
     }, {capture: true, signal: userScrollAbort.signal});
     protyle.observerLoad = new ResizeObserver(() => {
         if (userScrollAbort.signal.aborted) {
-            // 用户已主动滚动，停止强制定位并将滚动权交还给用户
+            // The user has scrolled on their own, so stop forcing the position and hand scroll control back to the user
             protyle.observerLoad.disconnect();
             protyle.observer.observe(protyle.wysiwyg.element);
             return;

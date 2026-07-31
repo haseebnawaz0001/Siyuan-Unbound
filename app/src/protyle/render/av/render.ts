@@ -54,7 +54,7 @@ export const genTabHeaderHTML = (data: IAV, showSearch: boolean, editable: boole
     let tabHTML = "";
     let viewData: IAVView;
     let hasFilter = false;
-    // 递归在过滤树中查找是否存在引用了现有字段的叶子
+    // Recursively search the filter tree for a leaf referencing an existing field
     const findLeafFilter = (nodes: IAVFilter[], columnId: string, columnType: string): boolean => {
         for (const n of nodes) {
             if (n.filters) {
@@ -177,7 +177,7 @@ style="width: ${column.width || "200px"};">
             contentHTML += "</div>";
         }
         if (column.type === "lineNumber") {
-            // lineNumber type 不参与计算操作
+            // The lineNumber type does not participate in calculation operations
             calcHTML += `<div data-col-id="${column.id}" data-dtype="${column.type}" class="av__calc" style="width: ${column.width || "200px"}">&nbsp;</div>`;
         } else {
             calcHTML += `<div class="av__calc${column.calc && column.calc.operator !== "" ? " av__calc--ashow" : ""}" data-col-id="${column.id}" data-dtype="${column.type}" data-operator="${column.calc?.operator || ""}" 
@@ -246,7 +246,7 @@ export const getGroupTitleHTML = (group: IAVView, counter: number) => {
     } else {
         nameHTML = group.name;
     }
-    // av__group-name 为第三方需求，本应用内没有使用，但不能移除 https://github.com/siyuan-note/siyuan/issues/15736
+    // av__group-name exists for a third-party requirement; it's not used within this application, but must not be removed https://github.com/siyuan-note/siyuan/issues/15736
     return `<div class="av__group-title">
     <div class="av__group-icon" data-type="av-group-fold" data-id="${group.id}">
         <svg class="${group.groupFolded ? "" : "av__group-arrow--open"}"><use xlink:href="#iconRight"></use></svg>
@@ -299,7 +299,7 @@ const afterRenderTable = (options: ITableOptions) => {
             headerTransformElement.style.transform = options.resetData.headerTransform.transform;
         }
     } else if (editRect && !options.protyle.options.action.includes(Constants.CB_GET_HISTORY)) {
-        // 需等待渲染完，否则 getBoundingClientRect 错误 https://github.com/siyuan-note/siyuan/issues/13787
+        // Must wait for rendering to finish, otherwise getBoundingClientRect would be wrong https://github.com/siyuan-note/siyuan/issues/13787
         setTimeout(() => {
             stickyRow(options.blockElement, options.protyle.contentElement, "top");
         }, Constants.TIMEOUT_LOAD);
@@ -310,7 +310,7 @@ const afterRenderTable = (options: ITableOptions) => {
             footerTransformElement.style.transform = options.resetData.footerTransform.transform;
         }
     } else if (editRect && !options.protyle.options.action.includes(Constants.CB_GET_HISTORY)) {
-        // 需等待渲染完，否则 getBoundingClientRect 错误 https://github.com/siyuan-note/siyuan/issues/13787
+        // Must wait for rendering to finish, otherwise getBoundingClientRect would be wrong https://github.com/siyuan-note/siyuan/issues/13787
         setTimeout(() => {
             stickyRow(options.blockElement, options.protyle.contentElement, "bottom");
         }, Constants.TIMEOUT_LOAD);
@@ -372,7 +372,7 @@ const afterRenderTable = (options: ITableOptions) => {
         activeCellElement?.classList.add("av__cell--active");
     });
     if (getSelection().rangeCount > 0) {
-        // 修改表头后光标重新定位
+        // Reposition the cursor after modifying the table header
         const range = getSelection().getRangeAt(0);
         if (!hasClosestByClassName(range.startContainer, "av__title")) {
             const blockElement = hasClosestBlock(range.startContainer);
@@ -473,8 +473,10 @@ export const avRender = async (element: Element, protyle: IProtyle, cb?: (data: 
             if (item.dataset.avLocateWindow === "true") {
                 return;
             }
-            // 守卫只保证至少 1 个 .av__row，但首行索引取的是 [1]（首个数据行，[0] 为表头）。
-            // 虚拟滚动 trim 后某分组可能只剩表头，[1] 不存在时需跳过，避免解引用 undefined.getAttribute
+            // The guard only ensures there's at least 1 .av__row, but the first-row index taken is
+            // [1] (the first data row, with [0] being the header).
+            // After virtual scroll trim, a group may have only the header left; when [1] doesn't
+            // exist it must be skipped, to avoid dereferencing undefined.getAttribute
             const secondRow = item.querySelectorAll(".av__row")[1] as HTMLElement;
             if (!secondRow || e.getAttribute(Constants.ATTRIBUTE_V_SCROLL) !== "true") {
                 return;
@@ -582,7 +584,7 @@ export const avRender = async (element: Element, protyle: IProtyle, cb?: (data: 
             blockElement: e,
             resetData
         });
-        // 历史兼容
+        // Legacy compatibility
         e.style.margin = "";
     }
 };
@@ -611,11 +613,12 @@ const getAVElements = (protyle: IProtyle, avID: string, viewID?: string): HTMLEl
 
 const getViewIDByAVElement = (avElement: HTMLElement): string | null => {
     return avElement.getAttribute(Constants.CUSTOM_SY_AV_VIEW)
-        || avElement.querySelector(".layout-tab-bar .item--focus")?.getAttribute("data-id") // 旧版本的数据库块没有 CUSTOM_SY_AV_VIEW 属性，所以在视图元素上获取 viewID
+        || avElement.querySelector(".layout-tab-bar .item--focus")?.getAttribute("data-id") // Older database blocks don't have the CUSTOM_SY_AV_VIEW attribute, so the viewID is obtained from the view element instead
         || null;
 };
 
-// 通过渲染数据判断条目是否存在，避免虚拟滚动/分页下条目被 trim 出 DOM 导致误判
+// Determine whether an item exists via the render data, to avoid misjudging when an item is
+// trimmed out of the DOM under virtual scrolling/pagination
 const isItemInData = (data: IAV, itemID: string): boolean => {
     const view = data.view as IAVTable & IAVGallery;
     if (view.groups?.length > 0) {
@@ -882,14 +885,16 @@ export const refreshAV = (protyle: IProtyle, operation: IOperation) => {
     } else {
         addingFocusTokens.delete(addingFocusKey);
     }
-    // 只能 setTimeout，以前方案快速输入后最后一次修改会被忽略；必须为每一个 protyle 单独设置，否则有多个 protyle 时，其余无法被执行
+    // Only setTimeout works here; the old approach would drop the last modification after rapid
+    // input; it must be set separately per protyle, otherwise with multiple protyle instances the
+    // others would never run
     clearTimeout(refreshTimeouts[protyle.id]);
     refreshTimeouts[protyle.id] = window.setTimeout(() => {
-        // 修改表格名 avID 传入到 id 上了 https://github.com/siyuan-note/siyuan/issues/12724
+        // When renaming a table, avID is passed in as id https://github.com/siyuan-note/siyuan/issues/12724
         const avID = operation.action === "setAttrViewName" ? operation.id : operation.avID;
         const attrElement = document.querySelector(`.b3-dialog--open[data-key="${Constants.DIALOG_ATTR}"] .custom-attr > [data-av-id="${avID}"]`) as HTMLElement;
         if (attrElement) {
-            // 更新属性面板
+            // Update the attribute panel
             attrElement.removeAttribute("data-rendering");
             renderAVAttribute(attrElement.parentElement, attrElement.dataset.nodeId, protyle);
         }
@@ -995,7 +1000,8 @@ export const refreshAV = (protyle: IProtyle, operation: IOperation) => {
                             addingFocusTokens.delete(addingFocusKey);
                         }
                         operation.srcs.find((srcItem) => {
-                            // 虚拟滚动/分页下条目可能不在 DOM 中，需通过渲染数据判断是否被过滤
+                            // Under virtual scrolling/pagination the item may not be in the DOM, so
+                            // whether it's been filtered must be determined via the render data
                             if (!isItemInData(data, srcItem.itemID)) {
                                 showMessage(window.siyuan.languages.databaseItemFiltered);
                                 return true;

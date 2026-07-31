@@ -95,7 +95,7 @@ left:${left || "auto"};top:${top || "auto"}">
     public destroy(options?: IObject) {
         this.element.classList.remove("b3-dialog--open");
         setTimeout(() => {
-            // av 修改列头emoji后点击关闭emoji图标
+            // Click to close the emoji icon after editing a column header emoji in an attribute view
             if ((this.element.querySelector(".b3-dialog") as HTMLElement).style.zIndex < window.siyuan.menus.menu.element.style.zIndex) {
                 // https://github.com/siyuan-note/siyuan/issues/6783
                 window.siyuan.menus.menu.remove();

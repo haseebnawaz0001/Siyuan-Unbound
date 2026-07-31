@@ -20,12 +20,13 @@ export const fetchPost = (
             "/api/block/getRecentUpdatedBlocks", "/api/search/fullTextSearchBlock"].includes(url)) {
             window.siyuan.reqIds[url] = Date.now();
             if (data.type === "local" && url === "/api/graph/getLocalGraph") {
-                // 当打开文档A的关系图、关系图、文档A后刷新，由于防止请求重复处理，文档A关系图无法渲染。
+                // Used for the following scenario: after opening document A's graph, then the graph, then
+                // document A and refreshing, document A's graph fails to render because duplicate request handling is prevented.
             } else {
                 data.reqId = window.siyuan.reqIds[url];
             }
         }
-        // 并发导出后端接受顺序不一致
+        // Concurrent exports may be accepted out of order by the backend
         if (url === "/api/transactions") {
             data.reqId = Date.now();
         }
@@ -52,7 +53,7 @@ export const fetchPost = (
                     code: -response.status,
                 };
             case 401:
-                // 返回鉴权失败的话直接刷新页面，避免用户在当前页面操作 https://github.com/siyuan-note/siyuan/issues/15163
+                // If authentication fails, reload the page directly, to prevent the user from continuing to operate on the current page https://github.com/siyuan-note/siyuan/issues/15163
                 setTimeout(() => {
                     window.location.reload();
                 }, 3000);
@@ -62,7 +63,7 @@ export const fetchPost = (
                     code: -response.status,
                 };
             default:
-                // /api/file/getFile 接口返回202时表示文件没有正常读取
+                // The /api/file/getFile endpoint returning 202 means the file was not read successfully
                 if (response.status === 202 && url === "/api/file/getFile") {
                     isGetFile202 = true;
                 }
@@ -115,7 +116,7 @@ export const fetchPost = (
         }
         /// #if !BROWSER
         if (url === "/api/system/exit" || url === "/api/system/setWorkspaceDir" || (
-            ["/api/system/setUILayout"].includes(url) && data.errorExit // 内核中断，点关闭处理
+            ["/api/system/setUILayout"].includes(url) && data.errorExit // Kernel interrupted, handle the close button click
         )) {
             ipcRenderer.send(Constants.SIYUAN_QUIT, location.port);
         }

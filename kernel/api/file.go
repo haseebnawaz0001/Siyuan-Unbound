@@ -38,21 +38,27 @@ import (
 	"github.com/siyuan-note/siyuan/kernel/util"
 )
 
-// errMsgSeeKernelLog 接在 API 错误提示末尾，引导用户查看内核日志以获取完整信息（避免在 Msg 暴露工作空间绝对路径）。
+// errMsgSeeKernelLog is appended to the end of an API error message, directing the user to check the kernel log for
+// full details (this avoids exposing the workspace's absolute path in Msg).
 const errMsgSeeKernelLog = ". For details, see the SiYuan kernel log."
 
-// rejectEncryptedBoxPath 检查 absPath 是否落在加密笔记本目录下（含 symlink 绕过），是则返回 true。
-// 原始文件 API（getFile/putFile/copyFile/renameFile/removeFile）是绕过加密层的逃生口，
-// 对加密笔记本的任何文件读写都应拒绝——合法读写走专用 API（upload/getBlockKramdown 等，已加密感知），
-// 避免密文泄漏给插件或明文破坏加密格式。
-// 防止 symlink 绕过：找到最长已存在的父路径，解析 symlink 后拼回剩余路径，再检查是否落入加密 box。
+// rejectEncryptedBoxPath checks whether absPath falls under an encrypted notebook directory (including symlink
+// bypass attempts), returning true if so.
+// The raw file APIs (getFile/putFile/copyFile/renameFile/removeFile) are an escape hatch that bypasses the
+// encryption layer, so any read/write of an encrypted notebook's files through them must be rejected -- legitimate
+// reads/writes go through the dedicated, encryption-aware APIs (upload/getBlockKramdown, etc.) to avoid leaking
+// ciphertext to plugins or corrupting the encrypted format with plaintext.
+// To prevent symlink bypass: find the longest existing parent path, resolve its symlink, append the remaining
+// path, and then check whether that falls inside an encrypted box.
 func rejectEncryptedBoxPath(absPath string) bool {
 	return model.EncryptedRawPathBoxID(absPath) != ""
 }
 
-// copyDecryptedAsset 将加密 asset 解密后复制到目标路径（dest 必须在工作区外）。
+// copyDecryptedAsset decrypts an encrypted asset and copies it to the destination path (dest must be outside the
+// workspace).
 func copyDecryptedAsset(src, dest string) error {
-	// 安全守卫：dest 必须在工作区外，防止解密后的明文落入工作区普通目录
+	// Safety guard: dest must be outside the workspace, to prevent decrypted plaintext from landing in a regular
+	// workspace directory
 	if gulu.File.IsSubPath(util.WorkspaceDir, dest) {
 		return fmt.Errorf("refuse to write decrypted asset inside workspace")
 	}
@@ -114,8 +120,8 @@ func globalCopyFiles(c *gin.Context) {
 	var srcsArg []any
 	var destDirArg string
 	if !util.ParseJsonArgs(arg, ret,
-		util.BindJsonArg("srcs", &srcsArg, true, true),        // 绝对路径
-		util.BindJsonArg("destDir", &destDirArg, true, false), // 相对于工作空间的路径
+		util.BindJsonArg("srcs", &srcsArg, true, true),        // absolute path
+		util.BindJsonArg("destDir", &destDirArg, true, false), // path relative to the workspace
 	) {
 		return
 	}
@@ -170,7 +176,8 @@ func globalCopyFiles(c *gin.Context) {
 		ret.Msg = err.Error()
 		return
 	}
-	// 在 MkdirAll 前拒绝加密笔记本目录，避免在加密笔记本内创建明文目录
+	// Reject encrypted notebook directories before MkdirAll, to avoid creating a plaintext directory inside an
+	// encrypted notebook
 	if rejectEncryptedBoxPath(destDir) {
 		ret.Code = -1
 		ret.Msg = "copying encrypted notebook files is not supported via this API"
@@ -204,7 +211,8 @@ func globalCopyFiles(c *gin.Context) {
 			ret.Msg = model.Conf.Language(321)
 			return
 		}
-		// 拒绝目标已存在的 symlink：os.Create 会跟随 symlink，可能写入加密笔记本内部
+		// Reject an existing symlink at the destination: os.Create follows symlinks, which could write inside an
+		// encrypted notebook
 		if li, lerr := os.Lstat(dest); lerr == nil && li.Mode()&os.ModeSymlink != 0 {
 			ret.Code = -1
 			ret.Msg = "destination path is a symlink, which is not supported"
@@ -233,8 +241,8 @@ func workspaceCopyFiles(c *gin.Context) {
 	var srcsArg []any
 	var destDirArg string
 	if !util.ParseJsonArgs(arg, ret,
-		util.BindJsonArg("srcs", &srcsArg, true, true),        // 相对于工作空间的路径
-		util.BindJsonArg("destDir", &destDirArg, true, false), // 相对于工作空间的路径
+		util.BindJsonArg("srcs", &srcsArg, true, true),        // path relative to the workspace
+		util.BindJsonArg("destDir", &destDirArg, true, false), // path relative to the workspace
 	) {
 		return
 	}
@@ -290,7 +298,8 @@ func workspaceCopyFiles(c *gin.Context) {
 		ret.Msg = err.Error()
 		return
 	}
-	// 在 MkdirAll 前拒绝加密笔记本目录，避免在加密笔记本内创建明文目录
+	// Reject encrypted notebook directories before MkdirAll, to avoid creating a plaintext directory inside an
+	// encrypted notebook
 	if rejectEncryptedBoxPath(destDir) {
 		ret.Code = -1
 		ret.Msg = "copying encrypted notebook files is not supported via this API"
@@ -351,8 +360,8 @@ func copyFile(c *gin.Context) {
 
 	var src, dest string
 	if !util.ParseJsonArgs(arg, ret,
-		util.BindJsonArg("src", &src, true, true),   // 资源路径，由 GetAssetAbsPath 解析
-		util.BindJsonArg("dest", &dest, true, true), // 绝对路径
+		util.BindJsonArg("src", &src, true, true),   // asset path, resolved via GetAssetAbsPath
+		util.BindJsonArg("dest", &dest, true, true), // absolute path
 	) {
 		return
 	}
@@ -374,11 +383,13 @@ func copyFile(c *gin.Context) {
 		return
 	}
 
-	// 加密笔记本的文件不允许通过原始文件 API 复制（src 读出密文/明文，dest 写入破坏加密存储）
-	// 例外：dest 在工作区外且非加密 box 时允许解密复制（用户导出的场景）
+	// Files in an encrypted notebook cannot be copied through the raw file API (src would read out ciphertext or
+	// plaintext, and writing to dest would corrupt the encrypted storage)
+	// Exception: if dest is outside the workspace and not an encrypted box, a decrypted copy is allowed (user
+	// export scenario)
 	if rejectEncryptedBoxPath(src) || rejectEncryptedBoxPath(dest) {
 		if !rejectEncryptedBoxPath(dest) && !gulu.File.IsSubPath(util.WorkspaceDir, dest) {
-			// dest 在工作区外且非加密 box，允许解密后复制
+			// dest is outside the workspace and not an encrypted box, so a decrypted copy is allowed
 			if err = copyDecryptedAsset(src, dest); err != nil {
 				ret.Code = -1
 				ret.Msg = err.Error()
@@ -451,8 +462,9 @@ func getFile(c *gin.Context) {
 		c.JSON(http.StatusAccepted, ret)
 		return
 	}
-	// 加密笔记本的任何文件都不允许通过原始文件 API 读取（不只 .sy）：
-	// 密文对插件无意义，且可能被误解析或泄漏；合法读取走专用 API（已加密感知）
+	// No file in an encrypted notebook may be read through the raw file API (not just .sy files): ciphertext is
+	// meaningless to plugins and could be misparsed or leaked; legitimate reads go through the dedicated,
+	// encryption-aware API
 	if rejectEncryptedBoxPath(fileAbsPath) {
 		ret.Code = -3
 		ret.Msg = model.Conf.Language(321)
@@ -527,10 +539,10 @@ func getFile(c *gin.Context) {
 }
 
 func refuseToAccess(c *gin.Context, fileAbsPath string, ret *gulu.Result) bool {
-	// 规范化并解析符号链接，防止通过大小写或符号链接绕过
+	// Normalize the path and resolve symlinks, to prevent bypass via case differences or symlinks
 	fileNorm := normalizeAndResolve(fileAbsPath)
 
-	// 禁止访问配置文件 conf/conf.json
+	// Forbid access to the config file conf/conf.json
 	confPath := normalizeAndResolve(filepath.Join(util.ConfDir, "conf.json"))
 	if fileNorm == confPath {
 		ret.Code = http.StatusForbidden
@@ -539,7 +551,7 @@ func refuseToAccess(c *gin.Context, fileAbsPath string, ret *gulu.Result) bool {
 		return true
 	}
 
-	// 禁止访问 data/snippets/conf.json
+	// Forbid access to data/snippets/conf.json
 	snippetPath := normalizeAndResolve(filepath.Join(util.DataDir, "snippets", "conf.json"))
 	if fileNorm == snippetPath {
 		ret.Code = http.StatusForbidden
@@ -548,7 +560,7 @@ func refuseToAccess(c *gin.Context, fileAbsPath string, ret *gulu.Result) bool {
 		return true
 	}
 
-	// 禁止访问 data/templates 目录
+	// Forbid access to the data/templates directory
 	templatesBase := normalizeAndResolve(filepath.Join(util.DataDir, "templates"))
 	if gulu.File.IsSubPath(templatesBase, fileNorm) {
 		ret.Code = http.StatusForbidden
@@ -557,7 +569,7 @@ func refuseToAccess(c *gin.Context, fileAbsPath string, ret *gulu.Result) bool {
 		return true
 	}
 
-	// 禁止访问 data/.siyuan/publishAccess.json
+	// Forbid access to data/.siyuan/publishAccess.json
 	publishAccessPath := normalizeAndResolve(filepath.Join(util.DataDir, ".siyuan", "publishAccess.json"))
 	if fileNorm == publishAccessPath {
 		ret.Code = http.StatusForbidden
@@ -566,7 +578,7 @@ func refuseToAccess(c *gin.Context, fileAbsPath string, ret *gulu.Result) bool {
 		return true
 	}
 
-	// 禁止访问 无发布访问权限的文件
+	// Forbid access to files without publish access permission
 	publishAccess := model.GetPublishAccess()
 	if !model.CheckAbsPathAccessableByPublishAccess(c, fileAbsPath, publishAccess) {
 		ret.Code = http.StatusForbidden
@@ -578,7 +590,8 @@ func refuseToAccess(c *gin.Context, fileAbsPath string, ret *gulu.Result) bool {
 	return false
 }
 
-// normalizeAndResolve 将路径转为绝对、解析符号链接并清理；在需要时转为小写以实现不区分大小写比较
+// normalizeAndResolve converts a path to absolute, resolves symlinks, and cleans it; lowercases it when needed
+// for case-insensitive comparison.
 func normalizeAndResolve(p string) string {
 	if abs, err := filepath.Abs(p); err == nil {
 		p = abs
@@ -587,7 +600,7 @@ func normalizeAndResolve(p string) string {
 		p = eval
 	}
 	p = filepath.Clean(p)
-	// 在 Windows 和 macOS 上文件系统通常为不区分大小写，使用小写统一比较
+	// On Windows and macOS the filesystem is usually case-insensitive, so use lowercase for a consistent comparison
 	if runtime.GOOS == "windows" || runtime.GOOS == "darwin" {
 		p = strings.ToLower(p)
 	}
@@ -617,8 +630,9 @@ func readDir(c *gin.Context) {
 		ret.Msg = err.Error()
 		return
 	}
-	// 加密笔记本的任何目录都不允许通过原始文件 API 枚举（不只 .sy）：
-	// 目录结构、文档 ID、随机化资产名和时间戳可能泄漏信息；合法读取走专用 API（已加密感知）
+	// No directory in an encrypted notebook may be enumerated through the raw file API (not just .sy files): the
+	// directory structure, document IDs, randomized asset names, and timestamps could leak information; legitimate
+	// reads go through the dedicated, encryption-aware API
 	if rejectEncryptedBoxPath(dirAbsPath) {
 		ret.Code = -3
 		ret.Msg = model.Conf.Language(321)
@@ -715,7 +729,8 @@ func renameFile(c *gin.Context) {
 		ret.Msg = err.Error()
 		return
 	}
-	// 加密笔记本的文件不允许通过原始文件 API 重命名（会破坏加密存储结构/跨 box 搬运密文）
+	// Files in an encrypted notebook cannot be renamed through the raw file API (this would corrupt the encrypted
+	// storage structure or move ciphertext across boxes)
 	if rejectEncryptedBoxPath(srcAbsPath) || rejectEncryptedBoxPath(destAbsPath) {
 		ret.Code = -3
 		ret.Msg = model.Conf.Language(321)
@@ -789,7 +804,8 @@ func removeFile(c *gin.Context) {
 		ret.Msg = err.Error()
 		return
 	}
-	// 加密笔记本的文件不允许通过原始文件 API 删除（破坏加密存储结构）
+	// Files in an encrypted notebook cannot be deleted through the raw file API (this would corrupt the encrypted
+	// storage structure)
 	if rejectEncryptedBoxPath(fileAbsPath) {
 		ret.Code = -3
 		ret.Msg = model.Conf.Language(321)
@@ -840,8 +856,9 @@ func putFile(c *gin.Context) {
 		return
 	}
 
-	// 加密笔记本的任何文件都不允许通过原始文件 API 写入（不只 .sy）：
-	// 明文写入会破坏密文格式或污染加密存储；合法写入走专用 API（已加密感知）
+	// No file in an encrypted notebook may be written through the raw file API (not just .sy files): writing
+	// plaintext would corrupt the ciphertext format or pollute the encrypted storage; legitimate writes go through
+	// the dedicated, encryption-aware API
 	if rejectEncryptedBoxPath(fileAbsPath) {
 		ret.Code = -3
 		ret.Msg = model.Conf.Language(321)

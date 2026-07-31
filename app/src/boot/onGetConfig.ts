@@ -64,7 +64,7 @@ export const onGetConfig = (isStart: boolean, app: App) => {
             JSONToLayout(app, isStart);
             setTimeout(() => {
                 adjustLayout();
-            }); // 等待 dock 中 !this.pin 的 setTimeout
+            }); // Wait for the !this.pin setTimeout in dock
             /// #if !BROWSER
             sendGlobalShortcut(app);
             /// #endif
@@ -86,7 +86,7 @@ export const onGetConfig = (isStart: boolean, app: App) => {
     setInlineStyle();
     renderSnippet();
     if (window.siyuan.config.system.safeMode) {
-        // 安全模式已禁用代码片段、插件、自定义主题和图标
+        // Safe mode has disabled snippets, plugins, custom themes and icons
         showMessage(window.siyuan.languages.safeModeTip);
     }
     let resizeTimeout = 0;
@@ -129,7 +129,7 @@ export const initWindow = async (app: App) => {
         exportLayout({
             cb() {
                 if (window.siyuan.config.appearance.closeButtonBehavior === 1 && !close) {
-                    // 最小化
+                    // Minimize
                     if ("windows" === window.siyuan.config.system.os) {
                         ipcRenderer.send(Constants.SIYUAN_CONFIG_TRAY, {
                             languages: window.siyuan.languages["_trayMenu"],
@@ -148,7 +148,8 @@ export const initWindow = async (app: App) => {
     ipcRenderer.send(Constants.SIYUAN_EVENT);
     ipcRenderer.on(Constants.SIYUAN_EVENT, (event, cmd) => {
         if (cmd === "focus") {
-            // 由于 https://github.com/siyuan-note/siyuan/issues/10060 和新版 electron 应用切出再切进会保持光标，故移除 focus
+            // Due to https://github.com/siyuan-note/siyuan/issues/10060 and newer Electron versions retaining the
+            // cursor state when switching the app out and back in, remove focus here
             window.siyuan.altIsPressed = false;
             window.siyuan.ctrlIsPressed = false;
             window.siyuan.shiftIsPressed = false;
@@ -157,12 +158,13 @@ export const initWindow = async (app: App) => {
             document.body.classList.add("body--blur");
         } else if (cmd === "enter-full-screen") {
             document.body.classList.add("body--fullscreen");
-            // 全屏下红绿灯隐藏，清除缩放补偿让 body--fullscreen 的 5px 生效
+            // The traffic lights are hidden in fullscreen; clear the zoom compensation so body--fullscreen's 5px
+            // takes effect
             setToolbarLeftMac(window.siyuan.storage[Constants.LOCAL_ZOOM]);
             setTabPosition();
         } else if (cmd === "leave-full-screen") {
             document.body.classList.remove("body--fullscreen");
-            // 退出全屏后按当前缩放重新补偿
+            // After exiting fullscreen, recompensate based on the current zoom level
             setToolbarLeftMac(window.siyuan.storage[Constants.LOCAL_ZOOM]);
             setTabPosition();
         } else if (cmd === "maximize") {
@@ -329,7 +331,8 @@ ${response.data.replace("%pages", "<span class=totalPages></span>").replace("%pa
     if (isFullScreen) {
         document.body.classList.add("body--fullscreen");
     }
-    // 全屏状态恢复后再同步一次，避免启动时按缩放设置的补偿覆盖 body--fullscreen 的 5px
+    // Sync again after the fullscreen state is restored, to prevent the zoom-based compensation applied at
+    // startup from overriding body--fullscreen's 5px
     setToolbarLeftMac(window.siyuan.storage[Constants.LOCAL_ZOOM]);
     const isMaximized = await ipcRenderer.invoke(Constants.SIYUAN_GET, {
         cmd: "isMaximized",
@@ -341,7 +344,7 @@ ${response.data.replace("%pages", "<span class=totalPages></span>").replace("%pa
     if ("darwin" !== window.siyuan.config.system.os) {
         document.body.classList.add("body--win32");
 
-        // 添加窗口控件
+        // Add window controls
         const controlsHTML = `<div class="toolbar__item ariaLabel toolbar__item--win" aria-label="${window.siyuan.languages.min}" id="minWindow">
     <svg>
         <use xlink:href="#iconMin"></use>

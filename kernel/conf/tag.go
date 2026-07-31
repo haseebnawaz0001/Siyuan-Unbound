@@ -21,7 +21,7 @@ import (
 )
 
 type Tag struct {
-	Sort int `json:"sort"` // 排序方式
+	Sort int `json:"sort"` // Sort mode
 }
 
 func NewTag() *Tag {

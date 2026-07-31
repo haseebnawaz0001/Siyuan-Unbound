@@ -17,18 +17,18 @@ export const processIOSPurchaseResponse = (code: number) => {
         document.querySelector("#configAccountMain #refresh")?.dispatchEvent(new Event("click"));
         /// #endif
     } else {
-        // -1：Invalid cloud region 云端区域无效
-        // -2：Server communication failed, need to retry 服务器通讯失败，需要重试
-        // -3：Non-iOS device 非 iOS 设备
-        // -4：Account not logged in 账号未登录
-        // -5：Account status abnormal 账号状态异常
-        // -6：Parameter error 参数错误
-        // -7：AccountToken verification failed 校验 accountToken 失败
-        // -8：Transaction verification failed 校验 transaction 失败
-        // -9：Unknown product 未知的商品
-        // -10：用户取消交易
-        // -11：购买交易被挂起
-        // -12：其他情况
+        // -1: Invalid cloud region
+        // -2: Server communication failed, need to retry
+        // -3: Non-iOS device
+        // -4: Account not logged in
+        // -5: Account status abnormal
+        // -6: Parameter error
+        // -7: AccountToken verification failed
+        // -8: Transaction verification failed
+        // -9: Unknown product
+        // -10: User canceled the transaction
+        // -11: Purchase transaction was suspended
+        // -12: Other cases
         let message = "";
         switch (code) {
             case -1:

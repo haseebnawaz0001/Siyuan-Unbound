@@ -88,7 +88,7 @@ func html2BlockDOM(c *gin.Context) {
 	if !util.ParseJsonArgs(arg, ret, util.BindJsonArg("dom", &dom, true, false)) {
 		return
 	}
-	// 可选 notebook 参数：指定目标加密笔记本时资源写入 box 内并加密
+	// Optional notebook parameter: when the target is an encrypted notebook, assets are written into and encrypted for that box
 	boxID := ""
 	if notebook, ok := arg["notebook"].(string); ok && notebook != "" {
 		if model.IsEncryptedBox(notebook) {
@@ -124,7 +124,7 @@ func html2BlockDOM(c *gin.Context) {
 		n.Unlink()
 	}
 
-	// 表格只包含一个单元格时，将其转换为段落
+	// When the table contains only a single cell, convert it into a paragraph
 	// Copy one cell from Excel/HTML table and paste it using the cell's content https://github.com/siyuan-note/siyuan/issues/9614
 	unlinks = nil
 	if nil != tree.Root.FirstChild && ast.NodeTable == tree.Root.FirstChild.Type && (nil == tree.Root.FirstChild.Next ||
@@ -151,7 +151,7 @@ func html2BlockDOM(c *gin.Context) {
 	}
 
 	if util.ContainerStd == model.Conf.System.Container {
-		// 处理本地资源文件复制
+		// Handle copying local asset files
 		ast.Walk(tree.Root, func(n *ast.Node, entering bool) ast.WalkStatus {
 			if !entering || ast.NodeLinkDest != n.Type {
 				return ast.WalkContinue
@@ -207,7 +207,7 @@ func html2BlockDOM(c *gin.Context) {
 		})
 	}
 
-	parse.TextMarks2Inlines(tree) // 先将 TextMark 转换为 Inlines https://github.com/siyuan-note/siyuan/issues/13056
+	parse.TextMarks2Inlines(tree) // First convert TextMark into Inlines https://github.com/siyuan-note/siyuan/issues/13056
 	parse.NestedInlines2FlattedSpansHybrid(tree, false)
 
 	md, err := lute.FormatNodeSync(tree.Root, luteEngine.ParseOptions, luteEngine.RenderOptions)
@@ -243,7 +243,7 @@ func spinBlockDOM(c *gin.Context) {
 	}
 }
 
-// md2HTML 将 Markdown 转换为 HTML。
+// md2HTML converts Markdown to HTML.
 func md2HTML(c *gin.Context) {
 	ret := gulu.Ret.NewResult()
 	defer c.JSON(http.StatusOK, ret)

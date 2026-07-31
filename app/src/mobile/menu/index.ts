@@ -106,7 +106,7 @@ export const initRightMenu = (app: App) => {
 </div>`;
     processSync();
     afterLayoutReady(app);
-    // 只能用 click，否则无法上下滚动 https://github.com/siyuan-note/siyuan/issues/6628
+    // Must use click, otherwise scrolling up and down won't work https://github.com/siyuan-note/siyuan/issues/6628
     menuElement.addEventListener("click", (event) => {
         let target = event.target as HTMLElement;
         let settingTabDef: ISettingTabShell<TSettingTab> | undefined;

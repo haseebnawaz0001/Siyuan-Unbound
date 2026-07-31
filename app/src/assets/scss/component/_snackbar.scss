@@ -18,7 +18,7 @@
     position: fixed;
     right: 30px;
     top: 22px;
-    // 不能设置死，否则右键菜单会被遮盖 z-index: 999999;
+    // Must not hardcode this, otherwise the right-click menu would be covered: z-index: 999999;
     max-height: calc(100vh - 32px);
     display: flex;
     flex-direction: column;

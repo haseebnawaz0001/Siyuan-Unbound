@@ -301,7 +301,8 @@ export const updateSearchResult = (config: Config.IUILayoutTabSearchConfig, elem
                 page: config.page,
                 pageSize: 32,
             };
-            // 限定在单个加密 box 内搜索时带 notebook，让内核走加密 db；跨 box 或全局搜索走原函数
+            // When search is scoped to a single encrypted box, pass the notebook so the kernel uses the encrypted
+            // db; for cross-box or global search, use the original function
             const idPaths = config.idPath || [];
             if (idPaths.length > 0) {
                 const box = idPaths[0].split("/")[0];

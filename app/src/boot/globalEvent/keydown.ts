@@ -356,7 +356,7 @@ const editKeydown = (app: App, event: KeyboardEvent) => {
     if (target.tagName !== "TABLE" && ["INPUT", "TEXTAREA"].includes(target.tagName)) {
         return false;
     }
-    // ctrl+home 光标移动到顶
+    // ctrl+home moves the cursor to the top
     if (!event.altKey && !event.shiftKey && isOnlyMeta(event) && event.key === "Home") {
         goHome(protyle);
         hideElements(["select"], protyle);
@@ -364,7 +364,7 @@ const editKeydown = (app: App, event: KeyboardEvent) => {
         event.preventDefault();
         return;
     }
-    // ctrl+end 光标移动到尾
+    // ctrl+end moves the cursor to the end
     if (!event.altKey && !event.shiftKey && isOnlyMeta(event) && event.key === "End") {
         goEnd(protyle);
         hideElements(["select"], protyle);
@@ -535,7 +535,7 @@ const editKeydown = (app: App, event: KeyboardEvent) => {
     if (hasClosestByClassName(target, "protyle-title__input")) {
         return false;
     }
-    // 没有光标时，无法撤销 https://ld246.com/article/1624021111567
+    // Cannot undo without a cursor https://ld246.com/article/1624021111567
     if (matchHotKey(window.siyuan.config.keymap.editor.general.undo.custom, event)) {
         protyle.undo.undo(protyle);
         event.preventDefault();
@@ -972,7 +972,7 @@ const fileTreeKeydown = (app: App, event: KeyboardEvent) => {
 };
 
 const panelTreeKeydown = (app: App, event: KeyboardEvent) => {
-    // 面板折叠展开操作
+    // Panel collapse/expand actions
     const target = event.target as HTMLElement;
     if (["INPUT", "TEXTAREA"].includes(target.tagName) ||
         hasClosestByAttribute(target, "contenteditable", null) ||
@@ -1096,7 +1096,7 @@ const panelTreeKeydown = (app: App, event: KeyboardEvent) => {
         while (nextElement) {
             if (nextElement.nextElementSibling) {
                 if (nextElement.nextElementSibling.tagName === "UL") {
-                    if (nextElement.nextElementSibling.classList.contains("fn__none")) {   // 遇到折叠内容
+                    if (nextElement.nextElementSibling.classList.contains("fn__none")) {   // Encountered collapsed content
                         if (nextElement.nextElementSibling.nextElementSibling) {
                             nextElement = nextElement.nextElementSibling.nextElementSibling;
                         }
@@ -1141,7 +1141,7 @@ const panelTreeKeydown = (app: App, event: KeyboardEvent) => {
                     if (previousElement.previousElementSibling.previousElementSibling) {
                         previousElement = previousElement.previousElementSibling.previousElementSibling;
                     }
-                } else if (previousElement.previousElementSibling.tagName === "UL" && previousElement.previousElementSibling.classList.contains("fn__none")) {   // 遇到折叠内容
+                } else if (previousElement.previousElementSibling.tagName === "UL" && previousElement.previousElementSibling.classList.contains("fn__none")) {   // Encountered collapsed content
                     if (previousElement.previousElementSibling.previousElementSibling) {
                         previousElement = previousElement.previousElementSibling.previousElementSibling;
                     }
@@ -1254,7 +1254,7 @@ export const windowKeyDown = (app: App, event: KeyboardEvent) => {
 </div>`,
         });
         switchDialog.element.setAttribute("data-key", Constants.DIALOG_SWITCHTAB);
-        // 需移走光标，否则编辑器会继续监听并执行按键操作
+        // The cursor needs to be moved away, otherwise the editor keeps listening for and handling key presses
         switchDialog.element.querySelector("input").focus();
         if (isMac()) {
             switchDialog.element.addEventListener("contextmenu", (event) => {
@@ -1299,7 +1299,7 @@ export const windowKeyDown = (app: App, event: KeyboardEvent) => {
 
     if (["Home", "End", "ArrowUp", "ArrowDown"].includes(event.key)) {
         let matchDialog: Dialog;
-        // 需找到最顶层的，因此不能用 find
+        // Need to find the topmost one, so find() can't be used
         window.siyuan.dialogs.forEach(item => {
             if ([Constants.DIALOG_VIEWCARDS, Constants.DIALOG_HISTORYCOMPARE].includes(item.element.getAttribute("data-key"))) {
                 matchDialog = item;
@@ -1443,15 +1443,17 @@ export const windowKeyDown = (app: App, event: KeyboardEvent) => {
         if (!window.siyuan.menus.menu.element.classList.contains("fn__none")) {
             if (window.siyuan.dialogs.length > 0 &&
                 window.siyuan.menus.menu.element.style.zIndex < (window.siyuan.dialogs[0].element.querySelector(".b3-dialog") as HTMLElement).style.zIndex) {
-                // 窗口高于菜单时，先关闭窗口，如 av 修改列 icon 时
+                // When a window is above the menu, close the window first, e.g. when editing a column icon in an
+                // attribute view
             } else {
                 window.siyuan.menus.menu.remove(true);
                 return;
             }
         }
 
-        // 需放在 menus 后，否则资源列中添加资源会先关闭菜单
-        // 需放在 dialog 前，否则属性面板中修改日期会先关闭 dialog，只剩修改界面
+        // This must come after menus, otherwise adding an asset in the assets column would close the menu first
+        // This must come before dialog, otherwise editing a date in the attribute panel would close the dialog
+        // first, leaving only the edit UI
         const avElement = document.querySelector(".av__panel");
         if (avElement) {
             const selectCellElement = document.querySelector(".av__cell--select");
@@ -1462,7 +1464,7 @@ export const windowKeyDown = (app: App, event: KeyboardEvent) => {
             return;
         }
 
-        // 闪卡长按 Esc 光标定位到闪卡按钮上 https://github.com/siyuan-note/siyuan/issues/12989
+        // Flashcards: a long-pressed Esc places the cursor on the flashcard button https://github.com/siyuan-note/siyuan/issues/12989
         // https://github.com/siyuan-note/siyuan/issues/14730
         if (event.repeat && document.activeElement && hasClosestByClassName(document.activeElement, "card__action")) {
             return;
@@ -1501,7 +1503,7 @@ export const windowKeyDown = (app: App, event: KeyboardEvent) => {
             return;
         }
 
-        // 光标在文档树等面板中，按 Esc 回到编辑器中 https://github.com/siyuan-note/siyuan/issues/4289
+        // When the cursor is in a panel such as the file tree, pressing Esc returns focus to the editor https://github.com/siyuan-note/siyuan/issues/4289
         if (getSelection().rangeCount > 0) {
             const range = getSelection().getRangeAt(0);
             if (hasClosestByClassName(range.startContainer, "protyle-content", true)) {
@@ -1693,12 +1695,12 @@ export const windowKeyDown = (app: App, event: KeyboardEvent) => {
         return;
     }
 
-    // 文件树的操作
+    // File tree actions
     if (!isTabWindow && fileTreeKeydown(app, event)) {
         return;
     }
 
-    // 面板的操作
+    // Panel actions
     if (!isTabWindow && panelTreeKeydown(app, event)) {
         return;
     }

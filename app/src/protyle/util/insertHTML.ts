@@ -25,13 +25,17 @@ import {getAvBodyData} from "../render/av/virtualScroll";
 import {processClonePHElement} from "../render/util";
 import {setFold} from "./blockFold";
 
-// 粘贴时临时插入的占位行标记，遍历结束后统一移除，避免污染虚拟滚动的 renderedStart/renderedEnd/spacer 状态
+// Marks a placeholder row temporarily inserted during paste; removed altogether once the traversal ends, to
+// avoid polluting virtual scrolling's renderedStart/renderedEnd/spacer state
 const PLACEHOLDER_ROW_CLASS = "av__row--placeholder";
 
-// 获取当前数据行的下一行。虚拟滚动会把视口外的数据行裁掉，此时 nextElementSibling 指向的是
-// .av__row--util 等非数据行。此处按 data-index 递增，若目标行未渲染则按数据源生成占位行插入后再返回，
-// 使粘贴可以覆盖视口外（被虚拟滚动裁掉的）数据行。nextIndex 超出已有行数时返回 null 以终止遍历。
-// 占位行带 av__row--placeholder 标记，由调用方在粘贴循环结束后移除，以免破坏虚拟滚动状态。
+// Get the row after the current data row. Virtual scrolling trims data rows outside the viewport, in which
+// case nextElementSibling points to a non-data row such as .av__row--util. This increments by data-index, and
+// if the target row hasn't been rendered, generates a placeholder row from the data source and inserts it
+// before returning, so paste can cover data rows outside the viewport (trimmed by virtual scrolling). Returns
+// null once nextIndex exceeds the existing row count, to end the traversal.
+// The placeholder row is marked with av__row--placeholder, and the caller removes it after the paste loop
+// ends, so virtual scrolling state isn't corrupted.
 const getNextDataRow = (currentRowElement: Element): HTMLElement => {
     const nextSibling = currentRowElement.nextElementSibling as HTMLElement;
     if (nextSibling && nextSibling.classList.contains("av__row") &&
@@ -58,7 +62,8 @@ const getNextDataRow = (currentRowElement: Element): HTMLElement => {
     return newRowElement;
 };
 
-// 移除粘贴过程中插入的占位行，使 DOM 恢复到与虚拟滚动 bodyStates 一致的裁剪状态
+// Remove placeholder rows inserted during paste, restoring the DOM to a trimmed state consistent with virtual
+// scrolling's bodyStates
 const removePlaceholderRows = (blockElement: HTMLElement) => {
     blockElement.querySelectorAll("." + PLACEHOLDER_ROW_CLASS).forEach(item => item.remove());
 };
@@ -326,7 +331,7 @@ const processTable = (range: Range, html: string, protyle: IProtyle, blockElemen
         return false;
     }
     const targetCells = getTableRangeCells(tableElement, startCell, endCell);
-    // 按逻辑网格坐标匹配实际单元格，避免 colspan/rowspan 的 fn__none 占位导致内容错位。
+    // Match actual cells by their logical grid coordinates, to avoid content misalignment caused by colspan/rowspan fn__none placeholders.
     const copyCellMap = new Map(copyCells.map(item => [`${item.row}:${item.col}`, item.cell]));
     const matchedCells: { source: HTMLTableCellElement; target: HTMLTableCellElement }[] = [];
     targetCells.forEach(item => {
@@ -353,9 +358,9 @@ const processTable = (range: Range, html: string, protyle: IProtyle, blockElemen
 };
 
 export const insertHTML = (html: string, protyle: IProtyle, isBlock = false,
-                           // 移动端插入嵌入块时，获取到的 range 为旧值
+                           // On mobile, when inserting an embed block the range obtained is a stale value
                            useProtyleRange = false,
-                           // 在开头粘贴块则插入上方
+                           // Pasting a block at the very beginning inserts it above
                            insertByCursor = false) => {
     if (html === "") {
         return;
@@ -374,7 +379,7 @@ export const insertHTML = (html: string, protyle: IProtyle, isBlock = false,
     }
     let blockElement = hasClosestBlock(range.startContainer) as HTMLElement;
     if (!blockElement) {
-        // 使用鼠标点击选则模版提示列表后 range 丢失
+        // The range is lost after using a mouse click to select from the template hint list
         if (protyle.toolbar.range) {
             blockElement = hasClosestBlock(protyle.toolbar.range.startContainer) as HTMLElement;
         } else {
@@ -408,7 +413,7 @@ export const insertHTML = (html: string, protyle: IProtyle, isBlock = false,
     if (!isBlock &&
         (isNodeCodeBlock || protyle.toolbar.getCurrentType(range).includes("code"))) {
         range.deleteContents();
-        // 代码块需保持至少一个 \n https://github.com/siyuan-note/siyuan/pull/13271#issuecomment-2502672155
+        // A code block must keep at least one \n https://github.com/siyuan-note/siyuan/pull/13271#issuecomment-2502672155
         let codeBlockIsEmpty = false;
         if (isNodeCodeBlock && editableElement.textContent === "") {
             codeBlockIsEmpty = true;
@@ -417,7 +422,7 @@ export const insertHTML = (html: string, protyle: IProtyle, isBlock = false,
         range.collapse(false);
         range.insertNode(document.createElement("wbr"));
         if (codeBlockIsEmpty) {
-            // 代码块为空添加的 \n 需放在最后 https://github.com/siyuan-note/siyuan/issues/15399
+            // The \n added for an empty code block must go at the very end https://github.com/siyuan-note/siyuan/issues/15399
             range.collapse(false);
             range.insertNode(document.createTextNode("\n"));
         }
@@ -440,15 +445,15 @@ export const insertHTML = (html: string, protyle: IProtyle, isBlock = false,
     if (range.toString() !== "") {
         const inlineMathElement = hasClosestByAttribute(range.commonAncestorContainer, "data-type", "inline-math");
         if (inlineMathElement) {
-            // 表格内选中数学公式 https://ld246.com/article/1631708573504
+            // Selecting a math formula inside a table https://ld246.com/article/1631708573504
             inlineMathElement.remove();
         } else if (range.startContainer.nodeType === 3 && range.startContainer.parentElement.getAttribute("data-type")?.indexOf("block-ref") > -1) {
-            // 选中 ref**bbb** 后 alt+[
+            // Alt+[ after selecting ref**bbb**
             range.deleteContents();
             // https://github.com/siyuan-note/siyuan/issues/14035
             if (range.startContainer.nodeType !== 3 && (range.startContainer as Element).tagName === "SPAN" &&
                 range.startContainer.textContent === "") {
-                // ref 选中处理 https://ld246.com/article/1629214377537
+                // Handling a selected ref https://ld246.com/article/1629214377537
                 (range.startContainer as HTMLElement).remove();
             }
         } else {
@@ -475,9 +480,9 @@ export const insertHTML = (html: string, protyle: IProtyle, isBlock = false,
         unSpinHTML = html;
     }
 
-    let innerHTML = unSpinHTML || // 在 table 中插入需要使用转换好的行内元素 https://github.com/siyuan-note/siyuan/issues/9358
-        html;   // 空格会被 Spin 不再，需要使用原文
-    // 粘贴纯文本时会进行内部转义，这里需要进行反转义 https://github.com/siyuan-note/siyuan/issues/10620
+    let innerHTML = unSpinHTML || // Inserting into a table requires the already-converted inline elements https://github.com/siyuan-note/siyuan/issues/9358
+        html;   // Spin no longer preserves spaces, so the original text must be used
+    // Pasting plain text internally escapes it, so it needs to be unescaped here https://github.com/siyuan-note/siyuan/issues/10620
     innerHTML = innerHTML.replace(/;;;lt;;;/g, "&lt;").replace(/;;;gt;;;/g, "&gt;");
     tempElement.innerHTML = innerHTML;
 
@@ -493,7 +498,8 @@ export const insertHTML = (html: string, protyle: IProtyle, isBlock = false,
         isBlock = false;
         block2text = true;
     }
-    // 使用 lute 方法会添加 p 元素，只有一个 p 元素或者只有一个字符串或者为 <u>b</u> 时的时候只拷贝内部
+    // Using a lute method adds a p element; only copy the inner content when there's a single p element, a
+    // single string, or something like <u>b</u>
     if (!isBlock) {
         if (tempElement.content.firstChild.nodeType === 3 || block2text ||
             (tempElement.content.firstChild.nodeType !== 3 &&
@@ -502,12 +508,12 @@ export const insertHTML = (html: string, protyle: IProtyle, isBlock = false,
             if (tempElement.content.firstChild.nodeType !== 3 && tempElement.content.firstElementChild.classList.contains("p")) {
                 tempElement.innerHTML = tempElement.content.firstElementChild.firstElementChild.innerHTML.trim();
             }
-            // 粘贴带样式的行内元素到另一个行内元素中需进行切割
+            // Pasting a styled inline element into another inline element requires splitting it
             const spanElement = range.startContainer.nodeType === 3 ? range.startContainer.parentElement : range.startContainer as HTMLElement;
             const splitElements: HTMLElement[] = [];
             if (spanElement.tagName === "SPAN" && spanElement === (range.endContainer.nodeType === 3 ? range.endContainer.parentElement : range.endContainer) &&
-                // 粘贴纯文本不需切割 https://ld246.com/article/1665556907936
-                // emoji 图片需要切割 https://github.com/siyuan-note/siyuan/issues/9370
+                // Pasting plain text doesn't need splitting https://ld246.com/article/1665556907936
+                // An emoji image needs splitting https://github.com/siyuan-note/siyuan/issues/9370
                 tempElement.content.querySelector("span, img")
             ) {
                 const afterElement = document.createElement("span");
@@ -525,24 +531,26 @@ export const insertHTML = (html: string, protyle: IProtyle, isBlock = false,
             range.insertNode(tempElement.content.cloneNode(true));
             range.collapse(false);
             blockElement.querySelector("wbr")?.remove();
-            // 移除行级元素边界插入时产生的空拆分元素，避免相邻标签修复在新标签后插入空格
+            // Remove the empty split element produced when inserting at an inline element's boundary, so
+            // adjacent-tag repair doesn't insert a space after the new tag
             splitElements.forEach((item) => {
                 if (item.childElementCount === 0 && item.textContent.split(Constants.ZWSP).join("") === "") {
                     item.remove();
                 }
             });
-            // 相邻标签之间插入空格区隔，避免后续 SpinBlockDOM 解析时合并为一个标签 https://github.com/siyuan-note/siyuan/issues/18191
+            // Insert a space between adjacent tags as a separator, so a later SpinBlockDOM parse doesn't merge
+            // them into a single tag https://github.com/siyuan-note/siyuan/issues/18191
             fixAdjacentTags(getContenteditableElement(blockElement));
             protyle.wysiwyg.lastHTMLs[id] = oldHTML;
             input(protyle, blockElement as HTMLElement, range);
             return;
         }
     }
-    // 光标是否在列表项的第一个段落块（紧挨 protyle-action）
+    // Whether the caret is in a list item's first paragraph block (right next to protyle-action)
     const isFirstBlockInLi = hasClosestByClassName(blockElement, "li") &&
         blockElement.previousElementSibling?.classList.contains("protyle-action");
     const cursorLiElement = hasClosestByClassName(blockElement, "li");
-    // 粘贴列表到已有列表内时统一列表类型 https://github.com/siyuan-note/siyuan/issues/17890
+    // Unify the list type when pasting a list into an existing list https://github.com/siyuan-note/siyuan/issues/17890
     if (cursorLiElement) {
         const targetSubtype = cursorLiElement.getAttribute("data-subtype");
         const firstChild = tempElement.content.firstElementChild;
@@ -580,7 +588,7 @@ export const insertHTML = (html: string, protyle: IProtyle, isBlock = false,
     }
     let isListPaste = false;
     let keepEmptyBlock = false;
-    // 列表项不能单独进行粘贴 https://ld246.com/article/1628681120576/comment/1628681209731#comments
+    // A list item can't be pasted on its own https://ld246.com/article/1628681120576/comment/1628681209731#comments
     if (tempElement.content.children[0]?.getAttribute("data-type") === "NodeListItem") {
         isListPaste = true;
         if (cursorLiElement) {
@@ -598,7 +606,7 @@ export const insertHTML = (html: string, protyle: IProtyle, isBlock = false,
         const hasRefCount = sourceList.querySelector(".protyle-attr--refcount");
         if (!hasRefCount) {
             isListPaste = true;
-            // 顶层空列表项粘贴列表块时拆开为同级列表项 https://github.com/siyuan-note/siyuan/issues/17890
+            // Pasting a list block into a top-level empty list item splits it into sibling list items https://github.com/siyuan-note/siyuan/issues/17890
             blockElement = cursorLiElement as HTMLElement;
             id = blockElement.getAttribute("data-node-id");
             oldHTML = blockElement.outerHTML;
@@ -612,7 +620,8 @@ export const insertHTML = (html: string, protyle: IProtyle, isBlock = false,
                 tempElement.content.appendChild(listElement.firstElementChild);
             }
         } else {
-            // 有 refcount 的列表直接作为子列表插入到空段落后，不拆开不清理 https://github.com/siyuan-note/siyuan/issues/17890
+            // A list with a refcount is inserted directly as a nested list after the empty paragraph, without
+            // splitting or cleanup https://github.com/siyuan-note/siyuan/issues/17890
             keepEmptyBlock = true;
         }
     }
@@ -697,7 +706,7 @@ export const insertHTML = (html: string, protyle: IProtyle, isBlock = false,
         }
     });
     if (editableElement && editableElement.textContent === "" && blockElement.classList.contains("p") && !keepEmptyBlock) {
-        // 选中当前块所有内容粘贴再撤销会导致异常 https://ld246.com/article/1662542137636
+        // Selecting all content in the current block, pasting, then undoing causes an anomaly https://ld246.com/article/1662542137636
         doOperation.find((item, index) => {
             if (item.id === id) {
                 doOperation.splice(index, 1);
@@ -708,7 +717,7 @@ export const insertHTML = (html: string, protyle: IProtyle, isBlock = false,
             action: "delete",
             id
         });
-        // 选中当前块所有内容粘贴再撤销会导致异常 https://ld246.com/article/1662542137636
+        // Selecting all content in the current block, pasting, then undoing causes an anomaly https://ld246.com/article/1662542137636
         undoOperation.find((item, index) => {
             if (item.id === id && item.action === "update") {
                 undoOperation.splice(index, 1);
@@ -731,7 +740,7 @@ export const insertHTML = (html: string, protyle: IProtyle, isBlock = false,
     protyle.wysiwyg.element.querySelectorAll("wbr").forEach(item => {
         item.remove();
     });
-    // 复制容器块中包含折叠标题块
+    // A copied container block contains a fold heading block
     protyle.wysiwyg.element.querySelectorAll("[parent-heading]").forEach(item => {
         item.remove();
     });
@@ -756,24 +765,24 @@ export const insertHTML = (html: string, protyle: IProtyle, isBlock = false,
         });
         return;
     }
-    // 粘贴到空列表项（第一个段落为空）后删除空列表项 https://github.com/siyuan-note/siyuan/issues/17890
+    // After pasting into an empty list item (whose first paragraph is empty), delete the empty list item https://github.com/siyuan-note/siyuan/issues/17890
     if (isListPaste && cursorLiElement && isFirstBlockInLi) {
         const editEl = getContenteditableElement(cursorLiElement);
         if (editEl && editEl.textContent.replace(Constants.ZWSP, "").trim() === "") {
-            // 把空列表项的子列表移到粘贴的最后一项下面
+            // Move the empty list item's nested list under the last pasted item
             const subList = cursorLiElement.querySelector(":scope > [data-type='NodeList']");
             if (subList && lastElement && lastElement.classList.contains("li")) {
                 const movedList = subList.cloneNode(true) as HTMLElement;
                 const existSubList = lastElement.querySelector(":scope > [data-type='NodeList']");
                 if (existSubList) {
-                    // 最后一项已有子列表，合并子列表项
+                    // The last item already has a nested list, so merge the list items into it
                     Array.from(movedList.querySelectorAll(":scope > .li")).forEach(li => {
                         existSubList.appendChild(li);
                     });
                 } else {
                     lastElement.appendChild(movedList);
                 }
-                // 更新最后一项的 update 操作 data
+                // Update the data of the insert operation for the last item
                 const lastUpdateOp = doOperation.find(op => op.action === "insert" && op.id === lastElement.getAttribute("data-node-id"));
                 if (lastUpdateOp) {
                     lastUpdateOp.data = lastElement.outerHTML;
@@ -792,20 +801,20 @@ export const insertHTML = (html: string, protyle: IProtyle, isBlock = false,
             cursorLiElement.remove();
         }
     }
-    // 粘贴后修正有序列表序号 https://github.com/siyuan-note/siyuan/issues/17890
+    // Fix the ordered-list numbering after pasting https://github.com/siyuan-note/siyuan/issues/17890
     const orderLists = new Set<Element>();
     if (cursorLiElement) {
-        // cursorLiElement 可能已被清理删除，用 parentList 引用
+        // cursorLiElement may have already been cleaned up and removed, so reference it via parentList
         const cursorList = cursorLiElement.classList.contains("list") ? cursorLiElement : cursorLiElement.parentElement;
         if (cursorList?.getAttribute("data-subtype") === "o") {
             orderLists.add(cursorList);
         }
-        // 粘贴的最后一项所在的列表
+        // The list containing the last pasted item
         if (lastElement?.parentElement?.getAttribute("data-subtype") === "o") {
             orderLists.add(lastElement.parentElement);
         }
     }
-    // 粘贴产生的子列表也可能是有序列表
+    // A nested list produced by the paste may also be an ordered list
     doOperation.forEach(op => {
         if (op.action === "insert") {
             const tempEl = document.createElement("template");
@@ -819,7 +828,7 @@ export const insertHTML = (html: string, protyle: IProtyle, isBlock = false,
         }
     });
     orderLists.forEach(orderList => {
-        // 保存原有列表项的原始状态用于撤销
+        // Save the original state of existing list items, for undo
         const originalItems: {id: string, html: string}[] = [];
         orderList.querySelectorAll(":scope > .li").forEach(li => {
             const liId = li.getAttribute("data-node-id");
@@ -828,7 +837,7 @@ export const insertHTML = (html: string, protyle: IProtyle, isBlock = false,
             }
         });
         updateListOrder(orderList);
-        // 更新 doOperation 中受影响列表项的 data，原有项补充 update 操作用于撤销
+        // Update the data of affected list items in doOperation; add an update operation for existing items, for undo
         orderList.querySelectorAll(":scope > .li").forEach(li => {
             const liId = li.getAttribute("data-node-id");
             const op = doOperation.find(o => o.id === liId && o.action === "insert");

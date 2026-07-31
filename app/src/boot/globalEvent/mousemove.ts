@@ -40,7 +40,7 @@ const getRightBlock = (element: HTMLElement, x: number, y: number) => {
 
 export const windowMouseMove = (event: MouseEvent, mouseIsEnter: boolean) => {
     if (document.body.classList.contains("body--blur") || document.getElementById("progress")) {
-        // 非激活状态下不执行 https://ld246.com/article/1693474547631
+        // Don't run while the window is inactive https://ld246.com/article/1693474547631
         return;
     }
     // https://github.com/siyuan-note/siyuan/pull/8793
@@ -72,12 +72,13 @@ export const windowMouseMove = (event: MouseEvent, mouseIsEnter: boolean) => {
     const target = event.target as Element;
     // Dock
     if (!mouseIsEnter &&
-        event.buttons === 0 &&  // 鼠标按键被按下时不触发
+        event.buttons === 0 &&  // Don't trigger while a mouse button is pressed
         window.siyuan.layout.bottomDock &&
         !isWindow()) {
         if (event.clientX < Math.max(document.getElementById("dockLeft").clientWidth + 1, 16)) {
             if (!window.siyuan.layout.leftDock.pin && window.siyuan.layout.leftDock.layout.element.clientWidth > 0 &&
-                // 隐藏停靠栏会导致点击两侧内容触发浮动面板弹出，因此需减小鼠标范围
+                // Hiding the dock bar would cause clicking content on either side to trigger the floating panel
+                // to pop up, so the mouse detection range needs to be narrowed
                 (window.siyuan.layout.leftDock.elements[0].clientWidth > 0 || (window.siyuan.layout.leftDock.elements[0].clientWidth === 0 && event.clientX < 8))) {
                 if (event.clientY > document.getElementById("toolbar").clientHeight &&
                     event.clientY < window.innerHeight - document.getElementById("status").clientHeight) {
@@ -117,7 +118,7 @@ export const windowMouseMove = (event: MouseEvent, mouseIsEnter: boolean) => {
     // gutter
     const eventPath0 = event.composedPath()[0] as HTMLElement;
     if (eventPath0 && eventPath0.nodeType !== 3 && eventPath0.classList.contains("protyle-wysiwyg") && eventPath0.style.paddingLeft) {
-        // 光标在编辑器右边也需要进行显示
+        // Also show it when the cursor is at the right edge of the editor
         const mouseElement = document.elementFromPoint(eventPath0.getBoundingClientRect().left + parseInt(eventPath0.style.paddingLeft) + 13, event.clientY);
         const blockElement = hasClosestBlock(mouseElement);
         if (blockElement) {
@@ -170,7 +171,8 @@ export const windowMouseMove = (event: MouseEvent, mouseIsEnter: boolean) => {
         eventPath0.classList.contains("list") ||
         (eventPath0.classList.contains("protyle-action") && eventPath0.parentElement.getAttribute("data-type") === "NodeListItem")
     )) {
-        // 光标在列表下部应显示右侧的元素，而不是列表本身
+        // When the cursor is in the lower part of a list, the element to the right should be shown instead of the
+        // list itself
         const targetBlockElement = getRightBlock(eventPath0, eventPath0.getBoundingClientRect().left + 1, event.clientY);
         if (!targetBlockElement) {
             return;
@@ -216,7 +218,7 @@ export const windowMouseMove = (event: MouseEvent, mouseIsEnter: boolean) => {
     }
 
     if (eventPath0 && eventPath0.nodeType !== 3 && eventPath0.classList.contains("av")) {
-        // 数据库居中时光标在数据库侧边 https://github.com/siyuan-note/siyuan/issues/13853
+        // The cursor is at the side of the attribute view when it is centered https://github.com/siyuan-note/siyuan/issues/13853
         if (eventPath0.getAttribute("data-type") === "NodeAttributeView") {
             const rowElement = hasClosestByClassName(document.elementFromPoint(eventPath0.firstElementChild.getBoundingClientRect().left + 10, event.clientY), "av__row");
             if (rowElement && !rowElement.classList.contains("av__row--header")) {
@@ -257,7 +259,8 @@ export const windowMouseMove = (event: MouseEvent, mouseIsEnter: boolean) => {
                 const rect = cellElement.getBoundingClientRect();
                 if (rect.right - event.clientX < 3 && rect.right - event.clientX > 0) {
                     resizeElement.setAttribute("data-col-index", (getColIndex(cellElement) + cellElement.colSpan - 1).toString());
-                    // 记录基础 left（不含 scrollLeft），以便横向滚动后重新定位 https://github.com/siyuan-note/siyuan/issues/13828
+                    // Record the base left (excluding scrollLeft) so it can be repositioned after horizontal
+                    // scrolling https://github.com/siyuan-note/siyuan/issues/13828
                     resizeElement.setAttribute("data-left", (cellElement.offsetWidth + cellElement.offsetLeft - 3).toString());
                     resizeElement.setAttribute("style", `top:${captionHeight}px;height:${tableHeight}px;left: ${Math.round(cellElement.offsetWidth + cellElement.offsetLeft - blockElement.firstElementChild.scrollLeft - 3)}px;display:block`);
                 } else if (event.clientX - rect.left < 3 && event.clientX - rect.left > 0 && cellElement.previousElementSibling) {

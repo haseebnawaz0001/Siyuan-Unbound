@@ -101,8 +101,9 @@ func agentChat(c *gin.Context) {
 	if maxRetries < 0 {
 		maxRetries = 0
 	}
-	// Provider 请求超时只限制建立上游流；流建立后由可重置的空闲超时检测连续无输出，
-	// 避免持续正常输出的长回答被固定截止时间中断。
+	// The provider's request timeout only bounds establishing the upstream stream; once the stream is established,
+	// a resettable idle timeout detects sustained no-output periods instead, so a long-running response with
+	// continuous normal output isn't cut off by a fixed deadline.
 	requestTimeout := time.Duration(selectedProvider.RequestTimeout) * time.Second
 	if requestTimeout <= 0 {
 		requestTimeout = 30 * time.Second
@@ -114,8 +115,8 @@ func agentChat(c *gin.Context) {
 
 	app := c.GetHeader("X-SiYuan-App-ID")
 
-	// 实例级互斥：同一 session 同时只允许一个活跃流。
-	// 检查和占用在同一把锁内完成，成功占用后才启动 Agent goroutine。
+	// Instance-level mutual exclusion: only one active stream is allowed per session at a time.
+	// The check and the claim happen within the same lock; the Agent goroutine is only started after the claim succeeds.
 	sessionsMu.Lock()
 	if _, ok := runningSessions[req.SessionID]; ok {
 		sessionsMu.Unlock()
@@ -163,7 +164,7 @@ func agentChat(c *gin.Context) {
 		defer deadlineTimer.Stop()
 	}
 
-	// 通知其他实例：该会话的流已开始，镜像端可显示"对话进行中"占位。
+	// Notify other instances: this session's stream has started, so mirroring clients can show a "conversation in progress" placeholder.
 	broadcastAgentSessionChanged(app, req.SessionID, "streamStart")
 
 	for {
@@ -445,7 +446,7 @@ func removeSession(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, ret)
 		return
 	}
-	// 通知其他实例：会话已删除，刷新列表；若为当前会话则清空视图。
+	// Notify other instances: the session has been deleted, so refresh the list; if it was the current session, clear the view.
 	broadcastAgentSessionChanged(c.GetHeader("X-SiYuan-App-ID"), req.ID, "delete")
 	ret := gulu.Ret.NewResult()
 	c.JSON(http.StatusOK, ret)
@@ -513,8 +514,9 @@ func saveSession(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, ret)
 			return
 		}
-		// 旧前端没有 commitTurnID。流已真正结束后，从终止检查点补出提交标识；SaveSession 仍会
-		// 用 runtime 重建权威内容，因此不会信任旧前端可能不完整的流式快照。
+		// Older frontends don't send commitTurnID. Once the stream has truly ended, recover the commit ID from the
+		// termination checkpoint; SaveSession still rebuilds the authoritative content from the runtime, so it
+		// never trusts a possibly incomplete streaming snapshot from an older frontend.
 		if commitTurnID == "" && c.GetHeader("X-SiYuan-Agent-Checkpoint") != "2" {
 			recoverableTurnID, runtimeErr := agent.RecoverableTurnID(meta.ID)
 			if runtimeErr != nil {
@@ -549,8 +551,9 @@ func saveSession(c *gin.Context) {
 			}
 		}
 	}
-	// 已占用会话但尚未收到本轮 turn 事件，通常表示 Agent 初始化失败。此时若磁盘上仍有旧的
-	// 未提交 turn，不能让无 commitTurnID 的普通保存绕过恢复协议并覆盖它。
+	// A session that's claimed but hasn't yet received a turn event for this round usually indicates the Agent
+	// failed to initialize. In that case, if an old uncommitted turn still exists on disk, a plain save without a
+	// commitTurnID must not be allowed to bypass the recovery protocol and overwrite it.
 	if commitTurnID == "" && (running == nil || running.turnID == "") {
 		uncommitted, runtimeErr := agent.HasUncommittedTurn(meta.ID)
 		if runtimeErr != nil {
@@ -593,8 +596,9 @@ func saveSession(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, ret)
 		return
 	}
-	// 从 body 解出 sessionID 用于广播。update 仅触发其他实例刷新会话列表元数据，
-	// 不触发当前视图重绘（重绘由 streamEnd 负责），回避流式中途半截数据的时序问题。
+	// Extract sessionID from the body for broadcasting. "update" only triggers other instances to refresh their
+	// session list metadata, not a redraw of the current view (that's streamEnd's job), avoiding timing issues
+	// from partial mid-stream data.
 	broadcastAgentSessionChanged(c.GetHeader("X-SiYuan-App-ID"), meta.ID, "update")
 	ret := gulu.Ret.NewResult()
 	data := map[string]any{"revision": revision}
@@ -605,8 +609,10 @@ func saveSession(c *gin.Context) {
 	c.JSON(http.StatusOK, ret)
 }
 
-// broadcastAgentSessionChanged 向除发起者 app 外、所有打开了 agentChat dock 的实例推送会话变更通知。
-// action: streamStart / streamEnd / update / delete。排除发起者 app（它已通过 SSE 自渲染或本地持有最新状态）。
+// broadcastAgentSessionChanged pushes a session-change notification to every instance with the agentChat dock open,
+// except the originating app.
+// action: streamStart / streamEnd / update / delete. The originating app is excluded (it already self-renders via
+// SSE or holds the latest state locally).
 func broadcastAgentSessionChanged(app, sessionID, action string) {
 	if "" == app || "" == sessionID {
 		return
@@ -615,7 +621,8 @@ func broadcastAgentSessionChanged(app, sessionID, action string) {
 	util.BroadcastByTypeAndExcludeApp(app, "agentChat", "agentSessionChanged", 0, "", data)
 }
 
-// sessionMeta 用于从 saveSession 的 body 中解析出会话 ID，agent 包内也有同名字段，此处独立定义避免循环依赖。
+// sessionMeta is used to parse the session ID out of saveSession's body; the agent package has a field of the same
+// name, but it's defined independently here to avoid a circular dependency.
 type sessionMeta struct {
 	ID             string `json:"id"`
 	CommitTurnID   string `json:"commitTurnID"`

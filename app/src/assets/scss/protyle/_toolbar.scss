@@ -62,7 +62,7 @@
     z-index: 5;
     overflow: auto;
     max-height: min(402px, 40vh);
-    // 不能使用，否则 hint emoji 出现双滚动条 box-sizing: border-box;
+    // Must not use this, otherwise the hint emoji list gets a double scrollbar: box-sizing: border-box;
     padding: 8px 0;
     display: flex;
     flex-direction: column;
@@ -87,7 +87,8 @@
       width: 100vw;
     }
 
-    // 行号栏与文本域共同的滚动容器，二者同高，由父层统一滚动，避免 JS 同步滚动
+    // Shared scroll container for the line-number gutter and the textarea; both are the same
+    // height and scroll together via the parent, avoiding the need for JS to sync scrolling
     &__scroll {
       overflow: auto;
       width: 100%;

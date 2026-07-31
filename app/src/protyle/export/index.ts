@@ -18,7 +18,7 @@ import {isEncryptedBox} from "../../util/pathName";
 const getPluginStyle = async () => {
     const response = await fetchSyncPost("/api/petal/loadPetals", {frontend: getFrontend()});
     let css = "";
-    // 为加快启动速度，不进行 await
+    // To speed up startup, no await is performed
     response.data.forEach((item: IPluginData) => {
         css += item.css || "";
     });
@@ -36,7 +36,7 @@ export const saveExport = (option: IExportOptions) => {
     if (["html", "htmlmd"].includes(option.type)) {
         const startExport = () => {
         const msgId = showMessage(window.siyuan.languages.exporting, -1);
-        // 浏览器环境：先调用 API 生成资源文件，再在前端生成完整的 HTML
+        // Browser environment: first call the API to generate the asset files, then generate the complete HTML on the frontend
         const url = option.type === "htmlmd" ? "/api/export/exportMdHTML" : "/api/export/exportHTML";
         fetchPost(url, {
             id: option.id,
@@ -56,7 +56,9 @@ export const saveExport = (option: IExportOptions) => {
                     showMessage(window.siyuan.languages._kernel[14].replace("%s", zipResponse.msg), 0, "error");
                     return;
                 }
-                // 与导出 .sy.zip/markdown.zip/图片一致，统一走 saveExportFile，以便移动端原生 App 调用 JSAndroid.saveExportFile 等接口保存到本地
+                // Consistent with exporting .sy.zip/markdown.zip/images, uniformly goes through
+                // saveExportFile, so the mobile native app can call interfaces like
+                // JSAndroid.saveExportFile to save it locally
                 saveExportFile(zipResponse.data.zip, msgId);
             });
         });
@@ -410,9 +412,9 @@ ${getIconScript(servePath)}
         width = width / parseFloat(document.querySelector("#scale").value);
         previewElement.style.width = width + "px";
         width = width - parseFloat(previewElement.style.paddingLeft) * 96 * 2;
-        // 为保持代码块宽度一致，全部都进行宽度设定 https://github.com/siyuan-note/siyuan/issues/7692 
+        // Set the width on all of them, to keep code block widths consistent https://github.com/siyuan-note/siyuan/issues/7692
         previewElement.querySelectorAll('.hljs').forEach((item) => {
-            // 强制换行 https://ld246.com/article/1679228783553
+            // Force line wrapping https://ld246.com/article/1679228783553
             item.parentElement.setAttribute("linewrap", "true");
             item.parentElement.style.width = "";
             item.parentElement.style.boxSizing = "border-box";
@@ -421,7 +423,7 @@ ${getIconScript(servePath)}
         })
         Protyle.highlightRender(previewElement, "${servePath}stage/protyle", document.querySelector("#scale").value);
         previewElement.querySelectorAll('[data-type="NodeMathBlock"]').forEach((item) => {
-            // 超级块内不能移除 width https://github.com/siyuan-note/siyuan/issues/14318
+            // width cannot be removed inside a super block https://github.com/siyuan-note/siyuan/issues/14318
             item.removeAttribute('data-render');
         })
         previewElement.querySelectorAll('[data-type="NodeCodeBlock"][data-subtype="mermaid"] svg').forEach((item) => {
@@ -553,7 +555,7 @@ ${getIconScript(servePath)}
                 if (target.tagName === "A") {
                     const linkAddress = target.getAttribute("href");
                     if (linkAddress.startsWith("#")) {
-                        // 导出预览模式点击块引转换后的脚注跳转不正确 https://github.com/siyuan-note/siyuan/issues/5700
+                        // In export preview mode, clicking a footnote converted from a block ref jumps incorrectly https://github.com/siyuan-note/siyuan/issues/5700
                         const hash = linkAddress.substring(1);
                         previewElement.querySelector('[data-node-id="' + hash + '"], [id="' + hash + '"]').scrollIntoView();
                         event.stopPropagation();
@@ -864,7 +866,7 @@ ${getIconScript(servePath)}
     });
 </script>
 ${getSnippetJS()}</body></html>`;
-    // 移动端导出 pdf、浏览器导出 HTML
+    // Mobile PDF export, browser HTML export
     if (typeof filePath === "undefined") {
         return html;
     }

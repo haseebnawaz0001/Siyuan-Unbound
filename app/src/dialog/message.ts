@@ -31,7 +31,7 @@ export const initMessage = () => {
     });
 };
 
-// type: info/error; timeout: 0 手动关闭；-1 永不关闭
+// type: info/error; timeout: 0 means close manually; -1 means never close
 export const showMessage = (message: string, timeout = 6000, type = "info", messageId?: string) => {
     if (!message) {
         return;
@@ -73,7 +73,7 @@ data-message-id="${messageId || ""}">${message}</div>`);
     let messageHTML = `<div data-id="${id}" class="b3-snackbar--hide b3-snackbar${type === "error" ? " b3-snackbar--error" : ""}"><div data-type="textMenu" class="b3-snackbar__content${timeout === 0 ? " b3-snackbar__content--close" : ""}">${messageVersion}</div>`;
     if (timeout === 0) {
         messageHTML += '<svg class="b3-snackbar__close"><use xlink:href="#iconCloseRound"></use></svg>';
-    } else if (timeout !== -1) { // -1 时需等待请求完成后手动关闭
+    } else if (timeout !== -1) { // With -1, wait for the request to finish and close manually
         const timeoutId = window.setTimeout(() => {
             hideMessage(id);
         }, timeout);

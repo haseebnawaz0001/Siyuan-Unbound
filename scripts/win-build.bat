@@ -49,11 +49,11 @@ if "%TARGET%"=="amd64" (
 ) else if "%TARGET%"=="arm64" (
     set BUILD_ARM64=1
 ) else if "%TARGET%"=="appx-amd64" (
-    REM appx 阶段依赖 electron-builder 产出的 win-unpacked 目录，需连带构建 amd64 electron
+    REM The appx stage depends on the win-unpacked directory produced by electron-builder, so amd64 electron must also be built
     set BUILD_AMD64=1
     set BUILD_APPX_AMD64=1
 ) else if "%TARGET%"=="appx-arm64" (
-    REM appx 阶段依赖 electron-builder 产出的 win-arm64-unpacked 目录，需连带构建 arm64 electron
+    REM The appx stage depends on the win-arm64-unpacked directory produced by electron-builder, so arm64 electron must also be built
     set BUILD_ARM64=1
     set BUILD_APPX_ARM64=1
 ) else (
@@ -206,7 +206,7 @@ if defined BUILD_APPX_ARM64 (
 )
 :skipappx
 
-REM 打包完成后再建硬链接，避免将 siyuan.exe 打进安装包
+REM Create the hard link only after packaging is done, to avoid bundling siyuan.exe into the installer
 if defined BUILD_AMD64 (
     mklink /H "%PROJECT_ROOT%\app\kernel\siyuan.exe" "%PROJECT_ROOT%\app\kernel\SiYuan-Kernel.exe"
 )
@@ -219,5 +219,5 @@ echo ==============================
 echo       Build successful!
 echo ==============================
 
-REM 返回初始目录
+REM Return to the initial directory
 cd /d "%INITIAL_DIR%"

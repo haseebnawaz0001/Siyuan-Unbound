@@ -133,7 +133,7 @@ export class Bookmark extends Model {
             },
         });
         this.bindDropEvent();
-        // 为了快捷键的 dispatch
+        // For dispatching the keyboard shortcut
         this.element.querySelector('[data-type="collapse"]').addEventListener("click", () => {
             this.tree.collapseAll();
         });

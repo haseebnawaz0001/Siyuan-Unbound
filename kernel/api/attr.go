@@ -86,7 +86,7 @@ func setBlockAttrs(c *gin.Context) {
 
 	attrs := arg["attrs"].(map[string]any)
 	if 1 == len(attrs) && "" != attrs["scroll"] {
-		// 不记录用户指南滚动位置
+		// Don't record the scroll position for the user guide
 		if b := treenode.GetBlockTree(id); nil != b && (model.IsUserGuide(b.BoxID)) {
 			attrs["scroll"] = ""
 		}
@@ -94,7 +94,7 @@ func setBlockAttrs(c *gin.Context) {
 
 	nameValues := map[string]string{}
 	for name, value := range attrs {
-		if nil == value { // API `setBlockAttrs` 中如果存在属性值设置为 `null` 时移除该属性 https://github.com/siyuan-note/siyuan/issues/5577
+		if nil == value { // In the `setBlockAttrs` API, if an attribute value is set to `null`, remove that attribute https://github.com/siyuan-note/siyuan/issues/5577
 			nameValues[name] = ""
 		} else {
 			strValue, ok := value.(string)

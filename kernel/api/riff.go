@@ -84,7 +84,7 @@ func resetRiffCards(c *gin.Context) {
 	typ := arg["type"].(string)      // notebook, tree, deck
 	id := arg["id"].(string)         // notebook ID, root ID, deck ID
 	deckID := arg["deckID"].(string) // deck ID
-	blockIDsArg := arg["blockIDs"]   // 如果不传入 blockIDs （或者传入实参为空数组），则重置所有卡片
+	blockIDsArg := arg["blockIDs"]   // If blockIDs is not passed (or an empty array is passed), reset all cards
 	var blockIDs []string
 	if nil != blockIDsArg {
 		for _, blockID := range blockIDsArg.([]any) {
@@ -331,7 +331,7 @@ func removeRiffCards(c *gin.Context) {
 		deck := model.Decks[deckID]
 		ret.Data = deckData(deck)
 	}
-	// All 卡包不返回数据
+	// The "All" deck doesn't return data
 }
 
 func addRiffCards(c *gin.Context) {

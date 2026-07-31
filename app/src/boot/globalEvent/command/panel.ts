@@ -295,7 +295,7 @@ export const execByCommand = async (options: {
         fileLiElements = Array.from(files.element.querySelectorAll(".b3-list-item--focus"));
     }
 
-    // 全局命令，在没有 protyle 和文件树没聚焦的情况下执行
+    // Global command, executed when there is no protyle and the file tree isn't focused
     if ((!protyle && !isFileFocus) ||
         (isFileFocus && (!fileLiElements || fileLiElements.length === 0)) ||
         (isMobile() && !document.getElementById("empty").classList.contains("fn__none"))) {

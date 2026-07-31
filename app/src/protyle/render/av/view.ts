@@ -8,7 +8,7 @@ import {escapeAriaLabel, escapeAttr, escapeHtml} from "../../../util/escape";
 import {hasClosestByClassName} from "../../util/hasClosest";
 import {Constants} from "../../../constants";
 
-// countFilterLeaves 递归统计过滤节点树中的叶子数量（分组不计入）。
+// countFilterLeaves recursively counts the number of leaves in the filter node tree (groups are not counted).
 const countFilterLeaves = (filters: IAVFilter[]): number => {
     let count = 0;
     const walk = (nodes: IAVFilter[]) => {

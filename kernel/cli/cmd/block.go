@@ -203,7 +203,7 @@ var blockInsertCmd = &cobra.Command{
 			return nil
 		}
 
-		// 仅靠 parentID 定位目标时（无 previousID），目标必须是容器块，否则非法嵌套
+		// When the target is located by parentID alone (no previousID), the target must be a container block, otherwise it's an illegal nesting
 		if previousID == "" {
 			if err := treenode.CheckContainerParent(parentID); err != nil {
 				return err
@@ -248,7 +248,7 @@ var blockAppendCmd = &cobra.Command{
 			return nil
 		}
 
-		// append 只用 parentID 定位目标，目标必须是容器块，否则非法嵌套
+		// append locates the target using parentID only; the target must be a container block, otherwise it's an illegal nesting
 		if err := treenode.CheckContainerParent(parentID); err != nil {
 			return err
 		}
@@ -290,7 +290,7 @@ var blockPrependCmd = &cobra.Command{
 			return nil
 		}
 
-		// prepend 只用 parentID 定位目标，目标必须是容器块，否则非法嵌套
+		// prepend locates the target using parentID only; the target must be a container block, otherwise it's an illegal nesting
 		if err := treenode.CheckContainerParent(parentID); err != nil {
 			return err
 		}
@@ -407,7 +407,7 @@ var blockMoveCmd = &cobra.Command{
 			return nil
 		}
 
-		// 仅靠 parentID 定位目标时（无 previousID），目标必须是容器块，否则非法嵌套
+		// When the target is located by parentID alone (no previousID), the target must be a container block, otherwise it's an illegal nesting
 		if previousID == "" {
 			if err := treenode.CheckListItemNesting(parentID, id); err != nil {
 				return err

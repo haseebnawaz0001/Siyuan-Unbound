@@ -24,9 +24,12 @@ import (
 	"github.com/siyuan-note/siyuan/kernel/util"
 )
 
-// init 把加密相关的回调注入各底层包，让它们能查询 box 的 DEK / 加密状态。
-// filesys / av / sql / treenode 不能直接 import model（循环依赖），故通过回调注入。
-// sql / treenode 的路由函数据此 fail-closed：加密笔记本未解锁时绝不回退全局库。
+// init injects encryption-related callbacks into the underlying packages so they can query a box's
+// DEK / encryption state.
+// filesys / av / sql / treenode cannot import model directly (circular dependency), so callback
+// injection is used instead.
+// Based on this, the routing functions in sql / treenode fail closed: they never fall back to the
+// global database when an encrypted notebook is locked.
 func init() {
 	filesys.DEKProvider = GetDEKIfUnlocked
 	filesys.DEKLockAcquire = HoldBoxReadLock
@@ -46,7 +49,8 @@ func init() {
 	sql.IsEncryptedBoxFn = IsEncryptedBox
 	treenode.IsEncryptedBoxFn = IsEncryptedBox
 	util.ReloadDocInfoGuard = func(boxID string) bool {
-		// 加密笔记本锁定后丢弃延迟 reloadDocInfo 广播，防止明文元数据泄漏
+		// Once an encrypted notebook is locked, drop the deferred reloadDocInfo broadcast to prevent
+		// plaintext metadata leakage
 		if !IsEncryptedBox(boxID) {
 			return true
 		}

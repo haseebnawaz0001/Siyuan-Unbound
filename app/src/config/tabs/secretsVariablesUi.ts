@@ -11,7 +11,7 @@ interface NamedItem {
     value: string;
 }
 
-// region 密钥区块（Secrets）
+// region Secrets block
 
 export const getSecretsBlockKeywords = (): string[] => [
     window.siyuan.languages.secrets,
@@ -105,7 +105,7 @@ const getSecretName = (el: HTMLElement): string | undefined =>
 
 // endregion
 
-// region 变量区块（Variables）
+// region Variables block
 
 export const getVariablesBlockKeywords = (): string[] => [
     window.siyuan.languages.variables,
@@ -199,7 +199,7 @@ const getVariableName = (el: HTMLElement): string | undefined =>
 
 // endregion
 
-// region 共享渲染与弹窗
+// region Shared rendering and dialogs
 
 interface RenderNamedItemListOptions {
     listEl: Element;

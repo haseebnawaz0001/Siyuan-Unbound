@@ -95,7 +95,7 @@ ${unicode2Emoji(emoji.unicode)}</button>`;
 
                     emojisContentElement.scrollTo({
                         top: titleElement.offsetTop,
-                        // behavior: "smooth"  不能使用，否则无法定位
+                        // behavior: "smooth" cannot be used, otherwise it cannot be positioned
                     });
                 }
                 return;
@@ -104,7 +104,7 @@ ${unicode2Emoji(emoji.unicode)}</button>`;
             if (emojiElement) {
                 const unicode = emojiElement.getAttribute("data-unicode");
                 if (this.element.querySelectorAll(".emojis__title").length > 2) {
-                    // /emoji 后会自动添加冒号，导致 range 无法计算，因此不依赖 this.fill
+                    // A colon is automatically added after /emoji, which makes the range uncomputable, so this doesn't rely on this.fill
                     const range = getSelection().getRangeAt(0);
                     if (range.endContainer.nodeType !== 3) {
                         range.endContainer.childNodes[range.endOffset - 1]?.remove();
@@ -139,7 +139,7 @@ ${unicode2Emoji(emoji.unicode)}</button>`;
             return;
         }
         protyle.toolbar.range = getSelection().getRangeAt(0);
-        // 粘贴后 range.startContainer 为空 https://github.com/siyuan-note/siyuan/issues/7360
+        // After pasting, range.startContainer is empty https://github.com/siyuan-note/siyuan/issues/7360
         if (protyle.toolbar.range.startContainer.nodeType === 3 && protyle.toolbar.range.startContainer.textContent === "") {
             const lastSibling = hasPreviousSibling(protyle.toolbar.range.startContainer) as Text;
             if (lastSibling && lastSibling.nodeType === 3) {
@@ -272,7 +272,7 @@ ${unicode2Emoji(emoji.unicode)}</button>`;
             hintsHTML = '<input style="margin:0 8px 4px 8px" class="b3-text-field"><div style="flex: 1;overflow:auto;">';
         }
         data.forEach((hintData, i) => {
-            // https://github.com/siyuan-note/siyuan/issues/1229 提示时，新建文件不应默认选中
+            // https://github.com/siyuan-note/siyuan/issues/1229 When hinting, "create new file" should not be selected by default
             let focusClass = "";
             if ((i === 1 && data[i].focus) ||
                 (i === 0 && (data.length === 1 || !data[1].focus))) {
@@ -337,7 +337,7 @@ ${unicode2Emoji(emoji.unicode)}</button>`;
             searchElement.select();
             searchElement.addEventListener("keydown", (event: KeyboardEvent) => {
                 if (event.key !== "Meta" && event.key !== "Control") {
-                    // 需要冒泡以满足光标在块标位置时 ctrl 弹出悬浮层
+                    // Must bubble so that Ctrl still shows the floating layer when the cursor is at the gutter button
                     event.stopPropagation();
                 }
                 if (event.isComposing) {
@@ -389,7 +389,7 @@ ${unicode2Emoji(emoji.unicode)}</button>`;
             response.data.blocks.forEach((item: IBlock, index: number) => {
                 let blockRefHTML;
                 if (source === "av") {
-                    // av 搜索时需要获取值 https://github.com/siyuan-note/siyuan/issues/12020
+                    // The value needs to be fetched during av search https://github.com/siyuan-note/siyuan/issues/12020
                     let refText = item.name || item.refText.replace(new RegExp(Constants.ZWSP, "g"), "");
                     if (nodeElement) {
                         refText = item.ial["custom-sy-av-s-text-" + nodeElement.getAttribute("data-av-id")] || refText;
@@ -425,7 +425,7 @@ ${genHintItemHTML(item)}
             }
             lazyLoadEmojiImg(panelElement);
         } else {
-            // max-height：min(402px,40vh) 和 .protyle-hint 保持一致，否则 emoji 不显示底部导航
+            // max-height: min(402px,40vh) must stay consistent with .protyle-hint, otherwise the emoji bottom navigation won't show
             this.element.innerHTML = `<div style="padding:0;max-height:min(402px,40vh);width:366px" class="emojis">
 <div class="emojis__panel">${filterEmoji(value, 256)}</div>
 <div class="fn__flex${value ? " fn__none" : ""}">
@@ -549,13 +549,13 @@ ${genHintItemHTML(item)}
             id = nodeElement.getAttribute("data-node-id");
         }
         const html = nodeElement.outerHTML;
-        // 自顶向下法新建文档后光标定位问题 https://github.com/siyuan-note/siyuan/issues/299
-        // QQ 拼音输入法自动补全需移除补全内容 https://github.com/siyuan-note/siyuan/issues/320
-        // 前后有标记符的情况 https://github.com/siyuan-note/siyuan/issues/2511
+        // Cursor positioning issue after creating a new document via the top-down method https://github.com/siyuan-note/siyuan/issues/299
+        // QQ Pinyin IME autocomplete needs the completed content removed https://github.com/siyuan-note/siyuan/issues/320
+        // Case where there are marker characters before and after https://github.com/siyuan-note/siyuan/issues/2511
         const endSplit = Constants.BLOCK_HINT_CLOSE_KEYS[this.splitChar];
         if (Constants.BLOCK_HINT_KEYS.includes(this.splitChar) && endSplit && range.startContainer.nodeType === 3
             && (range.startContainer as Text).wholeText.indexOf(endSplit) > -1
-            // 在包含 )) 的块中引用时会丢失字符  https://ld246.com/article/1679980200782
+            // Characters get lost when referencing inside a block that contains )) https://ld246.com/article/1679980200782
             && (range.startContainer as Text).wholeText.indexOf(this.splitChar) > -1) {
             let matchEndChar = 0;
             let textNode = range.startContainer;
@@ -583,7 +583,7 @@ ${genHintItemHTML(item)}
             range.setStart(range.startContainer, this.lastIndex);
             focusByRange(range);
         }
-        // 新建文件
+        // Create a new file
         if (Constants.BLOCK_HINT_KEYS.includes(this.splitChar) && value.startsWith("((newFile ") && value.endsWith(`${Lute.Caret}'))`)) {
             const fileNames = value.substring(11, value.length - 4).split(`"${Constants.ZWSP}'`);
             const realFileName = fileNames.length === 1 ? fileNames[0] : fileNames[1];
@@ -669,7 +669,8 @@ ${genHintItemHTML(item)}
                 this.splitChar = value;
                 this.lastIndex = 0;
                 range.deleteContents();
-                // 光标位于 block-ref 内末尾时，需调整到 block-ref 的外面，避免把标记符插入到引用内部
+                // When the cursor is at the end inside a block-ref, it needs to be moved outside the
+                // block-ref, to avoid inserting the marker character inside the reference
                 const refElement = hasClosestByAttribute(range.startContainer, "data-type", "block-ref");
                 if (refElement && range.startContainer.nodeType === 3 &&
                     range.startOffset === (range.startContainer as Text).textContent.length) {
@@ -706,13 +707,13 @@ ${genHintItemHTML(item)}
                 range.deleteContents();
                 return;
             } else if (value === Constants.ZWSP + 4) {
-                // 新建文档
+                // Create a new document
                 newFileInProtyle(protyle, (createDocId, createDocTitle) => {
                     insertHTML(`<span data-type="block-ref" data-id="${createDocId}" data-subtype="d">${getBlockRefAnchorText(createDocTitle)}</span>`, protyle);
                 });
                 return;
             } else if (value === Constants.ZWSP + 6) {
-                // 新建子文档
+                // Create a new sub-document
                 const newSubDocId = Lute.NewNodeID();
                 fetchPost("/api/filetree/createDoc", {
                     notebook: protyle.notebookId,
@@ -792,7 +793,7 @@ ${genHintItemHTML(item)}
                     updateTransaction(protyle, nodeElement, html);
                     let imgElement: HTMLElement = range.startContainer.childNodes[range.startOffset - 1] as HTMLElement || range.startContainer as HTMLElement;
                     if (imgElement && imgElement.nodeType !== 3 && imgElement.classList.contains("img")) {
-                        // 已经找到图片
+                        // Image already found
                     } else if (imgElement.previousSibling?.nodeType !== 3 && (imgElement.previousSibling as HTMLElement).classList.contains("img")) {
                         // https://github.com/siyuan-note/siyuan/issues/7540
                         imgElement = imgElement.previousSibling as HTMLElement;
@@ -818,13 +819,14 @@ ${genHintItemHTML(item)}
                         editableElement.textContent = textContent;
                         newHTML = protyle.lute.SpinBlockDOM(nodeElement.outerHTML);
                     }
-                    // 列表项内创建列表时保留空段落，避免形成 li>list 非法结构 https://github.com/siyuan-note/siyuan/issues/17890
+                    // When creating a list within a list item, keep the empty paragraph to avoid
+                    // forming an invalid li>list structure https://github.com/siyuan-note/siyuan/issues/17890
                     const tempCheck = document.createElement("div");
                     tempCheck.innerHTML = newHTML;
                     const keepEmptyInLi = hasClosestByClassName(nodeElement, "li") &&
                         tempCheck.firstElementChild?.getAttribute("data-type") === "NodeList";
                     if (keepEmptyInLi) {
-                        // 保留空段落时给新 NodeList 生成新 ID，避免与段落 ID 冲突
+                        // When keeping the empty paragraph, generate a new ID for the new NodeList to avoid conflicting with the paragraph's ID
                         const newListId = Lute.NewNodeID();
                         tempCheck.firstElementChild.setAttribute("data-node-id", newListId);
                         newHTML = tempCheck.innerHTML;
@@ -841,7 +843,8 @@ ${genHintItemHTML(item)}
                         }
                         updateTransaction(protyle, nodeElement, html);
                     } else {
-                        // 保留空段落：原段落清空内容，新列表用 insert 操作
+                        // Keep the empty paragraph: clear the original paragraph's content, and use an
+                        // insert operation for the new list
                         editableElement.textContent = "";
                         transaction(protyle, [{
                             action: "update",
@@ -866,7 +869,8 @@ ${genHintItemHTML(item)}
                     if (value === "<div>") {
                         newHTML = `<div data-node-id="${Lute.NewNodeID()}" data-type="NodeHTMLBlock" class="render-node" data-subtype="block">${genIconHTML()}<div><protyle-html data-content=""></protyle-html><span style="position: absolute">${Constants.ZWSP}</span></div><div class="protyle-attr" contenteditable="false"></div></div>`;
                     }
-                    // 列表项内创建列表时保留空段落，避免 ID 冲突和 li>list 非法结构 https://github.com/siyuan-note/siyuan/issues/17890
+                    // When creating a list within a list item, keep the empty paragraph to avoid ID
+                    // conflicts and an invalid li>list structure https://github.com/siyuan-note/siyuan/issues/17890
                     const keepEmptyInLi2 = hasClosestByClassName(nodeElement, "li") &&
                         (() => {
                             const tc = document.createElement("div");
@@ -989,7 +993,7 @@ ${genHintItemHTML(item)}
                 }
                 const unicode = currentElement.getAttribute("data-unicode");
                 if (this.element.querySelectorAll(".emojis__title").length > 2) {
-                    // /emoji 后会自动添加冒号，导致 range 无法计算，因此不依赖 this.fill
+                    // A colon is automatically added after /emoji, which makes the range uncomputable, so this doesn't rely on this.fill
                     const range = getSelection().getRangeAt(0);
                     if (range.endContainer.nodeType !== 3) {
                         range.endContainer.childNodes[range.endOffset - 1]?.remove();
@@ -1100,7 +1104,7 @@ ${genHintItemHTML(item)}
         }
         if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
             hideElements(["hint"], protyle);
-            // 不需要 preventDefault https://github.com/siyuan-note/siyuan/issues/11846
+            // No need for preventDefault https://github.com/siyuan-note/siyuan/issues/11846
             return true;
         }
         return false;
@@ -1138,13 +1142,13 @@ ${genHintItemHTML(item)}
         if (this.lastIndex === -1) {
             return undefined;
         }
-        // 上一次提示没有结束时不能被其余提示干扰 https://github.com/siyuan-note/siyuan/issues/14324
+        // While the previous hint hasn't ended, it must not be interrupted by other hints https://github.com/siyuan-note/siyuan/issues/14324
         if (!this.element.classList.contains("fn__none") && prevSplit && prevSplit !== this.splitChar &&
             !(["/", "、"].includes(prevSplit) && this.splitChar === ":")) {
             this.splitChar = prevSplit;
             this.lastIndex = prevLastIndex;
         }
-        // 冒号前为数字或冒号不进行emoji提示
+        // Don't show emoji hints when the character before the colon is a digit or another colon
         if (this.splitChar === ":") {
             this.enableEmoji = !(/\d/.test(currentLineValue.substr(this.lastIndex - 1, 1)) ||
                 currentLineValue.substr(this.lastIndex - 1, 2) === "::");
@@ -1156,7 +1160,7 @@ ${genHintItemHTML(item)}
             // https://github.com/siyuan-note/siyuan/issues/10637
             lastItem.trimStart() === lastItem &&
             lastItem.length < Constants.SIZE_TITLE) {
-            // 输入法自动补全 https://github.com/siyuan-note/insider/issues/100
+            // IME autocomplete https://github.com/siyuan-note/insider/issues/100
             if (this.splitChar === "【【" && currentLineValue.endsWith("【【】")) {
                 return "";
             }

@@ -50,7 +50,7 @@ export const globalClick = (event: MouseEvent & { target: HTMLElement }) => {
     }
 
     /// #if !MOBILE
-    // dock float 时，点击空白处，隐藏 dock。场景：文档树上重命名后
+    // When a dock is floating, hide it when clicking on empty space. Scenario: after renaming in the file tree
     if (!isWindow() && window.siyuan.layout.leftDock &&
         !hasClosestByClassName(event.target, "b3-dialog--open", true) &&
         !hasClosestByClassName(event.target, "b3-menu") &&
@@ -75,7 +75,7 @@ export const globalClick = (event: MouseEvent & { target: HTMLElement }) => {
         hideAllElements(["pdfutil"]);
     }
 
-    // 点击空白，pdf 搜索、更多消失
+    // Clicking on empty space dismisses the PDF search and "more" panels
     if (hasClosestByAttribute(event.target, "id", "secondaryToolbarToggleButton") ||
         hasClosestByAttribute(event.target, "id", "viewFindButton") ||
         hasClosestByAttribute(event.target, "id", "findbar")) {

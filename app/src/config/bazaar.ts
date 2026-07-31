@@ -19,7 +19,7 @@ import {afterLoadPlugin, loadPlugin, loadPlugins} from "../plugin/loader";
 import {useShell} from "../util/pathName";
 import {switchSettingPanelSubTab} from "./setting/mount";
 
-/** 集市 Tab 侧栏 / 全局搜索索引文案 */
+/** Text indexed for the sidebar and the global search of the bazaar tab */
 export const collectBazaarTabSearchStrings = (): string[] => [
     window.siyuan.languages.bazaar,
     window.siyuan.languages.downloaded,
@@ -30,7 +30,7 @@ export const collectBazaarTabSearchStrings = (): string[] => [
     window.siyuan.languages.widget,
 ];
 
-/** 集市 Tab 挂载（面板页，不走注册表渲染） */
+/** Mounts the bazaar tab, a panel page that is not rendered through the registry */
 export const mountBazaarTab = (root: HTMLElement, keywords?: string, app?: App) => {
     if (root.innerHTML === "") {
         bazaar.element = root;
@@ -54,7 +54,7 @@ export const mountBazaarTab = (root: HTMLElement, keywords?: string, app?: App) 
 };
 
 /**
- * 渲染集市 README
+ * Renders the README of a bazaar package
  */
 export const renderReadme = (bazaarType: TBazaarType, from: "downloaded" | "updated" | "bazaar", data: IBazaarItem) => {
     if (bazaar.element == null) return;
@@ -488,7 +488,7 @@ type="checkbox">
             }
             contentElement.innerHTML = html ? html : `<ul class="b3-list b3-list--background"><li class="b3-list--empty">${window.siyuan.languages.emptyContent}</li></ul>`;
             const sideElement = bazaar.element.querySelector("#configBazaarReadme.config-bazaar__readme--show .item__side");
-            // 仅刷新「已下载」详情，避免通过 URI 打开的在线详情被本地数据覆盖
+            // Only refresh the details of a "downloaded" package, so that online details opened through a URI are not overwritten with local data
             if (sideElement?.getAttribute("data-from") === "downloaded") {
                 const repoURL = sideElement.getAttribute("data-repourl");
                 bazaar._data.downloaded.find((i) => {
@@ -699,7 +699,7 @@ type="checkbox">
         }
         panel.setAttribute("data-init", "true");
     },
-    /** 切换集市顶部 Tab */
+    /** Switches the tab at the top of the bazaar */
     switchBazaarTab(app: App, bazaarType: TBazaarType, from: "downloaded" | "updated" | "bazaar") {
         if (!bazaar.element) {
             return;
@@ -1181,19 +1181,19 @@ type="checkbox">
     },
     _sortPackages(packages: IBazaarItem[], sortValue: string): IBazaarItem[] {
         const sorted = [...packages];
-        // 更新时间降序
+        // Update time, descending
         if (sortValue === "0") {
             return sorted.sort((a, b) => (b.updated < a.updated ? -1 : 1));
         }
-        // 更新时间升序
+        // Update time, ascending
         if (sortValue === "1") {
             return sorted.sort((a, b) => (b.updated < a.updated ? 1 : -1));
         }
-        // 下载次数降序
+        // Download count, descending
         if (sortValue === "2") {
             return sorted.sort((a, b) => (b.downloads < a.downloads ? -1 : 1));
         }
-        // 下载次数升序
+        // Download count, ascending
         if (sortValue === "3") {
             return sorted.sort((a, b) => (b.downloads < a.downloads ? 1 : -1));
         }
@@ -1224,7 +1224,7 @@ type="checkbox">
         };
         const element = bazaar.element.querySelector(panelSelector[bazaarType]);
         if (response.code === 1) {
-            // 安装集市包 /api/bazaar/installBazaar* 失败
+            // Installing the bazaar package through /api/bazaar/installBazaar* failed
             showMessage(response.msg);
             element.querySelectorAll("img[data-type='img-loading']").forEach((item) => {
                 item.remove();

@@ -13,7 +13,8 @@ export const addScriptSync = async (path: string, id: string) => {
     scriptElement.id = id;
     document.head.appendChild(scriptElement);
     if (typeof Lute === "undefined") {
-        // 鸿蒙系统上第一次加载会出现 Lute 未定义的情况，重新载入一次就好了，暂时没找到原因，先这样处理
+        // On HarmonyOS, the first load can leave Lute undefined; reloading once fixes it. The root cause hasn't
+        // been found yet, so this workaround is used for now.
         window.location.reload();
     }
 };
@@ -21,18 +22,18 @@ export const addScriptSync = async (path: string, id: string) => {
 export const addScript = (path: string, id: string) => {
     return new Promise((resolve) => {
         if (document.getElementById(id)) {
-            // 脚本加载后再次调用直接返回
+            // Return immediately if called again after the script has already loaded
             resolve(false);
             return false;
         }
         const scriptElement = document.createElement("script");
         scriptElement.src = path;
         scriptElement.async = true;
-        // 循环调用时 Chrome 不会重复请求 js
+        // Chrome won't re-request the js when called repeatedly in a loop
         document.head.appendChild(scriptElement);
         scriptElement.onload = () => {
             if (document.getElementById(id)) {
-                // 循环调用需清除 DOM 中的 script 标签
+                // The script tag must be removed from the DOM when called repeatedly in a loop
                 scriptElement.remove();
                 resolve(false);
                 return false;

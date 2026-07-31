@@ -48,28 +48,28 @@ var colorSchemes = map[string]ColorScheme{
 }
 
 func getColorScheme(color string) ColorScheme {
-	// 去除可能的空格
+	// Trim possible whitespace
 	color = strings.TrimSpace(color)
 
-	// 检查是否是预定义的颜色
+	// Check whether it's a predefined color
 	if scheme, ok := colorSchemes[strings.ToLower(color)]; ok {
 		return scheme
 	}
-	// 支持自定义颜色
-	// 如果颜色值不以#开头，自动添加#
+	// Support custom colors
+	// If the color value doesn't start with #, prepend it automatically
 	if !strings.HasPrefix(color, "#") && len(color) > 0 {
 		color = "#" + color
 	}
 
-	// 检查是否是十六进制颜色值
+	// Check whether it's a hex color value
 	hexColorPattern := `^#?([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$`
 	if matched, _ := regexp.MatchString(hexColorPattern, color); matched {
-		// 确保颜色值有#前缀
+		// Ensure the color value has a # prefix
 		if !strings.HasPrefix(color, "#") {
 			color = "#" + color
 		}
 
-		// 如果是3位十六进制，转换为6位
+		// If it's a 3-digit hex value, convert it to 6 digits
 		if len(color) == 4 {
 			r := string(color[1])
 			g := string(color[2])
@@ -77,7 +77,7 @@ func getColorScheme(color string) ColorScheme {
 			color = "#" + r + r + g + g + b + b
 		}
 
-		// 生成次要颜色（将主色调变深）
+		// Generate the secondary color (darken the primary color)
 		secondary := darkenColor(color, 0.1)
 
 		return ColorScheme{
@@ -86,30 +86,30 @@ func getColorScheme(color string) ColorScheme {
 		}
 	}
 
-	// 如果既不是预定义颜色也不是有效的十六进制值，返回默认颜色
+	// If it's neither a predefined color nor a valid hex value, return the default color
 	return colorSchemes["red"]
 }
 
 func darkenColor(hexColor string, factor float64) string {
-	// 去掉#号
+	// Strip the # sign
 	hex := hexColor[1:]
 
-	// 将十六进制转换为RGB
+	// Convert hex to RGB
 	r, _ := strconv.ParseInt(hex[0:2], 16, 64)
 	g, _ := strconv.ParseInt(hex[2:4], 16, 64)
 	b, _ := strconv.ParseInt(hex[4:6], 16, 64)
 
-	// 使颜色变深
+	// Darken the color
 	r = int64(float64(r) * (1 - factor))
 	g = int64(float64(g) * (1 - factor))
 	b = int64(float64(b) * (1 - factor))
 
-	// 确保值在0-255范围内
+	// Ensure values stay within the 0-255 range
 	r = int64(math.Max(0, float64(r)))
 	g = int64(math.Max(0, float64(g)))
 	b = int64(math.Max(0, float64(b)))
 
-	// 转回十六进制
+	// Convert back to hex
 	return fmt.Sprintf("#%02X%02X%02X", r, g, b)
 }
 
@@ -120,14 +120,14 @@ func getDynamicIcon(c *gin.Context) {
 	if "" == iconType {
 		iconType = "1"
 	}
-	color := c.Query("color") // 不要预设默认值，不然type6返回星期就没法自动设置周末颜色了
+	color := c.Query("color") // Do not preset a default value, otherwise type6 can't auto-set the weekend color when returning the weekday
 	date := c.Query("date")
 	lang := c.Query("lang")
 	if "" == lang {
 		lang = util.Lang
 	}
 	lang = util.LangToBCP47(lang)
-	weekdayType := c.Query("weekdayType") // 设置星期几的格式，zh-CN {1：周日，2：周天， 3：星期日，4：星期天，}, en {1: Mon, 2: MON，3: Monday, 4. MONDAY,}
+	weekdayType := c.Query("weekdayType") // Sets the weekday format, zh-CN {1: short "Sunday" form A, 2: short "Sunday" form B, 3: full "Sunday" form A, 4: full "Sunday" form B}, en {1: Mon, 2: MON, 3: Monday, 4. MONDAY}
 	if "" == weekdayType {
 		weekdayType = "1"
 	}
@@ -136,33 +136,33 @@ func getDynamicIcon(c *gin.Context) {
 	var svg string
 	switch iconType {
 	case "1":
-		// Type 1: 显示年月日星期
+		// Type 1: shows year, month, day, and weekday
 		svg = generateTypeOneSVG(color, dateInfo)
 	case "2":
-		// Type 2: 显示年月日
+		// Type 2: shows year, month, and day
 		svg = generateTypeTwoSVG(color, dateInfo)
 	case "3":
-		// Type 3: 显示年月
+		// Type 3: shows year and month
 		svg = generateTypeThreeSVG(color, dateInfo)
 	case "4":
-		// Type 4: 仅显示年
+		// Type 4: shows year only
 		svg = generateTypeFourSVG(color, dateInfo)
 	case "5":
-		// Type 5: 显示周数
+		// Type 5: shows the week number
 		svg = generateTypeFiveSVG(color, dateInfo)
 	case "6":
-		// Type 6: 仅显示星期
+		// Type 6: shows the weekday only
 		svg = generateTypeSixSVG(color, lang, weekdayType, dateInfo)
 	case "7":
-		// Type 7: 倒数日
+		// Type 7: countdown days
 		svg = generateTypeSevenSVG(color, lang, dateInfo)
 	case "8":
-		// Type 8: 文字图标
+		// Type 8: text icon
 		content := c.Query("content")
 		id := c.Query("id")
 		svg = generateTypeEightSVG(color, content, id)
 	default:
-		// 默认为Type 1
+		// Defaults to Type 1
 		svg = generateTypeOneSVG(color, dateInfo)
 	}
 
@@ -184,7 +184,7 @@ func getDynamicIcon(c *gin.Context) {
 }
 
 func getDateInfo(dateStr string, lang string, weekdayType string) map[string]any {
-	// 设置默认值
+	// Set the default value
 	var date time.Time
 	var err error
 	if dateStr == "" {
@@ -195,7 +195,7 @@ func getDateInfo(dateStr string, lang string, weekdayType string) map[string]any
 			date = time.Now()
 		}
 	}
-	// 获取年月日星期
+	// Get year, month, day, and weekday
 	year := date.Year()
 	month := date.Format("Jan")
 	day := date.Day()
@@ -235,7 +235,7 @@ func getDateInfo(dateStr string, lang string, weekdayType string) map[string]any
 		weekdayStr = weekdays[date.Weekday()]
 
 	default:
-		// 其他语言
+		// Other languages
 		switch weekdayType {
 		case "1":
 			weekdayStr = date.Format("Mon")
@@ -261,13 +261,13 @@ func getDateInfo(dateStr string, lang string, weekdayType string) map[string]any
 	case "zh-TW":
 		weekNumStr = fmt.Sprintf("%d週", weekNum)
 	}
-	// 判断是否是周末
+	// Determine whether it's a weekend
 	isWeekend := date.Weekday() == time.Saturday || date.Weekday() == time.Sunday
 	// Calculate days until today
 	today := time.Now()
 	today = time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, today.Location())
 	date = time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, date.Location())
-	// countDown := int(math.Floor(date.Sub(today).Hours() / 24)) // 注意最大返回106751天，go的时间戳最大值
+	// countDown := int(math.Floor(date.Sub(today).Hours() / 24)) // Note: this returns at most 106751 days, the max value of a Go timestamp
 	countDown := daysBetween(today, date)
 
 	return map[string]any{
@@ -284,18 +284,18 @@ func getDateInfo(dateStr string, lang string, weekdayType string) map[string]any
 }
 
 func daysBetween(date1, date2 time.Time) int {
-	// 将两个日期都调整到UTC时间的0点
+	// Adjust both dates to midnight UTC
 	date1 = time.Date(date1.Year(), date1.Month(), date1.Day(), 0, 0, 0, 0, time.UTC)
 	date2 = time.Date(date2.Year(), date2.Month(), date2.Day(), 0, 0, 0, 0, time.UTC)
 
-	// 确保date1不晚于date2
+	// Ensure date1 is not later than date2
 	swap := false
 	if date1.After(date2) {
 		date1, date2 = date2, date1
 		swap = true
 	}
 
-	// 计算天数差
+	// Calculate the day difference
 	days := 0
 	for y := date1.Year(); y < date2.Year(); y++ {
 		if isLeapYear(y) {
@@ -305,22 +305,22 @@ func daysBetween(date1, date2 time.Time) int {
 		}
 	}
 
-	// 加上最后一年的天数
+	// Add the day count of the final year
 	days += date2.YearDay() - date1.YearDay()
 
-	// 如果原始的date1晚于date2，返回负值
+	// If the original date1 was later than date2, return a negative value
 	if swap {
 		return -days
 	}
 	return days
 }
 
-// 判断是否为闰年
+// Determine whether a year is a leap year
 func isLeapYear(year int) bool {
 	return year%4 == 0 && (year%100 != 0 || year%400 == 0)
 }
 
-// Type 1: 显示年月日星期
+// Type 1: shows year, month, day, and weekday
 func generateTypeOneSVG(color string, dateInfo map[string]any) string {
 	colorScheme := getColorScheme(color)
 
@@ -336,7 +336,7 @@ func generateTypeOneSVG(color string, dateInfo map[string]any) string {
     `, colorScheme.Primary, dateInfo["month"], dateInfo["day"], dateInfo["weekday"], dateInfo["year"])
 }
 
-// Type 2: 显示年月日
+// Type 2: shows year, month, and day
 func generateTypeTwoSVG(color string, dateInfo map[string]any) string {
 	colorScheme := getColorScheme(color)
 
@@ -351,7 +351,7 @@ func generateTypeTwoSVG(color string, dateInfo map[string]any) string {
     `, colorScheme.Primary, dateInfo["month"], dateInfo["day"], dateInfo["year"])
 }
 
-// Type 3: 显示年月
+// Type 3: shows year and month
 func generateTypeThreeSVG(color string, dateInfo map[string]any) string {
 	colorScheme := getColorScheme(color)
 
@@ -373,7 +373,7 @@ func generateTypeThreeSVG(color string, dateInfo map[string]any) string {
     `, colorScheme.Primary, colorScheme.Secondary, dateInfo["year"], dateInfo["month"])
 }
 
-// Type 4: 仅显示年
+// Type 4: shows year only
 func generateTypeFourSVG(color string, dateInfo map[string]any) string {
 	colorScheme := getColorScheme(color)
 
@@ -394,7 +394,7 @@ func generateTypeFourSVG(color string, dateInfo map[string]any) string {
     `, colorScheme.Primary, colorScheme.Secondary, dateInfo["year"])
 }
 
-// Type 5:: 显示周数
+// Type 5:: shows the week number
 func generateTypeFiveSVG(color string, dateInfo map[string]any) string {
 	colorScheme := getColorScheme(color)
 
@@ -416,13 +416,13 @@ func generateTypeFiveSVG(color string, dateInfo map[string]any) string {
     `, colorScheme.Primary, colorScheme.Secondary, dateInfo["isoYear"], dateInfo["week"])
 }
 
-// Type 6: 仅显示星期
+// Type 6: shows the weekday only
 func generateTypeSixSVG(color string, lang string, weekdayType string, dateInfo map[string]any) string {
 
 	weekday := dateInfo["weekday"].(string)
 	isWeekend := dateInfo["isWeekend"].(bool)
 
-	// 如果不设置颜色，周末默认使用蓝色，工作日默认使用红色
+	// If no color is set, weekends default to blue and weekdays default to red
 	var colorScheme ColorScheme
 	if color == "" {
 		if isWeekend {
@@ -433,7 +433,7 @@ func generateTypeSixSVG(color string, lang string, weekdayType string, dateInfo 
 	} else {
 		colorScheme = getColorScheme(color)
 	}
-	// 动态变化字体大小
+	// Dynamically adjust the font size
 	var fontSize float64
 	switch lang {
 	case "zh-CN", "zh-TW":
@@ -469,7 +469,7 @@ func generateTypeSixSVG(color string, lang string, weekdayType string, dateInfo 
     </svg>`, colorScheme.Primary, colorScheme.Secondary, colorScheme.Primary, fontSize, weekday)
 }
 
-// Type7: 倒数日
+// Type7: countdown days
 func generateTypeSevenSVG(color string, lang string, dateInfo map[string]any) string {
 	colorScheme := getColorScheme(color)
 
@@ -477,7 +477,7 @@ func generateTypeSevenSVG(color string, lang string, dateInfo map[string]any) st
 
 	var tipText, diffDaysText string
 
-	// 设置输出字符
+	// Set the output text
 	switch {
 	case diffDays == 0:
 		switch lang {
@@ -517,7 +517,7 @@ func generateTypeSevenSVG(color string, lang string, dateInfo map[string]any) st
 	default:
 		dayStr = "days"
 	}
-	// 动态变化字体大小
+	// Dynamically adjust the font size
 	var fontSize float64
 	switch {
 	case len(diffDaysText) <= 3:
@@ -542,7 +542,7 @@ func generateTypeSevenSVG(color string, lang string, dateInfo map[string]any) st
     </svg>`, colorScheme.Primary, dateInfo["year"], dateInfo["date"], tipText, fontSize, diffDaysText, dayStr)
 }
 
-// Type 8: 文字图标
+// Type 8: text icon
 func generateTypeEightSVG(color, content, id string) string {
 	if strings.Contains(content, ".action{") {
 		content = model.RenderDynamicIconContentTemplate(content, id)
@@ -550,7 +550,7 @@ func generateTypeEightSVG(color, content, id string) string {
 
 	colorScheme := getColorScheme(color)
 
-	// 动态变化字体大小
+	// Dynamically adjust the font size
 	isChinese := regexp.MustCompile(`[\p{Han}]`).MatchString(content)
 	var fontSize float64
 	if isChinese {
@@ -572,7 +572,7 @@ func generateTypeEightSVG(color, content, id string) string {
 			fontSize = 750 / float64(len([]rune(content)))
 		}
 	}
-	// 当内容为单个字符时，一些小写字母需要调整文字位置(暂时没法批量解决)
+	// When the content is a single character, some lowercase letters need their position adjusted (no batch fix for this yet)
 	dy := "0%"
 	if len([]rune(content)) == 1 {
 		switch content {

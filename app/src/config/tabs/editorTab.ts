@@ -7,7 +7,7 @@ import type {SettingTabBuilder} from "../setting/builder";
 import {ipcRenderer} from "electron";
 /// #endif
 
-/** 编辑器 Tab：各组注册实现（由 setting/tabs.ts 调用） */
+/** Editor tab: registration of each group, called from setting/tabs.ts */
 const registerEditorBehaviorGroup = (tab: SettingTabBuilder) => {
     const group = tab.group("behavior", window.siyuan.languages.configGroupBehavior);
     const readOnlyKeymap = window.siyuan.config.keymap.general.editReadonly.custom;

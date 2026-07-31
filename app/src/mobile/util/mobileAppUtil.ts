@@ -3,8 +3,10 @@ import {hasClosestByAttribute, hasClosestByClassName} from "../../protyle/util/h
 export let keyboardLockUntil = 0;
 
 export const armKeyboardLock = () => {
-    // 某些机型（比如鸿蒙 Pura X）在弹起键盘后会立即触发 activeBlur 导致键盘被关闭；移动端浏览器（比如三星键盘）在编辑器获得焦点后也会触发 resize，
-    // 进而立即关闭键盘。因此主动唤起键盘或点击可编辑区域时，锁定接下来的一段时间，禁止 activeBlur 关闭键盘
+    // On some devices (e.g. HarmonyOS Pura X), showing the keyboard immediately triggers activeBlur, which closes
+    // the keyboard again; some mobile browsers (e.g. Samsung Keyboard) also trigger resize once the editor gains
+    // focus, which likewise closes the keyboard right away. So whenever we actively show the keyboard or tap an
+    // editable area, lock out activeBlur-triggered keyboard closing for a short period.
     keyboardLockUntil = Date.now() + 500;
 };
 

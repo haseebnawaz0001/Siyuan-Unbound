@@ -30,14 +30,14 @@ import (
 )
 
 func checkAttrView(attrView *av.AttributeView, view *av.View) {
-	// 字段删除以后需要删除设置的过滤和排序
+	// After a field is deleted, its configured filters and sorts need to be removed
 	validColumns := map[string]bool{}
 	for _, kv := range attrView.KeyValues {
 		validColumns[kv.Key.ID] = true
 	}
 	newFilters, filterChanged := av.PruneInvalidColumnFilters(view.Filters, validColumns)
 	if 0 == len(newFilters) {
-		// 保持 spec 5 根组不变量：根组被裁空后补一个空 AND 根组
+		// Maintain the spec 5 root-group invariant: if the root group is pruned empty, add back an empty AND root group
 		newFilters = []*av.ViewFilter{{Combination: av.FilterCombinationAnd}}
 	}
 	view.Filters = newFilters
@@ -54,17 +54,17 @@ func checkAttrView(attrView *av.AttributeView, view *av.View) {
 	}
 	view.Sorts = tmpSorts
 
-	// 字段删除以后需要删除设置的分组
+	// After a field is deleted, its configured grouping needs to be removed
 	if nil != view.Group {
 		if k, _ := attrView.GetKey(view.Group.Field); nil == k {
 			view.Group = nil
 		}
 	}
 
-	// 订正视图类型
+	// Fix up view types
 	for i, v := range attrView.Views {
 		if av.LayoutTypeGallery == v.LayoutType && nil == v.Gallery {
-			// 切换为卡片视图时可能没有初始化卡片实例 https://github.com/siyuan-note/siyuan/issues/15122
+			// The gallery instance may not have been initialized when switching to gallery view https://github.com/siyuan-note/siyuan/issues/15122
 			if nil != v.Table {
 				v.LayoutType = av.LayoutTypeTable
 				changed = true
@@ -77,7 +77,7 @@ func checkAttrView(attrView *av.AttributeView, view *av.View) {
 
 	now := util.CurrentTimeMillis()
 
-	// 订正字段类型
+	// Fix up field types
 	for _, kv := range attrView.KeyValues {
 		for _, v := range kv.Values {
 			if v.Type != kv.Key.Type {
@@ -105,7 +105,7 @@ func checkAttrView(attrView *av.AttributeView, view *av.View) {
 	}
 
 	attrView.Name = strings.ReplaceAll(attrView.Name, "\n", " ")
-	// 截断超长的数据库标题 Limit the database title to 512 characters https://github.com/siyuan-note/siyuan/issues/15459
+	// Truncate an overly long database title. Limit the database title to 512 characters https://github.com/siyuan-note/siyuan/issues/15459
 	if 512 < utf8.RuneCountInString(attrView.Name) {
 		attrView.Name = gulu.Str.SubStr(attrView.Name, 512)
 		changed = true

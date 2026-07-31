@@ -25,7 +25,8 @@ import {setFold} from "../util/blockFold";
 
 export const input = async (protyle: IProtyle, blockElement: HTMLElement, range: Range, needRender = true, event?: InputEvent) => {
     if (!blockElement.parentElement) {
-        // 不同 windows 版本下输入法会多次触发 input，导致 outerhtml 赋值的块丢失
+        // On different Windows versions, the IME can fire input multiple times, causing the block assigned by
+        // outerHTML to be lost
         return;
     }
     if (blockElement.classList.contains("av")) {
@@ -40,7 +41,8 @@ export const input = async (protyle: IProtyle, blockElement: HTMLElement, range:
     const editElement = getContenteditableElement(blockElement) as HTMLElement;
     const type = blockElement.getAttribute("data-type");
     if (!editElement) {
-        // hr、嵌入块、数学公式、iframe、音频、视频、图表渲染块等不允许输入 https://github.com/siyuan-note/siyuan/issues/3958
+        // Typing is not allowed in hr/embed blocks/math formulas/iframe/audio/video/chart render blocks, etc.
+        // https://github.com/siyuan-note/siyuan/issues/3958
         if (type === "NodeThematicBreak") {
             blockElement.innerHTML = "<div><wbr></div>";
         } else if (type === "NodeBlockQueryEmbed") {
@@ -68,7 +70,7 @@ export const input = async (protyle: IProtyle, blockElement: HTMLElement, range:
     range.insertNode(wbrElement);
     if (event) {
         const wbrNextElement = hasNextSibling(wbrElement) as HTMLElement;
-        // 行内代码前软换行，光标应在行内代码前
+        // A soft line break right before inline code: the caret should end up before the inline code
         if (!hasPreviousSibling(wbrElement) && wbrElement.parentElement.tagName === "SPAN" &&
             wbrNextElement && wbrNextElement.textContent.startsWith(Constants.ZWSP)) {
             wbrElement.parentElement.before(wbrElement);
@@ -100,7 +102,7 @@ export const input = async (protyle: IProtyle, blockElement: HTMLElement, range:
     const id = blockElement.getAttribute("data-node-id");
     if ((type !== "NodeCodeBlock" && type !== "NodeHeading") && // https://github.com/siyuan-note/siyuan/issues/11851
         (editElement.innerHTML.endsWith("\n<wbr>") || editElement.innerHTML.endsWith("\n<wbr>\n"))) {
-        // 软换行
+        // Soft line break
         updateTransaction(protyle, blockElement, protyle.wysiwyg.lastHTMLs[id] || blockElement.outerHTML.replace("\n<wbr>", "<wbr>"));
         wbrElement.remove();
         return;
@@ -111,7 +113,7 @@ export const input = async (protyle: IProtyle, blockElement: HTMLElement, range:
     if (headingTurnIntoList(protyle, type, blockElement, editElement, range)) {
         return;
     }
-    // table、粗体 中也会有 br，仅用于类似#a#，删除后会产生的 br
+    // Tables and bold text can also have a br; this is only for the br produced after deleting something like #a#
     const brElement = blockElement.querySelector("br");
     if (brElement && brElement.parentElement.tagName !== "TD" && brElement.parentElement.tagName !== "TH" && (
         brElement.parentElement.textContent.trim() === "" ||
@@ -131,10 +133,10 @@ export const input = async (protyle: IProtyle, blockElement: HTMLElement, range:
     const trimStartText = editElement.textContent.trimStart();
     if ((trimStartHTML.startsWith("````") || trimStartHTML.startsWith("····") || trimStartHTML.startsWith("~~~~")) &&
         trimStartHTML.indexOf("\n") === -1) {
-        // 超过三个标记符就可以形成为代码块，下方会处理
+        // More than three marker characters can form a code block; handled further below
     } else if ((trimStartHTML.startsWith("```") || trimStartHTML.startsWith("···") || trimStartHTML.startsWith("~~~")) &&
         trimStartHTML.indexOf("\n") === -1 && trimStartHTML.replace(/·|~/g, "`").replace(/^`{3,}/g, "").indexOf("`") === -1) {
-        // ```test` 后续处理，```test 不处理
+        // ```test` is handled later; ```test is left alone
         updateTransaction(protyle, blockElement, protyle.wysiwyg.lastHTMLs[id]);
         wbrElement.remove();
         return;
@@ -155,7 +157,8 @@ export const input = async (protyle: IProtyle, blockElement: HTMLElement, range:
             refElement.setAttribute("data-subtype", "s");
         }
     }
-    // 相邻标签之间插入空格区隔，避免 SpinBlockDOM 解析时合并为一个标签 https://github.com/siyuan-note/siyuan/issues/18191
+    // Insert a space between adjacent tags as a separator, to avoid SpinBlockDOM merging them into a single tag
+    // during parsing https://github.com/siyuan-note/siyuan/issues/18191
     fixAdjacentTags(editElement);
     let html = blockElement.outerHTML;
     let focusHR = false;
@@ -180,23 +183,25 @@ export const input = async (protyle: IProtyle, blockElement: HTMLElement, range:
             (trimStartHTML.indexOf("\n···") > -1 && trimStartText.indexOf("\n···") > -1)
         )) {
             if (trimStartHTML.indexOf("\n") === -1 && trimStartHTML.replace(/·|~/g, "`").replace(/^`{3,}/g, "").indexOf("`") > -1) {
-                // ```test` 不处理，正常渲染为段落块
+                // ```test` is left alone and renders normally as a paragraph block
             } else {
                 let replaceInnerHTML = editElement.innerHTML.trim().replace(/^(~|·|`){3,}/g, "```").replace(/\n(~|·|`){3,}/g, "\n```").trim();
                 if (replaceInnerHTML.endsWith("\n```<wbr>") &&
                     (replaceInnerHTML.split("\n```").length - 1 + (replaceInnerHTML.startsWith("```") ? 1 : 0)) % 2 === 0) {
-                    // 匹配已闭合的不需添加 https://github.com/siyuan-note/siyuan/issues/16053
+                    // Already-closed matches don't need to be added https://github.com/siyuan-note/siyuan/issues/16053
                 } else if (!replaceInnerHTML.endsWith("\n```")) {
-                    // 以 "\n```<wbr>" 结尾需要添加的情况 https://github.com/siyuan-note/siyuan/issues/16519
+                    // The case that needs to be added when ending with "\n```<wbr>" https://github.com/siyuan-note/siyuan/issues/16519
                     replaceInnerHTML = replaceInnerHTML.replace("<wbr>", "") + "<wbr>\n```";
                 }
                 editElement.innerHTML = replaceInnerHTML;
                 html = blockElement.outerHTML;
             }
         }
-        // 相邻标签之间插入空格区隔，避免 SpinBlockDOM 解析时合并为一个标签 https://github.com/siyuan-note/siyuan/issues/18191
-        // 使用迭代替换处理多个连续相邻标签（全局正则无法匹配重叠情况）
-        // 若中间含有 <wbr>（光标标记），替换后需保留 <wbr>，否则 focusByWbr 无法定位光标
+        // Insert a space between adjacent tags as a separator, to avoid SpinBlockDOM merging them into a single
+        // tag during parsing https://github.com/siyuan-note/siyuan/issues/18191
+        // Use iterative replacement to handle multiple consecutive adjacent tags (a global regex can't match overlapping cases)
+        // If <wbr> (the caret marker) is present in between, it must be preserved after replacement, otherwise
+        // focusByWbr can't locate the caret
         let prevHTML: string;
         do {
             prevHTML = html;
@@ -206,14 +211,15 @@ export const input = async (protyle: IProtyle, blockElement: HTMLElement, range:
         } while (html !== prevHTML);
         html = protyle.lute.SpinBlockDOM(html);
     }
-    // 在数学公式输入框中撤销到最后一步，再继续撤销会撤销编辑器正文内容，从而出发 input 事件
+    // Undoing to the last step in the math formula input box, then continuing to undo, would undo the editor's
+    // body content and thereby trigger the input event
     hideElements(["util"], protyle, true);
     if (type === "NodeTable") {
         blockElement.querySelector(".table__select").removeAttribute("style");
     }
     const tempElement = document.createElement("template");
     tempElement.innerHTML = html;
-    // 列表项内紧挨标记的第一个段落块不允许产生子列表 https://github.com/siyuan-note/siyuan/issues/17890
+    // The first paragraph block right next to the marker inside a list item isn't allowed to produce a nested list https://github.com/siyuan-note/siyuan/issues/17890
     if (blockElement.closest('[data-type="NodeListItem"]') &&
         blockElement.previousElementSibling?.classList.contains("protyle-action")) {
         if (tempElement.content.firstElementChild.classList.contains("list")) {
@@ -224,7 +230,7 @@ export const input = async (protyle: IProtyle, blockElement: HTMLElement, range:
     }
     if (needRender && (
             getContenteditableElement(tempElement.content.firstElementChild)?.innerHTML !== getContenteditableElement(blockElement).innerHTML ||
-            // 内容删空后使用上下键，光标无法到达 https://github.com/siyuan-note/siyuan/issues/4167 https://ld246.com/article/1636256333803
+            // The caret can't be reached with the up/down arrow keys after the content is deleted https://github.com/siyuan-note/siyuan/issues/4167 https://ld246.com/article/1636256333803
             tempElement.content.childElementCount === 1 && getContenteditableElement(tempElement.content.firstElementChild)?.innerHTML === "<wbr>"
         ) &&
         !(tempElement.content.childElementCount === 1 && tempElement.content.firstElementChild.classList.contains("code-block") && type === "NodeCodeBlock")
@@ -239,14 +245,16 @@ export const input = async (protyle: IProtyle, blockElement: HTMLElement, range:
         let scrollTop: number;
         let contentScrollTop: number;
         if (blockElement.classList.contains("table")) {
-            // 表格的横向、纵向滚动均发生在首个子节点（contenteditable 容器，overflow:auto）上，
-            // 重建 DOM 后需一并还原，否则固定表头长表格输入会跳回开头 https://github.com/siyuan-note/siyuan/issues/18035
+            // A table's horizontal/vertical scrolling both happen on the first child node (the contenteditable
+            // container with overflow:auto), so it needs to be restored together after rebuilding the DOM,
+            // otherwise typing in a long table with a sticky header would jump back to the top
+            // https://github.com/siyuan-note/siyuan/issues/18035
             scrollLeft = blockElement.firstElementChild.scrollLeft;
             scrollTop = blockElement.firstElementChild.scrollTop;
             contentScrollTop = protyle.contentElement.scrollTop;
         }
         if (!/<span data-type="backslash">.{1,8}<\/span><wbr>/.test(html)) {
-            // 使用 md 闭合后继续输入应为普通文本, 转义不需要添加 zwsp
+            // Continuing to type after closing via markdown should produce plain text; an escape doesn't need a zwsp added
             html = html.replace("</span><wbr>", "</span>" + Constants.ZWSP + "<wbr>");
         }
         blockElement.insertAdjacentHTML("afterend", html);
@@ -319,15 +327,16 @@ export const input = async (protyle: IProtyle, blockElement: HTMLElement, range:
                     itemHTML = realElement.outerHTML;
                     focusByWbr(protyle.wysiwyg.element, range);
                     protyle.hint.render(protyle);
-                    // 表格出现滚动条，输入数字会向前滚 https://github.com/siyuan-note/siyuan/issues/3650
+                    // When a table has a scrollbar, typing a digit scrolls it forward https://github.com/siyuan-note/siyuan/issues/3650
                     if (scrollLeft > 0) {
                         blockElement.firstElementChild.scrollLeft = scrollLeft;
                     }
                     if (scrollTop > 0) {
                         blockElement.firstElementChild.scrollTop = scrollTop;
                     }
-                    // SpinBlockDOM 会生成新表格并替换旧节点，旧节点移除时外层编辑器的滚动锚点会失效，
-                    // 因此需在恢复光标后还原滚动位置
+                    // SpinBlockDOM generates a new table and replaces the old node; removing the old node
+                    // invalidates the outer editor's scroll anchor, so the scroll position needs to be restored
+                    // after the caret is restored
                     // https://github.com/siyuan-note/siyuan/issues/18235
                     if (contentScrollTop > 0) {
                         protyle.contentElement.scrollTop = contentScrollTop;

@@ -91,16 +91,18 @@ func resolvePath(rel string) (string, error) {
 	if !gulu.File.IsSubPath(util.WorkspaceDir, abs) {
 		return "", fmt.Errorf("path escapes workspace: %s", rel)
 	}
-	// 拒绝加密笔记本目录：MCP 文件工具不能读写加密 box 下的文件（防止密文泄漏或明文破坏加密格式）
+	// Reject encrypted notebook directories: the MCP file tool must not read/write files under an encrypted box
+	// (to prevent ciphertext leaks or plaintext corrupting the encryption format)
 	if boxID, encrypted := rejectEncryptedPath(abs); encrypted {
 		return "", fmt.Errorf("path belongs to encrypted notebook [%s]: %s", boxID, rel)
 	}
-	// 防止 symlink 逃逸工作区：解析符号链接后再次检查
+	// Prevent a symlink from escaping the workspace: check again after resolving symlinks
 	if resolved := util.ResolveLongestExistingParent(abs); resolved != abs && !gulu.File.IsSubPath(util.WorkspaceDir, resolved) {
 		return "", fmt.Errorf("symlink escapes workspace: %s", rel)
 	}
-	// 禁止访问配置文件 conf/conf.json（含 accessAuthCode/api.token/cookieKey 等明文凭据），
-	// 对齐 HTTP 文件 API 的既定黑名单（见 kernel/api/file.go 的 refuseToAccess）。
+	// Forbid access to the config file conf/conf.json (which contains plaintext credentials such as
+	// accessAuthCode/api.token/cookieKey), matching the established blacklist of the HTTP file API
+	// (see refuseToAccess in kernel/api/file.go).
 	confPath := filepath.Join(util.ConfDir, "conf.json")
 	if abs == confPath {
 		return "", fmt.Errorf("access to conf.json is forbidden")
@@ -108,7 +110,7 @@ func resolvePath(rel string) (string, error) {
 	return abs, nil
 }
 
-// rejectEncryptedPath 检查路径是否属于加密笔记本（含 symlink 绕过），返回 boxID 和是否为加密 box。
+// rejectEncryptedPath checks whether the path belongs to an encrypted notebook (including symlink bypass attempts), returning the boxID and whether it's an encrypted box.
 func rejectEncryptedPath(absPath string) (boxID string, encrypted bool) {
 	boxID = model.EncryptedRawPathBoxID(absPath)
 	return boxID, boxID != ""

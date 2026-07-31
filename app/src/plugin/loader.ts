@@ -37,7 +37,7 @@ export const loadPlugins = async (app: App, names?: string[], init = true) => {
         const item = response.data[i] as IPluginData;
         if (!names || (names && names.includes(item.name))) {
             if (init) {
-                // 初始化时为加快启动速度，已特殊处理，不进行 await
+                // During init this is handled specially to speed up startup, so no await here
                 loadPluginJS(app, item);
             } else {
                 await loadPluginJS(app, item);
@@ -89,7 +89,7 @@ const getPluginsStyle = () => {
     let pluginsStyle = document.getElementById("pluginsStyle");
     if (!pluginsStyle) {
         pluginsStyle = document.createElement("style");
-        pluginsStyle.id = "pluginsStyle"; // 用于将内联样式插入到插件样式前的标识
+        pluginsStyle.id = "pluginsStyle"; // Marker used to insert inline styles before the plugin styles
         document.head.append(pluginsStyle);
     }
     return pluginsStyle;
@@ -105,7 +105,7 @@ const insertPluginCSS = (item: IPluginData, pluginsStyle: HTMLElement) => {
     pluginsStyle.insertAdjacentElement("afterend", styleElement);
 };
 
-// 启用插件
+// Enable a plugin
 export const loadPlugin = async (app: App, item: IPluginData) => {
     const plugin = await loadPluginJS(app, item);
     insertPluginCSS(item, getPluginsStyle());
@@ -200,7 +200,7 @@ export const afterLayoutReady = (app: App) => {
 
 export const addPluginDock = (plugin: Plugin) => {
     /// #if MOBILE
-    // 移动端只有存在插件 dock 时才显示插件入口图标
+    // On mobile, the plugin entry icon is only shown when a plugin dock exists
     if (Object.keys(plugin.docks).length > 0) {
         document.querySelector('#sidebar [data-type="sidebar-plugin-tab"]')?.classList.remove("fn__none");
     }
@@ -263,17 +263,17 @@ export const addPluginDock = (plugin: Plugin) => {
 };
 
 export const reloadPlugin = async (app: App, data: {
-    uninstallPlugins?: string[],  // 插件卸载
-    unloadPlugins?: string[],     // 插件禁用
-    reloadPlugins?: string[],     // 插件启用，或插件代码变更
-    dataChangePlugins?: string[], // 插件存储数据变更
+    uninstallPlugins?: string[],  // plugin uninstalled
+    unloadPlugins?: string[],     // plugin disabled
+    reloadPlugins?: string[],     // plugin enabled, or plugin code changed
+    dataChangePlugins?: string[], // plugin stored data changed
 } = {}) => {
     const {uninstallPlugins = [], unloadPlugins = [], reloadPlugins = [], dataChangePlugins = []} = data;
-    // 禁用
+    // Disable
     unloadPlugins.forEach((item) => {
         uninstall(app, item, true);
     });
-    // 卸载
+    // Uninstall
     uninstallPlugins.forEach((item) => {
         uninstall(app, item, false);
     });

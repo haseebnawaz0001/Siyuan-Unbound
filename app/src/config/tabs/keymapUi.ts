@@ -75,7 +75,7 @@ const bindKeymapToolbar = (root: HTMLElement) => {
     });
 };
 
-/** 快捷键 Tab 挂载（面板页，不走注册表渲染） */
+/** Mounts the keymap tab, a panel page that is not rendered through the registry */
 export const mountKeymapTab = async (root: HTMLElement, keywords?: string) => {
     if (root.innerHTML === "") {
         root.innerHTML = genKeymapTabHtml();
@@ -98,8 +98,9 @@ export const mountKeymapTab = async (root: HTMLElement, keywords?: string) => {
         resetKeymapList(keymapListElement);
         return;
     }
-    // 设置窗口全局搜索进入快捷键 Tab，仅当命中具体命令名时才写入搜索框并筛选列表，
-    // 命中分组名时不写入搜索框，完整展示分组
+    // When the global search of the setting dialog lands on the keymap tab, the keywords are only written into the search
+    // box and used to filter the list when they matched a command name. A match on a group name leaves the search box empty
+    // so that the whole group stays visible.
     searchKeymapElement.value = "";
     searchKeymapElement.dataset.keymap = "";
     if (buildKeymapCommandTexts().some((text) => normalizeSearchText(text).includes(keywords))) {
@@ -120,11 +121,11 @@ export const collectKeymapTabSearchStrings = (): string[] => [
 ];
 
 const buildKeymapKeywords = (): string[] => [
-    // 输入框占位符和按钮文案
+    // Input placeholders and button labels
     window.siyuan.languages.search,
     window.siyuan.languages.keymap,
     window.siyuan.languages.clear,
-    // 命令分组标题
+    // Command group titles
     window.siyuan.languages.general,
     window.siyuan.languages.editor,
     window.siyuan.languages.element,
@@ -132,9 +133,9 @@ const buildKeymapKeywords = (): string[] => [
     window.siyuan.languages.list1,
     window.siyuan.languages.table,
     window.siyuan.languages.plugin,
-    // 命令名
+    // Command names
     ...buildKeymapCommandTexts(),
-    // 有命令的插件名
+    // Names of the plugins that register commands
     ...buildKeymapPluginDisplayNames(),
 ];
 
@@ -148,8 +149,8 @@ const buildKeymapCommandTexts = (): string[] => {
     };
     Object.keys(Constants.SIYUAN_KEYMAP.general).forEach(pushKey);
     Object.keys(Constants.SIYUAN_KEYMAP.editor.general).forEach((key) => {
-        // TODO 把 window.siyuan.languages.duplicate 直接换成 "创建副本 / 创建镜像副本"，
-        // 原先使用 window.siyuan.languages.duplicate 的其他地方换成用新的键
+        // TODO replace window.siyuan.languages.duplicate outright with "创建副本 / 创建镜像副本",
+        // and move the other places that use window.siyuan.languages.duplicate over to the new key
         if (key === "duplicate") {
             const duplicate = window.siyuan.languages.duplicate;
             const duplicateMirror = window.siyuan.languages.duplicateMirror;
@@ -250,7 +251,7 @@ const genKeymapRowHtml = (label: string, dataKey: string, custom: string, defaul
 </label>`;
 };
 
-/** 编辑器快捷键分组，与 {@link Config.IKeymapEditor} 的键一致 */
+/** Editor keymap segments, matching the keys of {@link Config.IKeymapEditor} */
 const EDITOR_KEYMAP_SEGMENTS = ["general", "insert", "heading", "list", "table"] as const satisfies readonly (keyof Config.IKeymapEditor)[];
 
 const isEditorKeymapSegment = (key: string): key is keyof Config.IKeymapEditor =>
@@ -279,8 +280,8 @@ const getKeymapTemplateAndConfig = (keys: string): {
 const genKeymapItem = (keys: string) => {
     const {template, config} = getKeymapTemplateAndConfig(keys);
     const html: string[] = [];
-    // 使用固定的 Constants.SIYUAN_KEYMAP 来保证每次生成的选项顺序一致
-    // 避免在设置快捷键之后关闭设置重新打开设置之后选项顺序改变
+    // Iterate over the fixed Constants.SIYUAN_KEYMAP so that the options are always generated in the same order,
+    // otherwise the order would change after setting a shortcut and reopening the setting dialog
     for (const key of Object.keys(template)) {
         if (!window.siyuan.languages[key]) {
             continue;
@@ -369,8 +370,8 @@ const bindKeymapList = (root: HTMLElement) => {
     searchKeymapElement.addEventListener("blur", () => {
         sendGlobalShortcut(window.siyuan.ws.app);
     });
-    // 捕获阶段优先于其它监听，确保 keydown 在 IME/全局逻辑之前处理
-    // 按键搜索框只录物理键位，不接收文本输入；readonly 可避免 IME 抢占 keydown
+    // The capture phase runs before the other listeners, which makes sure keydown is handled before the IME and the global logic.
+    // The hotkey search box only records physical keys and takes no text input, readonly keeps the IME from swallowing keydown.
     searchKeymapElement.addEventListener("keydown", (event: KeyboardEvent) => {
         event.stopPropagation();
         event.preventDefault();
@@ -461,7 +462,7 @@ const bindKeymapList = (root: HTMLElement) => {
                 !hasConflict && (RESERVED_KEYMAPS.includes(keymapStr) || !matchHotKey(keymapStr, event) ||
                 (isMac() && keys[0] === "general" && ["goToEditTabNext", "goToEditTabPrev"].includes(keys[1]) && keymapStr.includes("⌘")))
             ) {
-                // TODO 还应该禁止单个数字或字母作为快捷键？
+                // TODO should a single digit or letter be rejected as a shortcut as well?
                 showMessage(`${window.siyuan.languages.invalid} [${adoptKeymapStr}]`, undefined, undefined, "keymapInvalid");
                 hasConflict = true;
             } else {
@@ -484,7 +485,7 @@ const bindKeymapList = (root: HTMLElement) => {
                     tipParts.push(thirdElement.querySelector(".b3-list-item__text").textContent.trim());
                     conflictTips.push(tipParts.join("-"));
                 }
-                // 目前插件注册的命令没有限制跟已有命令重复，所以这里可能有多个冲突
+                // Commands registered by plugins are currently allowed to duplicate existing ones, so there may be several conflicts
                 if (conflictTips.length > 0) {
                     showMessage(`${adoptKeymapStr} ${window.siyuan.languages.conflict} [${conflictTips.join("] [")}]`, undefined, undefined, "keymapConflict");
                     hasConflict = true;

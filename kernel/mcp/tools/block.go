@@ -165,7 +165,7 @@ func blockInsert(args map[string]any) (CallToolResult, error) {
 		nextID = v
 	}
 
-	// 仅靠 parentID 定位目标时，目标必须是容器块，否则非法嵌套
+	// When the target is located by parentID alone, the target must be a container block, otherwise it's an illegal nesting
 	if parentID != "" && previousID == "" && nextID == "" {
 		if err := treenode.CheckContainerParent(parentID); err != nil {
 			return CallToolResult{Content: []ContentItem{{Type: "text", Text: err.Error()}}, IsError: true}, nil
@@ -218,7 +218,7 @@ func blockAppend(args map[string]any) (CallToolResult, error) {
 	if parentID == "" {
 		return CallToolResult{Content: []ContentItem{{Type: "text", Text: "parentID is required"}}, IsError: true}, nil
 	}
-	// append 只用 parentID 定位目标，目标必须是容器块，否则非法嵌套
+	// append locates the target using parentID only; the target must be a container block, otherwise it's an illegal nesting
 	if err := treenode.CheckContainerParent(parentID); err != nil {
 		return CallToolResult{Content: []ContentItem{{Type: "text", Text: err.Error()}}, IsError: true}, nil
 	}
@@ -257,7 +257,7 @@ func blockPrepend(args map[string]any) (CallToolResult, error) {
 	if parentID == "" {
 		return CallToolResult{Content: []ContentItem{{Type: "text", Text: "parentID is required"}}, IsError: true}, nil
 	}
-	// prepend 只用 parentID 定位目标，目标必须是容器块，否则非法嵌套
+	// prepend locates the target using parentID only; the target must be a container block, otherwise it's an illegal nesting
 	if err := treenode.CheckContainerParent(parentID); err != nil {
 		return CallToolResult{Content: []ContentItem{{Type: "text", Text: err.Error()}}, IsError: true}, nil
 	}
@@ -297,8 +297,9 @@ func blockUpdate(args map[string]any) (CallToolResult, error) {
 		return CallToolResult{Content: []ContentItem{{Type: "text", Text: "data is required"}}, IsError: true}, nil
 	}
 
-	// markdown 转 DOM 时 Lute 会给块生成全新的随机 ID，update 前必须把原块 id 钉回去，
-	// 否则块 ID 每次更新都会变，后续按原 id 操作会报 block not found
+	// When converting markdown to DOM, Lute generates a brand-new random ID for the block; the original block
+	// id must be pinned back before update, otherwise the block ID would change on every update, and later
+	// operations by the original id would report block not found
 	data = pinBlockID(data, dataType, id)
 
 	transactions := []*model.Transaction{{
@@ -318,8 +319,8 @@ func blockUpdate(args map[string]any) (CallToolResult, error) {
 	return CallToolResult{Content: []ContentItem{{Type: "text", Text: "block updated"}}}, nil
 }
 
-// pinBlockID 把原块 id 钉回 markdown/dom 数据，保证 update 不改变块 ID。
-// 参照 HTTP API /api/block/updateBlock 的 id 复位逻辑（block_op.go updateBlock 非 Document 分支）。
+// pinBlockID pins the original block id back into the markdown/dom data, ensuring update does not change the block ID.
+// Mirrors the id-reset logic of the HTTP API /api/block/updateBlock (the non-Document branch of updateBlock in block_op.go).
 func pinBlockID(data, dataType, id string) string {
 	luteEngine := util.NewLute()
 	if dataType == "markdown" {
@@ -335,13 +336,14 @@ func pinBlockID(data, dataType, id string) string {
 		return data
 	}
 
-	// 更新列表项时 markdown 会渲染成 NodeList>ListItem，需要先把列表项提升到根下，渲染器才能正常工作
-	// 使用 API `api/block/updateBlock` 更新列表项时渲染错误 https://github.com/siyuan-note/siyuan/issues/4658
+	// When updating a list item, the markdown renders as NodeList>ListItem; the list item must first be
+	// promoted up under the root for the renderer to work correctly.
+	// Rendering error when updating a list item via the API `api/block/updateBlock` https://github.com/siyuan-note/siyuan/issues/4658
 	if ast.NodeList == tree.Root.FirstChild.Type {
-		tree.Root.AppendChild(tree.Root.FirstChild.FirstChild) // 将列表下的第一个列表项移到文档结尾
-		tree.Root.FirstChild.Unlink()                          // 删除列表
+		tree.Root.AppendChild(tree.Root.FirstChild.FirstChild) // move the first list item under the list to the end of the document
+		tree.Root.FirstChild.Unlink()                          // remove the list
 		if nil != tree.Root.FirstChild && ast.NodeKramdownBlockIAL == tree.Root.FirstChild.Type {
-			tree.Root.FirstChild.Unlink() // 继续删除列表 IAL
+			tree.Root.FirstChild.Unlink() // also remove the list's IAL
 		}
 	}
 
@@ -408,7 +410,8 @@ func blockMove(args map[string]any) (CallToolResult, error) {
 	}
 	previousID, _ := args["previousID"].(string)
 
-	// 仅靠 parentID 定位目标时（无 previousID），目标必须是容器块，否则 doMove parent-only 分支会形成非法嵌套
+	// When the target is located by parentID alone (no previousID), the target must be a container block,
+	// otherwise the doMove parent-only branch would form an illegal nesting
 	if previousID == "" {
 		if err := treenode.CheckListItemNesting(parentID, id); err != nil {
 			return CallToolResult{Content: []ContentItem{{Type: "text", Text: err.Error()}}, IsError: true}, nil

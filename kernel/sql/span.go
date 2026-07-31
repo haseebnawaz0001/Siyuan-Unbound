@@ -115,7 +115,7 @@ func QueryTagSpansByLabel(label string) (ret []*Span) {
 }
 
 func QueryTagSpansByKeyword(keyword string, limit int) (ret []*Span) {
-	// 标签搜索支持空格分隔关键字 Tag search supports space-separated keywords https://github.com/siyuan-note/siyuan/issues/14580
+	// Tag search supports space-separated keywords: Tag search supports space-separated keywords https://github.com/siyuan-note/siyuan/issues/14580
 	keywords := strings.Fields(keyword)
 	var stmt string
 	var args []any

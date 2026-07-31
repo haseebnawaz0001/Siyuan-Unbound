@@ -34,7 +34,8 @@ import (
 	"golang.org/x/text/transform"
 )
 
-// getReadmeFileCandidates 根据包的 README 配置返回去重的按优先级排序的 README 候选文件名列表：当前语言首选、default、README.md。
+// getReadmeFileCandidates returns a de-duplicated, priority-ordered list of README candidate filenames based on
+// the package's README config: current language preferred, then default, then README.md.
 func getReadmeFileCandidates(readme LocaleStrings) []string {
 	preferred := GetPreferredLocaleString(readme, "README.md")
 	defaultName := "README.md"
@@ -44,7 +45,7 @@ func getReadmeFileCandidates(readme LocaleStrings) []string {
 	return gulu.Str.RemoveDuplicatedElem([]string{preferred, defaultName, "README.md"})
 }
 
-// GetBazaarPackageREADME 获取集市包的在线 README。
+// GetBazaarPackageREADME fetches the online README of a bazaar package.
 func GetBazaarPackageREADME(ctx context.Context, repoURL, repoHash, pkgType string) (ret string) {
 	repoURLHash := repoURL + "@" + repoHash
 	url := strings.TrimPrefix(repoURLHash, "https://github.com/")
@@ -69,7 +70,7 @@ func GetBazaarPackageREADME(ctx context.Context, repoURL, repoHash, pkgType stri
 		return
 	}
 
-	// 解码 UTF-16 BOM
+	// decode a UTF-16 BOM
 	if len(data) > 2 {
 		var decoded []byte
 		var err error
@@ -88,7 +89,7 @@ func GetBazaarPackageREADME(ctx context.Context, repoURL, repoHash, pkgType stri
 	return
 }
 
-// getInstalledPackageREADME 获取集市包的本地 README。
+// getInstalledPackageREADME fetches the local README of a bazaar package.
 func getInstalledPackageREADME(installPath, linkBase string, readme LocaleStrings) (ret string) {
 	candidates := getReadmeFileCandidates(readme)
 	var errMsgs []string
@@ -105,9 +106,9 @@ func getInstalledPackageREADME(installPath, linkBase string, readme LocaleString
 	return
 }
 
-// renderPackageREADME 渲染 README Markdown 为 HTML。
+// renderPackageREADME renders the README Markdown as HTML.
 func renderPackageREADME(linkBase string, mdData []byte) (ret string) {
-	mdData = bytes.TrimPrefix(mdData, []byte("\xef\xbb\xbf")) // 移除文件开头的 BOM
+	mdData = bytes.TrimPrefix(mdData, []byte("\xef\xbb\xbf")) // remove the BOM at the start of the file
 	luteEngine := lute.New()
 	luteEngine.SetSanitize(true)
 	luteEngine.SetSoftBreak2HardBreak(false)
@@ -132,7 +133,7 @@ func normalizeNodesIAL(tree *parse.Tree) {
 			return ast.WalkContinue
 		}
 		if n.Type == ast.NodeCodeBlock {
-			// 代码块添加 code-block 类名以修正样式。
+			// Add the code-block class name to fix up styling.
 			n.KramdownIAL = addClassToKramdownIAL(n.KramdownIAL, "code-block")
 		}
 		return ast.WalkContinue

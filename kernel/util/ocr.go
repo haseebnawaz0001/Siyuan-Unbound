@@ -113,7 +113,7 @@ func SaveAssetsTexts() {
 	assetsTextsPath := filepath.Join(assetsPath, "ocr-texts.json")
 
 	assetsTextsLock.Lock()
-	// OCR 功能未开启且 ocr-texts.json 不存在时，如果 assetsTexts 为空则不创建文件
+	// When OCR is not enabled and ocr-texts.json doesn't exist, don't create the file if assetsTexts is empty
 	if !TesseractEnabled && !filelock.IsExist(assetsTextsPath) && 0 == len(assetsTexts) {
 		assetsTextsLock.Unlock()
 		assetsTextsChanged.Store(false)
@@ -216,7 +216,7 @@ func IsTesseractExtractable(p string) bool {
 	return false
 }
 
-// tesseractOCRLock 用于 Tesseract OCR 加锁串行执行提升稳定性 https://github.com/siyuan-note/siyuan/issues/7265
+// tesseractOCRLock serializes Tesseract OCR execution with a lock to improve stability https://github.com/siyuan-note/siyuan/issues/7265
 var tesseractOCRLock = sync.Mutex{}
 
 func Tesseract(imgAbsPath string) (ret []map[string]any) {
@@ -271,18 +271,18 @@ func Tesseract(imgAbsPath string) (ret []map[string]any) {
 	tsv := string(output)
 	//logging.LogInfof("tesseract [path=%s] success [%s]", imgAbsPath, tsv)
 
-	// 按行分割 TSV 数据
+	// Split the TSV data by line
 	tsv = strings.ReplaceAll(tsv, "\r", "")
 	lines := strings.Split(tsv, "\n")
 
-	// 解析 TSV 数据 跳过标题行，从第二行开始处理
+	// Parse the TSV data, skipping the header row and starting from the second line
 	for _, line := range lines[1:] {
 		if line == "" {
-			continue // 跳过空行
+			continue // Skip empty lines
 		}
-		// 分割每列数据
+		// Split each column's data
 		fields := strings.Split(line, "\t")
-		// 将字段名和字段值映射到一个 map 中
+		// Map field names to field values in a map
 		dataMap := make(map[string]any)
 		headers := strings.Split(lines[0], "\t")
 		for i, header := range headers {
@@ -302,12 +302,12 @@ func Tesseract(imgAbsPath string) (ret []map[string]any) {
 	return
 }
 
-// GetOcrJsonText 提取并连接所有 text 字段的函数
+// GetOcrJsonText extracts and concatenates all text fields.
 func GetOcrJsonText(jsonData []map[string]any) (ret string) {
 	for _, dataMap := range jsonData {
-		// 检查 text 字段是否存在
+		// Check whether the text field exists
 		if text, ok := dataMap["text"]; ok {
-			// 确保 text 是字符串类型
+			// Make sure text is a string
 			if textStr, ok := text.(string); ok {
 				ret += " " + strings.ReplaceAll(textStr, "\r", "")
 			}
@@ -401,7 +401,7 @@ func getTesseractVer() (ret string) {
 	if err != nil {
 		errMsg := strings.ToLower(err.Error())
 		if strings.Contains(errMsg, "executable file not found") || strings.Contains(errMsg, "no such file or directory") {
-			// macOS 端 Tesseract OCR 安装后不识别 https://github.com/siyuan-note/siyuan/issues/7107
+			// Tesseract OCR not recognized after installation on macOS https://github.com/siyuan-note/siyuan/issues/7107
 			TesseractBin = "/usr/local/bin/tesseract"
 			cmd = exec.Command(TesseractBin, "--version")
 			gulu.CmdAttr(cmd)

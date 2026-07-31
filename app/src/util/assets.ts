@@ -41,7 +41,7 @@ export const loadAssets = (data: Config.IAppearance) => {
     if (defaultStyleElement) {
         if (!defaultStyleElement.getAttribute("href").startsWith(defaultThemeAddress)) {
             const newStyleElement = document.createElement("link");
-            // 等待新样式表加载完成再移除旧样式表
+            // Wait for the new stylesheet to finish loading before removing the old one
             new Promise((resolve) => {
                 newStyleElement.rel = "stylesheet";
                 newStyleElement.href = defaultThemeAddress;
@@ -112,13 +112,14 @@ export const loadAssets = (data: Config.IAppearance) => {
     const isBuiltInIcon = data.icon === "litheness";
     const iconScriptElement = document.getElementById("iconScript");
     const iconDefaultScriptElement = document.getElementById("iconDefaultScript");
-    // 不能使用 data.iconVer，因为其他主题也需要加载默认图标，此时 data.iconVer 为其他图标的版本号
+    // data.iconVer cannot be used here, because other themes also need to load the default icons,
+    // and in that case data.iconVer is the version number of the other icon set
     const iconDefaultURL = `/appearance/icons/litheness/icon.js?v=${Constants.SIYUAN_VERSION}`;
     const iconThirdURL = `/appearance/icons/${data.icon}/icon.js?v=${data.iconVer}`;
 
     if ((isBuiltInIcon && iconDefaultScriptElement && iconDefaultScriptElement.getAttribute("src").startsWith(iconDefaultURL)) ||
         (!isBuiltInIcon && iconScriptElement && iconScriptElement.getAttribute("src").startsWith(iconThirdURL))) {
-        // 第三方图标切换到默认 litheness
+        // Switching from a third-party icon set back to the default litheness
         if (isBuiltInIcon) {
             iconScriptElement?.remove();
             Array.from(document.body.children).forEach((item) => {
@@ -196,8 +197,8 @@ export const initAssets = () => {
 
 export const setInlineStyle = async (set = true, servePath = "../../../") => {
     let style;
-    // Emojis Reset: 字体中包含了 emoji，需重置
-    // Emojis Additional： 苹果/win11 字体中没有的 emoji
+    // Emojis Reset: the font already contains emoji, so it needs to be reset
+    // Emojis Additional: emoji not present in the Apple/Win11 fonts
     if (isMac() || isIPad() || isIPhone()) {
         style = `@font-face {
   font-family: "Emojis Additional";
@@ -277,7 +278,7 @@ export const setInlineStyle = async (set = true, servePath = "../../../") => {
     if (window.siyuan.config.editor.fontFamily) {
         style += `\n.b3-typography:not(.b3-typography--default), .protyle-wysiwyg, .protyle-title {${window.siyuan.config.editor.fontWeight ? `font-weight: ${window.siyuan.config.editor.fontWeight};` : ""}font-family: "Emojis Additional", "Emojis Reset", "${window.siyuan.config.editor.fontFamily}", var(--b3-font-family)}`;
     }
-    // pad 端菜单移除显示，如工作空间
+    // Hide certain menu items on tablets, such as the workspace item
     if ("ontouchend" in document) {
         style += "\n.b3-menu .b3-menu__action {opacity: 0.68;}";
     }
@@ -351,7 +352,7 @@ const updateMobileTheme = (OSTheme: string) => {
             }
             const fallback = mode === 0 ? "#ffffffff" : "#1e1e1eff";
             const backgroundColor = rgbaToHex(cssVarToRgba("--b3-theme-background")) || fallback;
-            // 统一传 #RRGGBBAA：iOS 按 #RRGGBBAA 解析，Android / Harmony 将 #RRGGBBAA 转为 #AARRGGBB
+            // Always pass #RRGGBBAA: iOS parses it as #RRGGBBAA, Android / Harmony convert #RRGGBBAA to #AARRGGBB
             if (isInIOS()) {
                 window.webkit.messageHandlers.changeStatusBar.postMessage(backgroundColor + " " + mode);
             } else if (isInAndroid()) {
@@ -359,7 +360,7 @@ const updateMobileTheme = (OSTheme: string) => {
             } else if (isInHarmony()) {
                 window.JSHarmony.changeStatusBarColor(backgroundColor, mode);
             }
-        }, 500); // 移动端需要加载完才可以获取到颜色
+        }, 500); // On mobile, the color can only be retrieved after loading has finished
     }
 };
 
@@ -378,26 +379,26 @@ export const setBodyHighlight = () => {
         return;
     }
 
-    // 预定义颜色：赤橙黄绿青蓝紫（提高饱和度和亮度）
+    // Predefined colors: red, orange, yellow, green, cyan, blue, purple (with boosted saturation and lightness)
     const colors = [
-        {h: 0, s: 85, l: 50},    // 赤 - 鲜艳红
-        {h: 30, s: 90, l: 52},   // 橙 - 亮橙色
-        {h: 50, s: 88, l: 50},   // 黄 - 金黄色
-        {h: 140, s: 80, l: 48},  // 绿 - 翠绿色
-        {h: 185, s: 85, l: 50},  // 青 - 亮青色
-        {h: 230, s: 82, l: 52},  // 蓝 - 宝蓝色
-        {h: 280, s: 85, l: 50},  // 紫 - 亮紫色
+        {h: 0, s: 85, l: 50},    // Red - vivid red
+        {h: 30, s: 90, l: 52},   // Orange - bright orange
+        {h: 50, s: 88, l: 50},   // Yellow - golden yellow
+        {h: 140, s: 80, l: 48},  // Green - emerald green
+        {h: 185, s: 85, l: 50},  // Cyan - bright cyan
+        {h: 230, s: 82, l: 52},  // Blue - sapphire blue
+        {h: 280, s: 85, l: 50},  // Purple - bright purple
     ];
 
     let hue, saturation, lightness;
 
     if (name === "SiYuan") {
-        // SiYuan 专用：更艳丽的紫色
+        // Exclusive to SiYuan: a more vivid purple
         hue = 280;
         saturation = 85;
         lightness = 48;
     } else {
-        // 根据工作空间名生成稳定的索引
+        // Generate a stable index from the workspace name
         let hash = 0;
         for (let i = 0; i < name.length; i++) {
             hash = (hash << 5) - hash + name.charCodeAt(i);

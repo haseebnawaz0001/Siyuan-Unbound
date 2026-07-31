@@ -17,6 +17,6 @@
 package conf
 
 type Lang struct {
-	Label string `json:"label"` // 简体中文
-	Name  string `json:"name"`  // BCP 47 标准语言代码，例如 zh-CN
+	Label string `json:"label"` // Display name, e.g. Simplified Chinese
+	Name  string `json:"name"`  // Standard BCP 47 language code, e.g. zh-CN
 }

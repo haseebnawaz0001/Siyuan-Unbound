@@ -1716,7 +1716,7 @@ class PDFViewer {
 
   focus() {
     this.container.focus();
-    // NOTE 防止焦点没在 PDF 上时快捷键失效
+    // NOTE prevent shortcut keys from failing when focus is not on the PDF
     this.container.parentElement.querySelector("#sidebarToggleButton").focus()
   }
 

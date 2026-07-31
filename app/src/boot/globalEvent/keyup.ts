@@ -96,11 +96,11 @@ export const windowKeyUp = (app: App, event: KeyboardEvent) => {
         } else if (window.siyuan.config.keymap.general.goToEditTabNext.custom.startsWith(Constants.KEYCODELIST[event.keyCode]) ||
             window.siyuan.config.keymap.general.goToEditTabPrev.custom.startsWith(Constants.KEYCODELIST[event.keyCode])) {
             let currentLiElement = switchDialog.element.querySelector(".b3-list-item--focus");
-            // 快速切换时，不触发 Tab
+            // Don't trigger Tab during rapid switching
             if (currentLiElement.getAttribute("data-original")) {
                 currentLiElement.classList.remove("b3-list-item--focus");
                 if (matchHotKey(window.siyuan.config.keymap.general.goToEditTabPrev.custom, event)) {
-                    // 上一个
+                    // Previous
                     if (currentLiElement.previousElementSibling) {
                         currentLiElement.previousElementSibling.classList.add("b3-list-item--focus");
                     } else {

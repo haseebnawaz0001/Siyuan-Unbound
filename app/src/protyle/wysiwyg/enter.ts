@@ -50,11 +50,11 @@ export const enter = async (blockElement: HTMLElement, range: Range, protyle: IP
         return;
     }
     const editableElement = getContenteditableElement(blockElement) as HTMLElement;
-    // 选中图片后回车，应取消图片的选中状态 https://ld246.com/article/1650357135043
+    // Pressing Enter after an image is selected should deselect the image https://ld246.com/article/1650357135043
     editableElement.querySelectorAll(".img--select").forEach(item => {
         item.classList.remove("img--select");
     });
-    // 数据库
+    // Database
     if (blockElement.getAttribute("data-type") === "NodeAttributeView") {
         return true;
     }
@@ -66,7 +66,7 @@ export const enter = async (blockElement: HTMLElement, range: Range, protyle: IP
         (trimStartHTML.indexOf("\n~~~") > -1 && trimStartText.indexOf("\n~~~") > -1) ||
         (trimStartHTML.indexOf("\n···") > -1 && trimStartText.indexOf("\n···") > -1)) {
         if (trimStartHTML.indexOf("\n") === -1 && trimStartHTML.replace(/·|~/g, "`").replace(/^`{3,}/g, "").indexOf("`") > -1) {
-            // ```test` 不处理，正常渲染为段落块
+            // ```test` is left alone and renders normally as a paragraph block
         } else if (blockElement.classList.contains("p")) { // https://github.com/siyuan-note/siyuan/issues/6953
             range.insertNode(document.createElement("wbr"));
             const oldHTML = blockElement.outerHTML;
@@ -108,7 +108,7 @@ export const enter = async (blockElement: HTMLElement, range: Range, protyle: IP
             return true;
         }
     }
-    // 代码块
+    // Code block
     if (blockElement.getAttribute("data-type") === "NodeCodeBlock") {
         const wbrElement = document.createElement("wbr");
         range.insertNode(wbrElement);
@@ -175,7 +175,7 @@ export const enter = async (blockElement: HTMLElement, range: Range, protyle: IP
         }, undoInsert];
         if (topId === blockId && parentBlockElement.classList.contains("sb") &&
             parentBlockElement.getAttribute("data-sb-layout") === "col") {
-            // 合并到同一个 transaction，避免新块 id 在第二个 transaction 中找不到
+            // Merge into the same transaction, otherwise the new block's id wouldn't be found in a second transaction
             const sbOperations = await turnsIntoOneTransaction({
                 protyle,
                 selectsElement: [blockElement.previousElementSibling, blockElement],
@@ -209,7 +209,7 @@ export const enter = async (blockElement: HTMLElement, range: Range, protyle: IP
         }
     }
 
-    // 段首换行
+    // Line break at the start of a paragraph
     if (editableElement.textContent !== "" && range.toString() === "" && position.start === 0) {
         let newElement;
         const previousBlockElement = getPreviousBlockSibling(blockElement);
@@ -238,7 +238,7 @@ export const enter = async (blockElement: HTMLElement, range: Range, protyle: IP
     const html = blockElement.outerHTML;
     const parentHTML = getParentBlock(blockElement).outerHTML;
     if (range.toString() !== "") {
-        // 选中数学公式后回车取消选中 https://github.com/siyuan-note/siyuan/issues/12637#issuecomment-2381106949
+        // Pressing Enter after a math formula is selected deselects it https://github.com/siyuan-note/siyuan/issues/12637#issuecomment-2381106949
         const mathElement = hasClosestByAttribute(range.startContainer, "data-type", "inline-math");
         if (mathElement) {
             const nextSibling = hasNextSibling(mathElement);
@@ -277,7 +277,7 @@ export const enter = async (blockElement: HTMLElement, range: Range, protyle: IP
         (newHTML.indexOf("\n~~~") > -1 && newText.indexOf("\n~~~") > -1) ||
         (newHTML.indexOf("\n···") > -1 && newText.indexOf("\n···") > -1)) {
         if (newHTML.indexOf("\n") === -1 && newHTML.replace(/·|~/g, "`").replace(/^`{3,}/g, "").indexOf("`") > -1) {
-            // ```test` 不处理，正常渲染为段落块
+            // ```test` is left alone and renders normally as a paragraph block
         } else {
             let replaceNewHTML = newEditableElement.innerHTML.replace(/\n(~|·|`){3,}/g, "\n```").trim().replace(/^(~|·|`){3,}/g, "```");
             if (!replaceNewHTML.endsWith("\n```")) {
@@ -292,13 +292,13 @@ export const enter = async (blockElement: HTMLElement, range: Range, protyle: IP
     // https://github.com/siyuan-note/siyuan/issues/3850
     // https://github.com/siyuan-note/siyuan/issues/6018
     // https://github.com/siyuan-note/siyuan/issues/9682
-    // 图片后的零宽空格前回车 https://github.com/siyuan-note/siyuan/issues/5690
+    // Pressing Enter right before a zero-width space that follows an image https://github.com/siyuan-note/siyuan/issues/5690
     const enterElement = document.createElement("div");
     enterElement.innerHTML = protyle.lute.SpinBlockDOM(editableElement.parentElement.outerHTML);
     const doOperation: IOperation[] = [];
     const undoOperation: IOperation[] = [];
     let currentElement = blockElement;
-    // 回车之前的块为 1\n\n2 时会产生多个块
+    // Multiple blocks are produced when the block before Enter is 1\n\n2
     const selectsElement: Element[] = [];
     Array.from(enterElement.children).forEach((item: HTMLElement) => {
         if (item.dataset.nodeId === id) {
@@ -385,7 +385,7 @@ export const enter = async (blockElement: HTMLElement, range: Range, protyle: IP
     });
     if (parentElement.classList.contains("sb") &&
         parentElement.getAttribute("data-sb-layout") === "col") {
-        // 合并到同一个 transaction，避免新块 id 在第二个 transaction 中找不到
+        // Merge into the same transaction, otherwise the new block's id wouldn't be found in a second transaction
         const sbOperations = await turnsIntoOneTransaction({
             protyle,
             selectsElement,
@@ -405,7 +405,8 @@ export const enter = async (blockElement: HTMLElement, range: Range, protyle: IP
 
 const getEmbedListEnterMode = (blockElement: HTMLElement, embedContext: IEmbedChildOperationContext) => {
     const listItemElement = blockElement.parentElement;
-    // 单独查询列表项时外层列表是渲染器补充的，回车只能在目标列表项内部创建普通子块。
+    // When a list item is queried standalone, the outer list is added by the renderer, so Enter can only
+    // create a plain child block within the target list item.
     if (listItemElement === embedContext.targetElement) {
         return "block";
     }
@@ -423,7 +424,7 @@ const getEmbedListEnterMode = (blockElement: HTMLElement, embedContext: IEmbedCh
 const listEnter = (protyle: IProtyle, blockElement: HTMLElement, range: Range) => {
     const listItemElement = blockElement.parentElement;
     const editableElement = getContenteditableElement(blockElement);
-    if (// \n 是因为 https://github.com/siyuan-note/siyuan/issues/3846
+    if (// \n is here because of https://github.com/siyuan-note/siyuan/issues/3846
         ["", "\n"].includes(editableElement.textContent) &&
         blockElement.previousElementSibling.classList.contains("protyle-action") &&
         !blockElement.querySelector("img") // https://ld246.com/article/1651820644238
@@ -432,7 +433,7 @@ const listEnter = (protyle: IProtyle, blockElement: HTMLElement, range: Range) =
             listOutdent(protyle, [blockElement.parentElement], range);
             return true;
         } else if (!listItemElement.parentElement.classList.contains("protyle-wysiwyg")) {
-            // 打断列表
+            // Break out of the list
             breakList(protyle, blockElement, range);
             return true;
         }
@@ -440,9 +441,9 @@ const listEnter = (protyle: IProtyle, blockElement: HTMLElement, range: Range) =
 
     const position = getSelectionOffset(editableElement, protyle.wysiwyg.element, range);
     if (range.toString() === "" && position.start === 0 &&
-        // 段首为图片是 start 也为 0
+        // start is also 0 when the paragraph starts with an image
         !hasPreviousSibling(range.startContainer)) {
-        // 段首换行
+        // Line break at the start of a paragraph
         if (listItemElement.parentElement.classList.contains("protyle-wysiwyg")) {
             return true;
         }
@@ -453,7 +454,7 @@ const listEnter = (protyle: IProtyle, blockElement: HTMLElement, range: Range) =
         wbrElement.remove();
         let newElement = genListItemElement(listItemElement, -1, true);
         if (!blockElement.previousElementSibling.classList.contains("protyle-action")) {
-            // 列表项中有多个块，最后一个块为空，换行应进行缩进
+            // A list item has multiple blocks and the last one is empty; a line break should indent it
             if (getContenteditableElement(blockElement).textContent !== "") {
                 return false;
             }
@@ -478,13 +479,13 @@ const listEnter = (protyle: IProtyle, blockElement: HTMLElement, range: Range) =
     const subListElement = listItemElement.querySelector(".list");
     let newElement;
     if (subListElement && listItemElement.getAttribute("fold") !== "1" &&
-        // 子列表下的段落块回车 https://ld246.com/article/1623919354587
+        // Pressing Enter in the paragraph block right before a nested list https://ld246.com/article/1623919354587
         blockElement.nextElementSibling === subListElement) {
-        // 含有子列表的换行
+        // A line break where a nested list is present
         if (position.end >= editableElement.textContent.length -
-            // 数学公式结尾会有 zwsp https://github.com/siyuan-note/siyuan/issues/6679
+            // A math formula has a trailing zwsp https://github.com/siyuan-note/siyuan/issues/6679
             (editableElement.textContent.endsWith(Constants.ZWSP) ? 1 : 0)) {
-            // 段末换行，在子列表中插入
+            // Line break at the end of the paragraph: insert into the nested list
             range.insertNode(document.createElement("wbr"));
             const html = listItemElement.outerHTML;
             blockElement.querySelector("wbr").remove();
@@ -497,7 +498,7 @@ const listEnter = (protyle: IProtyle, blockElement: HTMLElement, range: Range) =
             focusByWbr(listItemElement, range);
             scrollCenter(protyle);
         } else {
-            // 文字中间换行
+            // Line break in the middle of text
             range.insertNode(document.createElement("wbr"));
             const listItemHTML = listItemElement.outerHTML;
             const html = listItemElement.parentElement.outerHTML;
@@ -557,8 +558,8 @@ const listEnter = (protyle: IProtyle, blockElement: HTMLElement, range: Range) =
         return true;
     }
     if ((range.toString() === "" || range.toString() === Constants.ZWSP) && range.startContainer.nodeType === 3 && range.startOffset === 0) {
-        // 图片后的零宽空格前回车 https://github.com/siyuan-note/siyuan/issues/5690
-        // 列表中的图片后双击换行图片光标错误 https://ld246.com/article/1660987186727/comment/1662181221732?r=Vanessa#comments
+        // Pressing Enter right before a zero-width space that follows an image https://github.com/siyuan-note/siyuan/issues/5690
+        // Double-clicking to break a line after an image in a list puts the caret in the wrong place https://ld246.com/article/1660987186727/comment/1662181221732?r=Vanessa#comments
         let nextSibling = range.startContainer;
         while (nextSibling) {
             if (nextSibling.textContent === Constants.ZWSP) {
@@ -574,7 +575,7 @@ const listEnter = (protyle: IProtyle, blockElement: HTMLElement, range: Range) =
     const listItemHTML = listItemElement.outerHTML;
     const oldHTML = listItemElement.parentElement.outerHTML;
     if (range.toString() !== "") {
-        // 选中数学公式后回车取消选中 https://github.com/siyuan-note/siyuan/issues/12637#issuecomment-2381106949
+        // Pressing Enter after a math formula is selected deselects it https://github.com/siyuan-note/siyuan/issues/12637#issuecomment-2381106949
         const mathElement = hasClosestByAttribute(range.startContainer, "data-type", "inline-math");
         if (mathElement) {
             const nextSibling = hasNextSibling(mathElement);
@@ -599,9 +600,9 @@ const listEnter = (protyle: IProtyle, blockElement: HTMLElement, range: Range) =
     if (selectWbrElement && selectWbrElement.parentElement.tagName === "SPAN" && selectWbrElement.parentElement.innerHTML === "<wbr>") {
         selectWbrElement.parentElement.outerHTML = "<wbr>";
     }
-    // 回车移除空元素 https://github.com/siyuan-note/insider/issues/480
+    // Enter removes empty elements https://github.com/siyuan-note/insider/issues/480
     // https://github.com/siyuan-note/siyuan/issues/12273
-    // 文字和图片中间回车后图片前需添加 zwsp
+    // A zwsp must be added before the image after pressing Enter between text and an image
     newEditableElement.parentElement.outerHTML = protyle.lute.SpinBlockDOM(newEditableElement.parentElement.outerHTML);
     listItemElement.insertAdjacentElement("afterend", newElement);
     blockRender(protyle, newElement);
@@ -609,7 +610,7 @@ const listEnter = (protyle: IProtyle, blockElement: HTMLElement, range: Range) =
     processRender(newElement);
     // https://github.com/siyuan-note/siyuan/issues/3850
     // https://github.com/siyuan-note/siyuan/issues/6018
-    // img 后有文字，在 img 后换行
+    // There's text after an img, and the line break happens after the img
     editableElement.parentElement.outerHTML = protyle.lute.SpinBlockDOM(editableElement.parentElement.outerHTML);
     blockRender(protyle, listItemElement);
     mathRender(listItemElement);
@@ -664,7 +665,7 @@ export const softEnter = (range: Range, nodeElement: HTMLElement, protyle: IProt
     if (nextSibling && nextSibling.nodeType !== 3) {
         const textPosition = getSelectionOffset(range.startContainer, protyle.wysiwyg.element, range);
         if (textPosition.end === range.endContainer.textContent.length) {
-            // 图片之前软换行 || 数学公式之前软换行 https://github.com/siyuan-note/siyuan/issues/13621
+            // A soft line break right before an image or a math formula https://github.com/siyuan-note/siyuan/issues/13621
             if (nextSibling.classList.contains("img") || nextSibling.getAttribute("data-type") === "inline-math") {
                 nextSibling.insertAdjacentHTML("beforebegin", "<wbr>");
                 const oldHTML = nodeElement.outerHTML;
@@ -679,7 +680,7 @@ export const softEnter = (range: Range, nodeElement: HTMLElement, protyle: IProt
             }
         }
     }
-    // 行内元素末尾软换行 https://github.com/siyuan-note/insider/issues/886
+    // A soft line break at the end of an inline element https://github.com/siyuan-note/insider/issues/886
     if (startElement.nodeType === 3) {
         startElement = startElement.parentElement;
     }
@@ -689,7 +690,7 @@ export const softEnter = (range: Range, nodeElement: HTMLElement, protyle: IProt
         return true;
     }
     if (isIPad() || isMobile()) {
-        // iPad shift+enter 无效
+        // shift+enter doesn't work on iPad
         startElement = range.startContainer as HTMLElement;
         const nextSibling = hasNextSibling(startElement);
         if (nextSibling && nextSibling.textContent.trim() !== "") {

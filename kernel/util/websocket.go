@@ -35,8 +35,10 @@ var (
 	sessions     = sync.Map{} // {appId, {sessionId, session}}
 	authSessions = sync.Map{}
 
-	// ReloadDocInfoGuard 由 model 层注入，在广播 docInfo 前检查 box 是否仍处于可广播状态。
-	// 加密笔记本锁定后返回 false，防止 500ms 延迟任务在锁定后泄漏明文元数据。
+	// ReloadDocInfoGuard is injected by the model layer to check whether the box is still in a broadcastable
+	// state before broadcasting docInfo.
+	// Returns false once an encrypted notebook is locked, preventing a delayed 500ms task from leaking plaintext
+	// metadata after locking.
 	ReloadDocInfoGuard func(boxID string) bool
 )
 
@@ -83,7 +85,7 @@ func BroadcastByTypeAndApp(typ, app, cmd string, code int, msg string, data any)
 	})
 }
 
-// BroadcastByType 广播所有实例上 typ 类型的会话。
+// BroadcastByType broadcasts to sessions of type typ across all instances.
 func BroadcastByType(typ, cmd string, code int, msg string, data any) {
 	typeSessions := SessionsByType(typ)
 	for _, sess := range typeSessions {
@@ -295,9 +297,9 @@ func ContextPushMsg(context map[string]any, msg string) {
 }
 
 const (
-	PushProgressCodeProgressed = 0 // 有进度
-	PushProgressCodeEndless    = 1 // 无进度
-	PushProgressCodeEnd        = 2 // 关闭进度
+	PushProgressCodeProgressed = 0 // Has progress
+	PushProgressCodeEndless    = 1 // No progress
+	PushProgressCodeEnd        = 2 // Close progress
 )
 
 func PushClearAllMsg() {
@@ -320,12 +322,12 @@ func PushProgress(code, current, total int, msg string) {
 	})
 }
 
-// PushClearMsg 会清空指定消息。
+// PushClearMsg clears the specified message.
 func PushClearMsg(msgId string) {
 	BroadcastByType("main", "cmsg", 0, "", map[string]any{"id": msgId})
 }
 
-// PushClearProgress 取消进度遮罩。
+// PushClearProgress cancels the progress overlay.
 func PushClearProgress() {
 	BroadcastByType("main", "cprogress", 0, "", nil)
 }
@@ -349,7 +351,7 @@ func PushSaveDoc(rootID, typ string, sources any) {
 }
 
 func PushReloadDocInfo(docInfo map[string]any) {
-	// 加密笔记本锁定后丢弃延迟广播，避免泄漏明文元数据（title/alias/memo/bookmark）
+	// Once an encrypted notebook is locked, drop the delayed broadcast to avoid leaking plaintext metadata (title/alias/memo/bookmark)
 	if ReloadDocInfoGuard != nil {
 		if boxID, ok := docInfo["box"].(string); ok && boxID != "" {
 			if !ReloadDocInfoGuard(boxID) {
@@ -365,7 +367,7 @@ func PushReloadProtyle(rootID string) {
 }
 
 func PushSetRefDynamicText(rootID, blockID, defBlockID, refText, boxID string) {
-	// 加密笔记本锁定后丢弃延迟广播，避免泄漏明文 refText
+	// Once an encrypted notebook is locked, drop the delayed broadcast to avoid leaking plaintext refText
 	if ReloadDocInfoGuard != nil && boxID != "" {
 		if !ReloadDocInfoGuard(boxID) {
 			return
@@ -525,13 +527,13 @@ func CountSessions() (ret int) {
 	return
 }
 
-// ClosePublishServiceSessions 关闭所有发布服务的 WebSocket 连接
+// ClosePublishServiceSessions closes all publish service WebSocket connections
 func ClosePublishServiceSessions() {
 	if WebSocketServer == nil {
 		return
 	}
 
-	// 收集所有发布服务的会话
+	// Collect all publish service sessions
 	var publishSessions []*melody.Session
 	sessions.Range(func(key, value any) bool {
 		appSessions := value.(*sync.Map)
@@ -545,7 +547,7 @@ func ClosePublishServiceSessions() {
 		return true
 	})
 
-	// 发送消息通知客户端关闭页面
+	// Send a message notifying the client to close the page
 	for _, session := range publishSessions {
 		event := NewResult()
 		event.Cmd = "closepublishpage"
@@ -557,47 +559,47 @@ func ClosePublishServiceSessions() {
 		session.Write(event.Bytes())
 	}
 
-	// 等待一小段时间让消息发送完成、客户端刷新页面之后显示消息
+	// Wait a short while for the message to finish sending and for the client to refresh the page and show the message
 	time.Sleep(500 * time.Millisecond)
 
-	// 关闭所有发布服务的 WebSocket 连接
+	// Close all publish service WebSocket connections
 	for _, session := range publishSessions {
-		// 使用 "close websocket" 作为关闭消息，客户端检测到后会停止重连
+		// Use "close websocket" as the close message; the client stops reconnecting once it detects this
 		session.CloseWithMsg([]byte("  close websocket: publish service closed"))
 		RemovePushChan(session)
 	}
 }
 
 var (
-	// lastActivityNs 记录最近一次用户写操作（前端发送 /api/transactions* 请求）的纳秒时间戳。
+	// lastActivityNs records the nanosecond timestamp of the most recent user write operation (frontend sending an /api/transactions* request).
 	lastActivityNs atomic.Int64
-	// indexFixDirty 标记索引可能已脏（上次订正后用户又有新的写操作），需要再次订正。
+	// indexFixDirty marks that the index may be dirty (a new write happened after the last fix-up), needing another fix-up pass.
 	indexFixDirty atomic.Bool
 )
 
 func init() {
-	// 初始化为启动时间，避免启动瞬间被判定为空闲
+	// Initialize to the boot time, to avoid being judged idle right at startup
 	lastActivityNs.Store(time.Now().UnixNano())
 }
 
-// RefreshActivity 刷新用户最近活动时间，并标记索引可能已脏（需要订正）。
-// 在 model.Activity 中间件中，对 /api/transactions* 写操作请求调用。
+// RefreshActivity refreshes the user's most recent activity time and marks the index as possibly dirty (needing a fix-up).
+// Called in the model.Activity middleware for /api/transactions* write requests.
 func RefreshActivity() {
 	lastActivityNs.Store(time.Now().UnixNano())
 	indexFixDirty.Store(true)
 }
 
-// MarkIndexClean 标记索引已订正完成，清除脏标志。订正流水线结束后调用。
+// MarkIndexClean marks the index fix-up as complete, clearing the dirty flag. Called at the end of the fix-up pipeline.
 func MarkIndexClean() {
 	indexFixDirty.Store(false)
 }
 
-// IsIdle 自上次用户活动以来是否已超过 idleThreshold。
+// IsIdle reports whether idleThreshold has elapsed since the last user activity.
 func IsIdle(idleThreshold time.Duration) bool {
 	return time.Since(time.Unix(0, lastActivityNs.Load())) >= idleThreshold
 }
 
-// IsIndexFixDirty 返回是否存在未订正的变更（上次订正后有新用户活动）。
+// IsIndexFixDirty returns whether there are unfixed changes (new user activity since the last fix-up).
 func IsIndexFixDirty() bool {
 	return indexFixDirty.Load()
 }

@@ -42,7 +42,7 @@ const (
 
 	ClaimsContextKey = "claims"
 
-	iss = "siyuan-kernel" // token 的发行者
+	iss = "siyuan-kernel" // the token issuer
 
 	ClaimsKeyRole string = "role"
 )
@@ -90,7 +90,7 @@ func DeleteSession(sessionID string) {
 
 func InitPublishAccounts() {
 	accountsMap = AccountsMap{
-		"": &Account{}, // 匿名用户
+		"": &Account{}, // anonymous user
 	}
 	for _, account := range Conf.Publish.Auth.Accounts {
 		accountsMap[account.Username] = &Account{
@@ -113,12 +113,12 @@ func InitPublishJWT() {
 		t := jwt.NewWithClaims(
 			jwt.SigningMethodHS256,
 			jwt.MapClaims{
-				"iss": iss,                     // token 的发行者
-				"sub": username,                // token 代表的主体
-				"aud": "siyuan-publish-server", // token 的受众
-				"jti": uuid.New().String(),     // token 的唯一标识
+				"iss": iss,                     // the token issuer
+				"sub": username,                // the subject the token represents
+				"aud": "siyuan-publish-server", // the token audience
+				"jti": uuid.New().String(),     // the token's unique identifier
 
-				ClaimsKeyRole: RoleReader, // 角色
+				ClaimsKeyRole: RoleReader, // role
 			},
 		)
 		if token, err := t.SignedString(jwtKey); err != nil {
@@ -130,7 +130,8 @@ func InitPublishJWT() {
 	}
 }
 
-// CreatePluginJWT 为指定名称的内核插件创建一个 JWT，包含管理员权限。插件使用这个 JWT 调用内核 API。
+// CreatePluginJWT creates a JWT with administrator privileges for the kernel plugin with the given name.
+// The plugin uses this JWT to call the kernel API.
 func CreatePluginJWT(name string) (string, error) {
 	t := jwt.NewWithClaims(
 		jwt.SigningMethodHS256,
@@ -185,7 +186,7 @@ func GetClaimRole(claims jwt.MapClaims) Role {
 	return RoleVisitor
 }
 
-// IsPublishServiceToken 检查 token 是否来自发布服务
+// IsPublishServiceToken checks whether the token came from the publish service
 func IsPublishServiceToken(token *jwt.Token) bool {
 	if token == nil || !token.Valid {
 		return false

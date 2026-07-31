@@ -8,8 +8,8 @@ import {genRenderFrame} from "./util";
 import {isEncryptedBox} from "../../util/pathName";
 
 /**
- * 渲染嵌入块
- * onEmbedRender 在每个异步查询结果写入 DOM 后调用。
+ * Render an embed block
+ * onEmbedRender is called after each async query result is written to the DOM.
  */
 export const blockRender = (protyle: IProtyle, element: Element, top?: number, onEmbedRender?: () => void) => {
     let blockElements: Element[] = [];
@@ -22,11 +22,11 @@ export const blockRender = (protyle: IProtyle, element: Element, top?: number, o
         return;
     }
     blockElements.forEach((item: HTMLElement) => {
-        // 需置于请求返回前，否则快速滚动会导致重复加载 https://ld246.com/article/1666857862494?r=88250
+        // Must be set before the request returns, otherwise fast scrolling would cause duplicate loading https://ld246.com/article/1666857862494?r=88250
         item.setAttribute("data-render", "true");
         genRenderFrame(item);
         if (item.childElementCount > 3) {
-            item.style.height = (item.clientHeight - 4) + "px"; // 减少抖动 https://ld246.com/article/1668669380171
+            item.style.height = (item.clientHeight - 4) + "px"; // Reduce jitter https://ld246.com/article/1668669380171
             for (let i = 1; i < item.children.length - 1; i++) {
                 if (!item.children[i].classList.contains("protyle-cursor")) {
                     item.children[i].remove();
@@ -137,7 +137,7 @@ ${popover}${breadcrumbHTML}${blocksItem.block.content}
     highlightRender(item);
     avRender(item, protyle);
     if (top) {
-        // 前进后退定位 https://ld246.com/article/1667652729995
+        // Forward/back navigation positioning https://ld246.com/article/1667652729995
         protyle.contentElement.scrollTop = top;
     }
     let maxDeep = 0;

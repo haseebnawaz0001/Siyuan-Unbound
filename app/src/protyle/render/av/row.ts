@@ -55,7 +55,7 @@ export const getRowHTML = (options: {
                 checkClass = cell.value?.checkbox?.checked ? " av__cell-check" : " av__cell-uncheck";
             }
             const isEmpty = cellValueIsEmpty(cell.value);
-            // NOTE: innerHTML 中不能换行否则 https://github.com/siyuan-note/siyuan/issues/15132
+            // NOTE: there must be no line break inside innerHTML, otherwise https://github.com/siyuan-note/siyuan/issues/15132
             let ariaLabel = escapeAttr(kanbanData.fields[fieldsIndex].name) || getColNameByType(kanbanData.fields[fieldsIndex].type);
             if (kanbanData.fields[fieldsIndex].desc) {
                 ariaLabel += escapeAttr(`<div class="ft__on-surface">${kanbanData.fields[fieldsIndex].desc}</div>`);
@@ -121,7 +121,7 @@ ${cell.color ? `color:${cell.color};` : ""}">${renderCell(cell.value, options.ro
                 checkClass = cell.value?.checkbox?.checked ? " av__cell-check" : " av__cell-uncheck";
             }
             const isEmpty = cellValueIsEmpty(cell.value);
-            // NOTE: innerHTML 中不能换行否则 https://github.com/siyuan-note/siyuan/issues/15132
+            // NOTE: there must be no line break inside innerHTML, otherwise https://github.com/siyuan-note/siyuan/issues/15132
             let ariaLabel = escapeAttr(kanbanData.fields[fieldsIndex].name) || getColNameByType(kanbanData.fields[fieldsIndex].type);
             if (kanbanData.fields[fieldsIndex].desc) {
                 ariaLabel += escapeAttr(`<div class="ft__on-surface">${kanbanData.fields[fieldsIndex].desc}</div>`);
@@ -224,13 +224,16 @@ export const selectRow = (checkElement: Element, type: "toggle" | "select" | "un
                     rowItemElement.classList.remove("av__row--select");
                 }
             });
-            // 全不选：清空选中快照，避免被 trim 掉的行回填后仍带选中态
+            // Deselect all: clear the selection snapshot, to avoid rows removed by trim still
+            // carrying the selected state after being refilled
             if (bodyElement) {
                 resetAVRowSelect(bodyElement, []);
             }
         } else {
-            // 全选：范围以当前已加载的分页行（dataStore 的 view.rows）为准，而非仅 DOM 内已渲染的行。
-            // 虚拟滚动下被 trim 掉的行 ID 一并存入快照，回填时由 restoreSelect 恢复高亮。
+            // Select all: the range is based on the currently loaded paginated rows (view.rows in
+            // dataStore), not only the rows rendered in the DOM.
+            // Under virtual scrolling, IDs of rows removed by trim are also stored in the snapshot,
+            // and restoreSelect restores the highlight when they're refilled.
             rowElement.parentElement.querySelectorAll(".av__firstcol").forEach(item => {
                 item.querySelector("use").setAttribute("xlink:href", "#iconCheck");
                 const rowItemElement = hasClosestByClassName(item, "av__row");
@@ -280,7 +283,8 @@ export const updateHeader = (rowElement: HTMLElement) => {
     let selectCount: number;
     if (avType === "table") {
         const bodyElement = rowElement.parentElement as HTMLElement;
-        // 虚拟滚动下 DOM 内只有渲染窗口的行，直接计数会低估；优先用选中快照与已加载行总数。
+        // Under virtual scrolling, the DOM only contains rows in the render window, so counting
+        // directly would undercount; prefer the selection snapshot and the total loaded row count.
         const stat = getAVSelectStat(bodyElement);
         selectCount = stat ? stat.selectCount : bodyElement.querySelectorAll(".av__row--select:not(.av__row--header)").length;
         const count = stat ? stat.loadedCount : bodyElement.querySelectorAll(".av__row:not(.av__row--header)").length;
@@ -297,7 +301,8 @@ export const updateHeader = (rowElement: HTMLElement) => {
             headUseElement.setAttribute("xlink:href", "#iconIndeterminateCheck");
         }
     } else {
-        // 卡片/看板视图按分组（.av__body）聚合选中数，看板与分组卡片视图存在多个 body。
+        // Card/kanban views aggregate the selection count by group (.av__body); kanban and grouped
+        // card views can have multiple bodies.
         selectCount = 0;
         blockElement.querySelectorAll(".av__body").forEach((bodyItem: HTMLElement) => {
             const stat = getAVSelectStat(bodyItem);
@@ -328,12 +333,12 @@ export const setPage = (blockElement: Element) => {
 };
 
 /**
- * 前端插入一假行
+ * Insert a fake row on the frontend
  * @param options.protyle
  * @param options.blockElement
  * @param options.srcIDs
  * @param options.previousId
- * @param options.avId 存在为新增否则为拖拽插入
+ * @param options.avId Present for adding a new one, otherwise for drag insertion
  */
 export const insertAttrViewBlockAnimation = (options: {
     protyle: IProtyle,
@@ -345,7 +350,7 @@ export const insertAttrViewBlockAnimation = (options: {
     options.blockElement.querySelector('[data-type="av-search"]').textContent = "";
     const groupQuery = options.groupID ? `.av__body[data-group-id="${options.groupID}"] ` : "";
     let previousElement = options.blockElement.querySelector(groupQuery + `.av__row[data-id="${options.previousId}"]`) || options.blockElement.querySelector(groupQuery + ".av__row--header");
-    // 有排序需要加入最后一行
+    // When sorting is active, it needs to be appended as the last row
     const hasSort = options.blockElement.querySelector('.av__views [data-type="av-sort"]').classList.contains("block__icon--active");
     if (hasSort) {
         previousElement = options.blockElement.querySelector(groupQuery + ".av__row--util").previousElementSibling;
@@ -504,14 +509,15 @@ export const stickyRow = (blockElement: HTMLElement, scrollElement: HTMLElement,
         bindHeaderScrollSync(blockElement, scrollEl);
     }
 
-    // 先批量读取所有几何信息，再统一写入 style，避免读-写交错触发强制重排
+    // First batch-read all geometry info, then write style in one pass, to avoid interleaved
+    // reads/writes triggering forced reflow
     const elementRect = scrollElement.getBoundingClientRect();
     const scrollTop = scrollElement.scrollTop;
     const scrollLeft = scrollEl ? scrollEl.scrollLeft : 0;
     const doTop = status === "top" || status === "all";
     const doBottom = status === "bottom" || status === "all";
 
-    // 第一遍：纯读取，收集每个 header/footer 的几何与判定结果
+    // First pass: pure read, collecting geometry and decision results for each header/footer
     const headerTasks: Array<{
         item: HTMLElement;
         bodyRect: DOMRect;
@@ -568,7 +574,7 @@ export const stickyRow = (blockElement: HTMLElement, scrollElement: HTMLElement,
         });
     }
 
-    // 第二遍：纯写入，此时不再读取布局，仅触发一次重排
+    // Second pass: pure write; layout is no longer read at this point, triggering only a single reflow
     const stickyTop = Math.round(elementRect.top);
     const stickyBottom = Math.round(window.innerHeight - elementRect.bottom);
     headerTasks.forEach((task) => {
@@ -845,7 +851,7 @@ export const duplicateRows = (blockElement: HTMLElement, protyle: IProtyle, rowE
     const doOperations: IOperation[] = [];
     const undoOperations: IOperation[] = [];
     const newRowIDs: string[] = [];
-    // 副本统一插入到最后选中的条目之后，按源序排列
+    // All duplicates are inserted after the last selected entry, arranged in source order
     const anchorID = rowElements[rowElements.length - 1].getAttribute("data-id");
     let previousID = anchorID;
     rowElements.forEach(rowElement => {
@@ -859,7 +865,7 @@ export const duplicateRows = (blockElement: HTMLElement, protyle: IProtyle, rowE
             srcIDs: [srcRowID],
             previousID,
         });
-        // 后续副本接在前一个副本之后，保证源序
+        // Subsequent duplicates follow the previous duplicate, preserving source order
         previousID = newRowID;
     });
     const newUpdated = dayjs().format("YYYYMMDDHHmmss");

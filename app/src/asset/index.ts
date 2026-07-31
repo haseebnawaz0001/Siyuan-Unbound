@@ -94,7 +94,8 @@ export class Asset extends Model {
 
     private render(isInit = true) {
         const type = this.path.substr(this.path.lastIndexOf(".")).toLowerCase().split("?")[0];
-        // 对资源路径进行 HTML 转义后再拼入 src 属性，避免路径中包含 " 等字符导致属性逃逸引发 XSS
+        // HTML-escape the asset path before concatenating it into the src attribute, to avoid characters like "
+        // in the path breaking out of the attribute and causing XSS
         const src = Lute.EscapeHTMLStr(this.path.startsWith("file") ? this.path : document.getElementById("baseURL").getAttribute("href") + "/" + this.path);
         if (Constants.SIYUAN_ASSETS_IMAGE.includes(type)) {
             this.element.innerHTML = `<div class="asset"><img src="${src}"></div>`;
@@ -516,7 +517,8 @@ export class Asset extends Model {
                 darkElement.classList.add("toggled");
                 setStorageVal(Constants.LOCAL_PDFTHEME, window.siyuan.storage[Constants.LOCAL_PDFTHEME]);
             });
-            // 初始化完成后需等待页签是否显示设置完成，才可以判断 pdf 是否能进行渲染
+            // After initialization completes, we must wait for the tab's visibility to be settled before we can
+            // determine whether the PDF can be rendered
             setTimeout(() => {
                 if (this.element.clientWidth === 0) {
                     const observer = new MutationObserver(() => {

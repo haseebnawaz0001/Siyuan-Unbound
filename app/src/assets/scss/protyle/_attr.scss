@@ -8,7 +8,7 @@
   font-weight: normal;
   align-items: center;
   line-height: 16px;
-  // 会导致 https://github.com/siyuan-note/siyuan/issues/16829 先移除 user-select: none;
+  // Causes https://github.com/siyuan-note/siyuan/issues/16829, so user-select: none; was removed for now;
 
   &--av span:hover {
     color: var(--b3-protyle-inline-blockref-color);
@@ -53,7 +53,7 @@
     cursor: pointer;
     height: 16px;
     background-color: var(--b3-theme-surface);
-    z-index: 1; // 防止被 protyle-scroll 遮挡
+    z-index: 1; // Prevent it from being covered by protyle-scroll
     white-space: nowrap;
 
     &:hover {

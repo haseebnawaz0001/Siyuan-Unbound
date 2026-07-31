@@ -39,16 +39,17 @@ import (
 var luteEngine = util.NewLute()
 
 func init() {
-	luteEngine.RenderOptions.KramdownBlockIAL = false // 数据库 markdown 字段为标准 md，但是要保留 span block ial
+	luteEngine.RenderOptions.KramdownBlockIAL = false // The database's markdown field is standard md, but span block IAL still needs to be kept
 }
 
 const (
 	BlocksInsert      = "INSERT INTO blocks (id, parent_id, root_id, hash, box, path, hpath, name, alias, memo, tag, content, fcontent, markdown, length, type, subtype, ial, sort, created, updated) VALUES %s"
 	BlocksPlaceholder = "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
 
-	// blocks_fts 采用 external content 模式（content='blocks'），写入时必须显式提供 rowid，
-	// 该 rowid 取自 blocks 表的隐式 rowid，否则 FTS rowid 与 blocks rowid 脱钩会导致
-	// snippet/highlight 回表取错行、按 rowid 删除静默失效。首列即为 rowid。
+	// blocks_fts uses external content mode (content='blocks'), so the rowid must be provided explicitly on
+	// insert; this rowid comes from the blocks table's implicit rowid. Otherwise, the FTS rowid becoming
+	// disconnected from the blocks rowid would cause snippet/highlight to look up the wrong row and deletion by
+	// rowid to silently fail. The first column is the rowid.
 	BlocksFTSInsert      = "INSERT INTO blocks_fts (rowid, id, parent_id, root_id, hash, box, path, hpath, name, alias, memo, tag, content, fcontent, markdown, length, type, subtype, ial, sort, created, updated) VALUES %s"
 	BlocksFTSPlaceholder = "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
 
@@ -124,11 +125,12 @@ func insertBlocks0(tx *sql.Tx, bulk []*Block, context map[string]any) (err error
 	}
 	hashBuf.WriteString("blocks")
 	evtHash := fmt.Sprintf("%x", sha256.Sum256(hashBuf.Bytes()))[:7]
-	// 使用下面的 EvtSQLInsertBlocksFTS 就可以了
+	// Using the EvtSQLInsertBlocksFTS event below is enough
 	//eventbus.Publish(eventbus.EvtSQLInsertBlocks, context, current, total, len(bulk), evtHash)
 
-	// external content 模式下，FTS 行必须使用 blocks 的 rowid。刚插入的 blocks 行在同一事务内可见，
-	// 这里按 id 反查 rowid，再用与 bulk 顺序对齐的 rowid 拼装 FTS 写入参数。
+	// In external content mode, FTS rows must use the blocks table's rowid. The just-inserted blocks rows are
+	// visible within the same transaction, so here rowid is looked up by id, and then the FTS write arguments are
+	// assembled using rowids aligned with bulk's order.
 	blockRowIDs, err := queryBlockRowIDsTx(tx, bulk)
 	if err != nil {
 		return
@@ -138,7 +140,7 @@ func insertBlocks0(tx *sql.Tx, bulk []*Block, context map[string]any) (err error
 	for _, b := range bulk {
 		rowID, ok := blockRowIDs[b.ID]
 		if !ok {
-			// 理论上不会发生（刚插入即反查），防御性处理避免错位
+			// Should theoretically never happen (looked up right after inserting); this is defensive handling to avoid misalignment
 			logging.LogErrorf("query block rowid failed after insert: id=%s not found", b.ID)
 			err = fmt.Errorf("block rowid not found after insert: %s", b.ID)
 			return
@@ -512,7 +514,7 @@ func insertTree0(tx *sql.Tx, tree *parse.Tree, context map[string]any,
 	}
 
 	if 0 < len(spans) {
-		// 移除文档标签，否则会重复添加 https://github.com/siyuan-note/siyuan/issues/3723
+		// Remove document tags, otherwise they would be added again duplicately https://github.com/siyuan-note/siyuan/issues/3723
 		if err = deleteSpansByRootID(tx, tree.Root.ID); err != nil {
 			return
 		}

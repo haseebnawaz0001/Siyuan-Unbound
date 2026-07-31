@@ -93,7 +93,7 @@ export class Outline extends Model {
         const inputElement = this.headerElement.querySelector("input.b3-text-field.search__label") as HTMLInputElement;
         inputElement.addEventListener("blur", () => {
             inputElement.classList.add("fn__none");
-            const filterIconElement = inputElement.nextElementSibling as HTMLElement; // search 图标
+            const filterIconElement = inputElement.nextElementSibling as HTMLElement; // search icon
             const value = inputElement.value;
             if (value) {
                 filterIconElement.classList.add("block__icon--active");
@@ -167,7 +167,7 @@ export class Outline extends Model {
                 });
             },
             altClick: (element: HTMLElement, event: MouseEvent) => {
-                // alt 点击箭头，切换同层级的所有标题的展开/折叠状态
+                // alt-click the arrow to toggle expand/collapse for all headings at the same level
                 const arrowElement = hasClosestByClassName(event.target as HTMLElement, "b3-list-item__toggle");
                 if (arrowElement) {
                     this.collapseSameLevel(element);
@@ -199,19 +199,19 @@ export class Outline extends Model {
             blockExtHTML: window.siyuan.config.readonly ? undefined : '<span class="b3-list-item__action"><svg><use xlink:href="#iconMore"></use></svg></span>',
             topExtHTML: window.siyuan.config.readonly ? undefined : '<span class="b3-list-item__action"><svg><use xlink:href="#iconMore"></use></svg></span>',
         });
-        // 为了快捷键的 dispatch
+        // For dispatching the keyboard shortcut
         options.tab.panelElement.querySelector('[data-type="collapse"]').addEventListener("click", () => {
             this.tree.collapseAll();
             this.saveExpendIds();
         });
 
-        // 普通的全部展开按钮
+        // Regular expand-all button
         options.tab.panelElement.querySelector('[data-type="expand"]').addEventListener("click", () => {
             this.tree.expandAll();
             this.saveExpendIds();
         });
 
-        // 保持当前标题展开功能
+        // Keep-current-heading-expanded feature
         options.tab.panelElement.querySelector('[data-type="keepCurrentExpand"]').addEventListener("click", (event: MouseEvent & {
             target: Element
         }) => {
@@ -242,7 +242,7 @@ export class Outline extends Model {
                     this.setCurrent(focusElement);
                 }
             }
-            // 保存keepCurrentExpand状态到localStorage
+            // Save the keepCurrentExpand state to localStorage
             setStorageVal(Constants.LOCAL_OUTLINE, window.siyuan.storage[Constants.LOCAL_OUTLINE]);
         });
         options.tab.panelElement.addEventListener("click", (event: MouseEvent & { target: HTMLElement }) => {
@@ -303,7 +303,7 @@ export class Outline extends Model {
             id: this.blockId,
             preview: this.isPreview
         };
-        // 解析当前大纲面板所属 box：按 blockId 在已打开的编辑器里查找
+        // Resolve the notebook (box) this outline panel belongs to: look it up by blockId among the open editors
         let notebookId: string;
         getAllModels().editor.some(item => {
             if (item.editor.protyle.block.rootID === this.blockId) {
@@ -440,7 +440,7 @@ export class Outline extends Model {
                 documentSelf.onselect = null;
                 ghostElement?.remove();
                 item.style.opacity = "";
-                // 清理滚动动画
+                // Clean up the scroll animation
                 stopScrollAnimation();
                 if (!selectItem) {
                     selectItem = this.element.querySelector(".dragover__top, .dragover__bottom, .dragover");
@@ -526,7 +526,7 @@ export class Outline extends Model {
                 docTitleElement.setAttribute("title", title);
                 docTitleElement.classList.remove("fn__none");
             }
-            // count 为 -1 时，不对数量进行更新
+            // Do not update the count when it is -1
             if (typeof count === "number" && count !== -1) {
                 const counterElement = docTitleElement.querySelector(".counter") as HTMLElement;
                 if (count > 0) {
@@ -576,7 +576,7 @@ export class Outline extends Model {
                 id: this.blockId,
                 preview: this.isPreview
             };
-            // 解析当前大纲面板所属 box：按 blockId 在已打开的编辑器里查找
+            // Resolve the notebook (box) this outline panel belongs to: look it up by blockId among the open editors
             let notebookId: string;
             getAllModels().editor.some(item => {
                 if (item.editor.protyle.block.rootID === this.blockId) {
@@ -588,7 +588,7 @@ export class Outline extends Model {
                 outlineParam.notebook = notebookId;
             }
             fetchPost("/api/outline/getDocOutline", outlineParam, response => {
-                // 文档切换后不再更新原有推送 https://github.com/siyuan-note/siyuan/issues/13409
+                // No longer apply the original push after the document has switched https://github.com/siyuan-note/siyuan/issues/13409
                 if (data.data.rootID !== this.blockId) {
                     return;
                 }
@@ -631,7 +631,7 @@ export class Outline extends Model {
                     id: nodeElement.getAttribute("data-node-id"),
                     excludeTypes: []
                 };
-                // 解析当前大纲面板所属 box：按 blockId 在已打开的编辑器里查找
+                // Resolve the notebook (box) this outline panel belongs to: look it up by blockId among the open editors
                 let notebookId: string;
                 getAllModels().editor.some(editorItem => {
                     if (editorItem.editor.protyle.block.rootID === this.blockId) {
@@ -749,10 +749,10 @@ export class Outline extends Model {
     }
 
     /**
-     * 应用大纲筛选
+     * Apply the outline filter
      */
     private setFilter() {
-        // 还原 display
+        // Restore display
         this.element.querySelectorAll('li.b3-list-item[style$="display: none;"]').forEach((item: HTMLElement) => {
             item.style.display = "";
         });
@@ -761,7 +761,7 @@ export class Outline extends Model {
         });
         const keyword = (this.headerElement.querySelector("input.b3-text-field.search__label") as HTMLInputElement).value.toLowerCase();
         if (keyword) {
-            // 首次筛选时记录折叠状态
+            // Record the collapse state the first time a filter is applied
             if (!this.preFilterExpandIds) {
                 this.preFilterExpandIds = this.tree.getExpandIds();
             }
@@ -780,25 +780,25 @@ export class Outline extends Model {
 
                     const arrowElement = liItem.querySelector(".b3-list-item__arrow");
                     if ((liItem.querySelector(".b3-list-item__text")?.textContent || "").trim().toLowerCase().includes(keyword)) {
-                        // 当前标题命中
+                        // Current heading matches
                         liItem.style.display = "";
                         hasMatch = true;
 
                         if (nextUlElement) {
                             nextUlElement.classList.remove("fn__none");
                             if (childResult.hasMatch || childResult.hasChildMatch) {
-                                // 子项也有命中
+                                // Children also have a match
                                 arrowElement.classList.add("b3-list-item__arrow--open");
                                 nextUlElement.classList.remove("fn__none");
                             } else {
-                                // 子项无命中，折叠所有子项
+                                // No children match, collapse all children
                                 arrowElement.classList.remove("b3-list-item__arrow--open");
                                 arrowElement.parentElement.classList.add("fn__hidden");
                                 nextUlElement.classList.add("fn__none");
                             }
                         }
                     } else if (childResult.hasMatch || childResult.hasChildMatch) {
-                        // 当前标题未命中，但子级有命中
+                        // Current heading does not match, but a descendant does
                         liItem.style.display = "";
                         hasChildMatch = true;
 
@@ -807,7 +807,7 @@ export class Outline extends Model {
                             arrowElement.classList.add("b3-list-item__arrow--open");
                         }
                     } else {
-                        // 当前标题和子级都未命中，隐藏
+                        // Neither the current heading nor its descendants match, hide it
                         liItem.style.display = "none";
                         if (nextUlElement) {
                             nextUlElement.classList.add("fn__none");
@@ -820,40 +820,40 @@ export class Outline extends Model {
             processUL(this.element.firstElementChild);
             return;
         }
-        // 恢复折叠状态
+        // Restore the collapse state
         this.tree.setExpandIds(this.preFilterExpandIds);
         this.preFilterExpandIds = null;
     }
 
     /**
-     * 获取标题元素的实际标题级别（H1=1, H2=2, 等等）
-     * @param element li元素
-     * @returns 标题级别（1-6）
+     * Get the actual heading level of a heading element (H1=1, H2=2, etc.)
+     * @param element the li element
+     * @returns heading level (1-6)
      */
     private getHeadingLevel(element: HTMLElement) {
         return parseInt(element.getAttribute("data-subtype")?.replace("h", "") || "0");
     }
 
     /**
-     * 展开到指定标题级别
-     * @param targetLevel 目标标题级别，1-6级（H1-H6），6级表示全部展开
+     * Expand to the specified heading level
+     * @param targetLevel target heading level, 1-6 (H1-H6); 6 means expand all
      */
     private expandToLevel(targetLevel: number) {
         if (targetLevel >= 6) {
-            // 全部展开
+            // Expand all
             this.tree.expandAll();
         } else {
-            // 展开到指定标题级别
+            // Expand to the specified heading level
             this.element.querySelectorAll("li.b3-list-item").forEach(item => {
                 const headingLevel = this.getHeadingLevel(item as HTMLElement);
                 const arrowElement = item.querySelector(".b3-list-item__arrow");
                 if (item.nextElementSibling && item.nextElementSibling.tagName === "UL" && arrowElement) {
                     if (headingLevel > 0 && headingLevel < targetLevel) {
-                        // 当前标题级别小于目标级别，展开
+                        // Current heading level is below the target level, expand it
                         arrowElement.classList.add("b3-list-item__arrow--open");
                         item.nextElementSibling.classList.remove("fn__none");
                     } else if (headingLevel >= targetLevel) {
-                        // 当前标题级别大于等于目标级别，折叠
+                        // Current heading level is at or above the target level, collapse it
                         arrowElement.classList.remove("b3-list-item__arrow--open");
                         item.nextElementSibling.classList.add("fn__none");
                     }
@@ -864,7 +864,7 @@ export class Outline extends Model {
     }
 
     /**
-     * 显示展开层级菜单
+     * Show the expand-level menu
      */
     private showExpandLevelMenu(target: HTMLElement) {
         window.siyuan.menus.menu.remove();
@@ -887,10 +887,11 @@ export class Outline extends Model {
     }
 
     /**
-     * 切换同层级的所有标题的展开/折叠状态（基于标题级别而不是DOM层级）
+     * Toggle expand/collapse for all headings at the same level (based on heading level rather
+     * than DOM level)
      */
     private collapseSameLevel(element: HTMLElement, expand?: boolean) {
-        // 获取所有相同标题级别的元素
+        // Get all elements at the same heading level
         this.element.querySelectorAll(`li.b3-list-item[data-subtype="${element.getAttribute("data-subtype")}"]`).forEach(item => {
             const arrowElement = item.querySelector(".b3-list-item__arrow");
             if (typeof expand === "undefined") {
@@ -941,18 +942,18 @@ export class Outline extends Model {
     }
 
     /**
-     * 显示右键菜单
+     * Show the context menu
      */
     private showContextMenu(element: HTMLElement, event: MouseEvent) {
         if (this.isPreview) {
-            return; // 预览模式下不显示右键菜单
+            return; // Do not show the context menu in preview mode
         }
         const currentLevel = this.getHeadingLevel(element);
         window.siyuan.menus.menu.remove();
         window.siyuan.menus.menu.element.setAttribute("data-name", Constants.MENU_OUTLINE_CONTEXT);
         const id = element.getAttribute("data-node-id");
         if (!window.siyuan.config.readonly) {
-            // 升级
+            // Promote
             if (currentLevel > 1) {
                 window.siyuan.menus.menu.append(new MenuItem({
                     id: "upgrade",
@@ -972,7 +973,7 @@ export class Outline extends Model {
                 }).element);
             }
 
-            // 降级
+            // Demote
             if (currentLevel < 6) {
                 window.siyuan.menus.menu.append(new MenuItem({
                     id: "downgrade",
@@ -992,7 +993,7 @@ export class Outline extends Model {
                 }).element);
             }
 
-            // 带子标题转换
+            // Convert including subheadings
             checkFold(id, (zoomIn) => {
                 openFileById({
                     app: this.app,
@@ -1034,7 +1035,7 @@ export class Outline extends Model {
 
             window.siyuan.menus.menu.append(new MenuItem({id: "separator_1", type: "separator"}).element);
 
-            // 在前面插入同级标题
+            // Insert a heading at the same level before
             window.siyuan.menus.menu.append(new MenuItem({
                 id: "insertSameLevelHeadingBefore",
                 icon: "iconBefore",
@@ -1064,7 +1065,7 @@ export class Outline extends Model {
                 }
             }).element);
 
-            // 在后面插入同级标题
+            // Insert a heading at the same level after
             window.siyuan.menus.menu.append(new MenuItem({
                 id: "insertSameLevelHeadingAfter",
                 icon: "iconAfter",
@@ -1101,8 +1102,8 @@ export class Outline extends Model {
                 }
             }).element);
 
-            // 添加子标题
-            if (currentLevel < 6) { // 只有当前级别小于6时才能添加子标题
+            // Add a child heading
+            if (currentLevel < 6) { // A child heading can only be added when the current level is below 6
                 window.siyuan.menus.menu.append(new MenuItem({
                     id: "addChildHeading",
                     icon: "iconAdd",
@@ -1154,7 +1155,7 @@ export class Outline extends Model {
             window.siyuan.menus.menu.append(new MenuItem({id: "separator_2", type: "separator"}).element);
         }
 
-        // 复制带子标题
+        // Copy including subheadings
         window.siyuan.menus.menu.append(new MenuItem({
             id: "copyHeadings1",
             icon: "iconCopy",
@@ -1177,7 +1178,7 @@ export class Outline extends Model {
         }).element);
 
         if (!window.siyuan.config.readonly) {
-            // 剪切带子标题
+            // Cut including subheadings
             window.siyuan.menus.menu.append(new MenuItem({
                 id: "cutHeadings1",
                 icon: "iconCut",
@@ -1225,7 +1226,7 @@ export class Outline extends Model {
                 }
             }).element);
 
-            // 删除
+            // Delete
             window.siyuan.menus.menu.append(new MenuItem({
                 id: "deleteHeadings1",
                 icon: "iconTrashcan",
@@ -1263,7 +1264,7 @@ export class Outline extends Model {
         }
         window.siyuan.menus.menu.append(new MenuItem({id: "separator_3", type: "separator"}).element);
 
-        // 展开子标题
+        // Expand child headings
         window.siyuan.menus.menu.append(new MenuItem({
             id: "expandChildHeading",
             icon: "iconExpand",
@@ -1272,7 +1273,7 @@ export class Outline extends Model {
             click: () => this.collapseChildren(element, true)
         }).element);
 
-        // 折叠子标题
+        // Fold child headings
         window.siyuan.menus.menu.append(new MenuItem({
             id: "foldChildHeading",
             icon: "iconContract",
@@ -1281,7 +1282,7 @@ export class Outline extends Model {
             click: () => this.collapseChildren(element, false)
         }).element);
 
-        // 展开同级标题
+        // Expand same-level headings
         window.siyuan.menus.menu.append(new MenuItem({
             id: "expandSameLevelHeading",
             icon: "iconExpand",
@@ -1290,7 +1291,7 @@ export class Outline extends Model {
             click: () => this.collapseSameLevel(element, true)
         }).element);
 
-        // 折叠同级标题
+        // Fold same-level headings
         window.siyuan.menus.menu.append(new MenuItem({
             id: "foldSameLevelHeading",
             icon: "iconContract",
@@ -1299,7 +1300,7 @@ export class Outline extends Model {
             click: () => this.collapseSameLevel(element, false)
         }).element);
 
-        // 全部展开
+        // Expand all
         window.siyuan.menus.menu.append(new MenuItem({
             id: "expandAll",
             icon: "iconExpand",
@@ -1310,7 +1311,7 @@ export class Outline extends Model {
             }
         }).element);
 
-        // 全部折叠
+        // Fold all
         window.siyuan.menus.menu.append(new MenuItem({
             id: "foldAll",
             icon: "iconContract",
@@ -1348,7 +1349,7 @@ export class Outline extends Model {
     }
 
     /**
-     * 生成标题级别转换菜单项
+     * Generate a heading-level conversion menu item
      */
     private genHeadingTransform(id: string, level: number) {
         return {
@@ -1377,7 +1378,7 @@ export class Outline extends Model {
                         protyle.wysiwyg.element.querySelectorAll(`[data-node-id="${operation.id}"]`).forEach((itemElement: HTMLElement) => {
                             itemElement.outerHTML = operation.data;
                         });
-                        // 使用 outer 后元素需要重新查询
+                        // The element must be re-queried after using outerHTML
                         protyle.wysiwyg.element.querySelectorAll(`[data-node-id="${operation.id}"]`).forEach((itemElement: HTMLElement) => {
                             mathRender(itemElement);
                         });

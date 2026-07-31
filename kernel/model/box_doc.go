@@ -124,7 +124,7 @@ func EnsureBoxDoc(boxID string) (boxDocID string, err error) {
 	return ensureBoxDoc0(boxID)
 }
 
-// ensureBoxDoc0 的调用方必须持有 createDocLock。
+// ensureBoxDoc0 callers must hold createDocLock.
 func ensureBoxDoc0(boxID string) (boxDocID string, err error) {
 	if !ast.IsNodeIDPattern(boxID) {
 		return "", fmt.Errorf("invalid box ID [%s]", boxID)
@@ -272,12 +272,13 @@ func reconcileBoxDoc(box *Box, boxDocID string) error {
 	return nil
 }
 
-// BoxDocSubFileCount 返回笔记本顶层文档的可见下级文档数。
+// BoxDocSubFileCount returns the number of visible sub-documents under the notebook's top-level document.
 func BoxDocSubFileCount(boxID string) int {
 	return boxDocSubFileCount(boxID, nil)
 }
 
-// BoxDocSubFileCountForPublish 返回发布访问控制下笔记本顶层文档的可见下级文档数。
+// BoxDocSubFileCountForPublish returns the number of visible sub-documents under the notebook's top-level
+// document, subject to publish access control.
 func BoxDocSubFileCountForPublish(boxID string, publishAccess PublishAccess) int {
 	publishIgnore := GetInvisiblePublishAccess(publishAccess)
 	return boxDocSubFileCount(boxID, func(p string) bool {
@@ -321,7 +322,7 @@ func IsBoxDocPath(boxID, p string) bool {
 	return IsBoxDoc(boxID, util.GetTreeID(p))
 }
 
-// normalizeBoxDocPath 将虚拟根文档下的路径映射到笔记本物理根路径。
+// normalizeBoxDocPath maps a path under the virtual root document to the notebook's physical root path.
 func normalizeBoxDocPath(boxID, p string) string {
 	box := Conf.Box(boxID)
 	if nil == box {

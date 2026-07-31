@@ -290,7 +290,7 @@ export const fontEvent = (protyle: IProtyle, nodeElements: Element[], type?: str
 export const setFontStyle = (textElement: HTMLElement, textOption: ITextOption) => {
     const setBlockRef = (blockRefOption: string) => {
         const blockRefData = blockRefOption.split(Constants.ZWSP);
-        // 标签等元素中包含 ZWSP，需移除后拼接 https://github.com/siyuan-note/siyuan/issues/6466
+        // Elements like tags contain a ZWSP, which must be removed before concatenating https://github.com/siyuan-note/siyuan/issues/6466
         const id = blockRefData.splice(0, 1)[0];
         textElement.setAttribute("data-id", id);
         textElement.setAttribute("data-subtype", blockRefData.splice(0, 1)[0]);
@@ -404,7 +404,7 @@ export const hasSameTextStyle = (currentElement: HTMLElement, sideElement: HTMLE
 
     if (textObj) {
         if (textObj.type === "text") {
-            // 清除样式
+            // Clear the style
             return !sideElement.style.color &&
                 !sideElement.style.webkitTextFillColor &&
                 !sideElement.style.webkitTextStroke &&

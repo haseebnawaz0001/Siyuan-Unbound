@@ -46,7 +46,7 @@ async function fetchCoverData(): Promise<{
             cachedCoversByCategory.set(cover.category, list);
         }
 
-        // 保持 manifest 中的原始顺序
+        // Keep the original order from the manifest
         cachedCategories = [];
         const seen = new Set<string>();
         for (const cover of covers) {
@@ -62,7 +62,7 @@ async function fetchCoverData(): Promise<{
             allCovers: cachedCovers,
         };
     } catch (e) {
-        console.warn("加载封面数据失败", e);
+        console.warn("Failed to load cover data", e);
         return null;
     }
 }

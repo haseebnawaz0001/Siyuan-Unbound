@@ -689,7 +689,8 @@
     border-right: 1px solid var(--b3-theme-surface-lighter);
     overflow: hidden;
     cursor: pointer;
-    //  display: flex; 不需要使用，否则 av__celltext 会占满单元格，导致链接列点击空白无法进行编辑
+    //  display: flex; should not be used, otherwise av__celltext fills the whole cell and clicking
+    // blank space in a link column can no longer trigger editing
 
     &:not(.av__cell--header) {
       &[data-dtype="number"][data-align=""],
@@ -804,7 +805,7 @@
       padding: 5px 8px;
       display: flex;
       align-items: center;
-      overflow: inherit; // 保证列宽和顺序调整的拖拽点样式
+      overflow: inherit; // Ensures the drag handle styling for resizing/reordering columns stays intact
       border-right-color: transparent;
 
       &[data-dtype="number"][data-align=""],
@@ -956,7 +957,7 @@
   &__colsticky {
     position: sticky;
     left: 0;
-    z-index: 2; // 需大于 av__widthdrag，否则横行滚动后，拖拽会悬浮于 stick 列上
+    z-index: 2; // Must exceed av__widthdrag, else drag handle floats over sticky column after scrolling
     display: flex;
     background-color: var(--b3-parent-background);
   }
@@ -1072,7 +1073,7 @@
         }
       }
 
-      // “当/且/或”只读标签，盒模型与 b3-select 对齐以保证垂直居中一致
+      // Read-only "when/and/or" label, box model aligned with b3-select to keep vertical centering consistent
       .av__filter-label {
         flex-shrink: 0;
         height: 28px;
@@ -1141,7 +1142,7 @@
         }
       }
 
-      // 分组行尾“更多”按钮与底部下拉箭头统一尺寸
+      // Unify the size of the "more" button at the end of a group row with the dropdown arrow below it
       .av__filter-group-item > .b3-menu__action {
         flex-shrink: 0;
         align-self: center;
@@ -1155,7 +1156,8 @@
         margin-left: 4px;
       }
 
-      // “添加筛选条件”按钮：label 按内容宽度，使下拉箭头紧跟文案而非被推到最右
+      // "Add filter" button: label sized to its content so the dropdown arrow stays right next to
+      // the text instead of being pushed to the far right
       .av__filter-add-label {
         flex: none;
       }
@@ -1189,7 +1191,8 @@
         margin-bottom: 0;
       }
 
-      // 筛选面板内的下拉/输入控件统一为描边卡片样式（与字段选择器一致）
+      // Dropdowns/inputs inside the filter panel share a unified outlined card style (matching
+      // the field selector)
       .av__filter-row .b3-select,
       .av__filter-row .b3-text-field--text,
       .av__filter-group-left .b3-select {
@@ -1225,7 +1228,7 @@
         background-color: var(--b3-menu-background);
       }
 
-      // 字段选择器嵌入描边容器内，去掉自身描边避免双重描边
+      // Field selector is embedded inside an outlined container, so remove its own border to avoid a double outline
       .av__field-wrapper .b3-select {
         border: 0;
         box-shadow: none;
@@ -1314,12 +1317,12 @@
         overflow: hidden;
       }
 
-      // 触发器内已选 chip
+      // Selected chip inside the trigger
       .av__select-chip {
         margin: 1px 2px;
       }
 
-      // 下拉面板内的选项 chip
+      // Option chip inside the dropdown panel
       .av__select-option {
         margin: 2px 0;
         cursor: pointer;
@@ -1338,7 +1341,7 @@
         }
       }
 
-      // 下拉内搜索框，复用 input 的外观但占满宽度
+      // Search field inside the dropdown, reuses the input's look but fills the full width
       .av__select-dropdown .b3-text-field {
         margin: 0 0 4px 0;
         height: 28px;

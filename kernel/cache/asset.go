@@ -84,15 +84,15 @@ func GetAssetHash(hash string) *AssetHash {
 	assetHashLock.Lock()
 	defer assetHashLock.Unlock()
 
-	// 直接使用 hash 作为 key 进行查找
+	// Look up directly using the hash as the key
 	asset, exists := assetHashCache[hash]
 	if !exists {
 		return nil
 	}
 
-	// 验证文件是否存在
+	// Verify the file exists
 	if !filelock.IsExist(filepath.Join(util.DataDir, asset.Path)) {
-		// 文件不存在，清理缓存
+		// File doesn't exist, clear the cache
 		delete(assetHashCache, hash)
 		delete(assetPathHashCache, asset.Path)
 		return nil
@@ -111,7 +111,7 @@ var (
 	assetsLock  = sync.Mutex{}
 )
 
-// FilterAssets 根据过滤函数返回符合条件的资源
+// FilterAssets returns the assets matching the filter function
 func FilterAssets(filter func(path string, asset *Asset) bool) (ret map[string]*Asset) {
 	assetsLock.Lock()
 	defer assetsLock.Unlock()

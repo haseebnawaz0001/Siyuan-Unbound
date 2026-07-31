@@ -205,7 +205,7 @@
     'use strict';
     const params = new URLSearchParams(window.location.search);
 
-    // 窗口控制按钮
+    // Window control buttons
     if (process.platform === 'darwin') {
         document.body.classList.add('darwin');
     }
@@ -218,22 +218,22 @@
         ipcRenderer.send("siyuan-cmd", "minimize");
     });
 
-    // LOGO和版本号
+    // Logo and version number
     const version = 'SiYuan v' + params.get('v') || '';
     document.querySelector('#icon').innerHTML = `<img src="${params.get('icon') || ''}" alt="SiYuan LOGO"> ${version}`;
 
-    // 标题
+    // Title
     document.getElementById('titleEmoji').textContent = params.get('emoji');
     document.getElementById('titleText').innerHTML = params.get('title') || '';
 
-    // 内容
+    // Content
     document.getElementById('content').innerHTML = params.get('content') || '';
 
-    // 时间信息
+    // Time information
     const date = new Date();
     document.getElementById('time').innerHTML = `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}:${String(date.getSeconds()).padStart(2, '0')}`;
 
-    // 系统信息
+    // System information
     const os = require('os');
     let platformName = {
         'darwin': 'macOS',
@@ -241,9 +241,9 @@
         'linux': 'Linux'
     }[process.platform] || process.platform;
     const release = typeof process.getSystemVersion === 'function'
-        ? process.getSystemVersion() // Electron 提供，系统版本
-        : os.release(); // Node.js 提供，内核版本
-    // Windows 系统版本判断
+        ? process.getSystemVersion() // Provided by Electron, the OS version
+        : os.release(); // Provided by Node.js, the kernel version
+    // Windows OS version check
     if (process.platform === 'win32') {
         const versionParts = release.split('.'); // 10.0.22000
         if (versionParts.length >= 3) {

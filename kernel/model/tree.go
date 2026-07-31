@@ -65,7 +65,7 @@ func resetTree(tree *parse.Tree, titleSuffix string, removeAvBinding bool) {
 	tree.Path = p
 	tree.HPath = tree.HPath + " " + titleSuffix
 
-	// 收集所有引用
+	// Collect all references
 	refIDs := map[string]string{}
 	ast.Walk(tree.Root, func(n *ast.Node, entering bool) ast.WalkStatus {
 		if !entering || !treenode.IsBlockRef(n) {
@@ -79,7 +79,7 @@ func resetTree(tree *parse.Tree, titleSuffix string, removeAvBinding bool) {
 		return ast.WalkContinue
 	})
 
-	// 重置块 ID
+	// Reset block IDs
 	ast.Walk(tree.Root, func(n *ast.Node, entering bool) ast.WalkStatus {
 		if !entering || ast.NodeDocument == n.Type {
 			return ast.WalkContinue
@@ -87,7 +87,7 @@ func resetTree(tree *parse.Tree, titleSuffix string, removeAvBinding bool) {
 		if n.IsBlock() && "" != n.ID {
 			newID := ast.NewNodeID()
 			if "1" == refIDs[n.ID] {
-				// 如果是文档自身的内部引用
+				// If it's an internal reference within the document itself
 				refIDs[n.ID] = newID
 			}
 			n.ID = newID
@@ -96,7 +96,7 @@ func resetTree(tree *parse.Tree, titleSuffix string, removeAvBinding bool) {
 		return ast.WalkContinue
 	})
 
-	// 重置内部引用
+	// Reset internal references
 	ast.Walk(tree.Root, func(n *ast.Node, entering bool) ast.WalkStatus {
 		if !entering || !treenode.IsBlockRef(n) {
 			return ast.WalkContinue
@@ -114,7 +114,7 @@ func resetTree(tree *parse.Tree, titleSuffix string, removeAvBinding bool) {
 	})
 
 	var attrViewIDs []string
-	// 绑定镜像数据库
+	// Bind mirrored database
 	ast.Walk(tree.Root, func(n *ast.Node, entering bool) ast.WalkStatus {
 		if !entering {
 			return ast.WalkContinue
@@ -128,7 +128,7 @@ func resetTree(tree *parse.Tree, titleSuffix string, removeAvBinding bool) {
 	})
 
 	if removeAvBinding {
-		// 清空文档绑定的数据库
+		// Clear the databases bound to the document
 		tree.Root.RemoveIALAttr(av.NodeAttrNameAvs)
 	}
 }
@@ -168,8 +168,9 @@ func loadTree(localPath string, luteEngine *lute.Lute) (ret *parse.Tree, err err
 		return
 	}
 
-	// 加密笔记本的 .sy 是密文，需先解密。从路径反推 boxID，已解锁的加密笔记本用 fileKey 解密；
-	// 加密笔记本未解锁时返回错误（fail-closed）；非加密笔记本原样 data。
+	// The .sy file of an encrypted notebook is ciphertext and must be decrypted first. Derive the boxID
+	// from the path; if the encrypted notebook is unlocked, decrypt with its fileKey. If it is not
+	// unlocked, return an error (fail-closed). Non-encrypted notebooks use the data as-is.
 	if boxID := extractBoxIDFromPath(localPath); boxID != "" && IsEncryptedBox(boxID) {
 		HoldBoxReadLock(boxID)
 		defer ReleaseBoxReadLock(boxID)
@@ -178,7 +179,7 @@ func loadTree(localPath string, luteEngine *lute.Lute) (ret *parse.Tree, err err
 			err = dekErr
 			return
 		}
-		// 从绝对路径推导 box 内相对路径作为 AAD
+		// Derive the path relative to the box from the absolute path to use as AAD
 		relPath := filepath.ToSlash(strings.TrimPrefix(localPath, filepath.Join(util.DataDir, boxID)+string(os.PathSeparator)))
 		if data, err = DecryptFile(boxID, relPath, dek, data); err != nil {
 			logging.LogErrorf("decrypt tree [path=%s] failed: %s", localPath, err)
@@ -207,7 +208,8 @@ func LoadTreeByBlockIDWithReindex(id string) (ret *parse.Tree, err error) {
 	return LoadTreeByBlockIDWithReindexInBox(id, "")
 }
 
-// LoadTreeByBlockIDWithReindexInBox 与 LoadTreeByBlockIDWithReindex 一致，但按 boxID 路由 blocktree 查询。
+// LoadTreeByBlockIDWithReindexInBox behaves the same as LoadTreeByBlockIDWithReindex, but routes the
+// blocktree query by boxID.
 func LoadTreeByBlockIDWithReindexInBox(id, boxID string) (ret *parse.Tree, err error) {
 	if "" == id {
 		logging.LogWarnf("block id is empty")
@@ -216,7 +218,8 @@ func LoadTreeByBlockIDWithReindexInBox(id, boxID string) (ret *parse.Tree, err e
 
 	bt := treenode.GetBlockTreeInBox(id, boxID)
 	if nil == bt && "" == boxID {
-		// boxID 未知时（如通用打开入口），遍历所有已打开的加密笔记本查找
+		// When boxID is unknown (e.g. a generic open entry point), iterate over all opened
+		// encrypted notebooks to find it
 		for _, encBoxID := range treenode.GetOpenedEncryptedBoxIDs() {
 			if encBT := treenode.GetBlockTreeInBox(id, encBoxID); nil != encBT {
 				bt = encBT
@@ -230,7 +233,7 @@ func LoadTreeByBlockIDWithReindexInBox(id, boxID string) (ret *parse.Tree, err e
 			return
 		}
 
-		// 尝试从文件系统加载并建立索引
+		// Try to load from the filesystem and build the index
 		err = indexTreeInFilesystem(id)
 		bt = treenode.GetBlockTreeInBox(id, boxID)
 		if nil == bt {
@@ -263,7 +266,8 @@ func loadTreeByBlockTree(bt *treenode.BlockTree) (ret *parse.Tree, err error) {
 	return
 }
 
-// loadTreeByBlockIDInBox 与 LoadTreeByBlockID 一致，但按 boxID 路由 blocktree 查询到加密 db 或全局 db。
+// loadTreeByBlockIDInBox behaves the same as LoadTreeByBlockID, but routes the blocktree query by boxID
+// to either the encrypted db or the global db.
 func loadTreeByBlockIDInBox(id, boxID string) (ret *parse.Tree, err error) {
 	if !ast.IsNodeIDPattern(id) {
 		stack := logging.ShortStack()
@@ -273,7 +277,8 @@ func loadTreeByBlockIDInBox(id, boxID string) (ret *parse.Tree, err error) {
 
 	bt := treenode.GetBlockTreeInBox(id, boxID)
 	if nil == bt && "" == boxID {
-		// boxID 未知时（如通用打开入口），遍历所有已打开的加密笔记本查找
+		// When boxID is unknown (e.g. a generic open entry point), iterate over all opened
+		// encrypted notebooks to find it
 		for _, encBoxID := range treenode.GetOpenedEncryptedBoxIDs() {
 			if encBT := treenode.GetBlockTreeInBox(id, encBoxID); nil != encBT {
 				bt = encBT
@@ -335,7 +340,7 @@ func indexTreeInFilesystem(blockID string) error {
 		}
 
 		logging.LogInfof("box [%s] not found", boxID)
-		// 如果笔记本不存在则不处理 https://github.com/siyuan-note/siyuan/issues/11149
+		// Skip processing if the notebook doesn't exist https://github.com/siyuan-note/siyuan/issues/11149
 		return ErrTreeNotFound
 	}
 

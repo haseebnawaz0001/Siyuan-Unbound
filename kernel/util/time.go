@@ -77,20 +77,20 @@ func ISOYear(date time.Time) int {
 func ISOMonth(date time.Time) int {
 	isoYear, isoWeek := date.ISOWeek()
 
-	// 1. 找到该 ISO 年份的 1 月 4 日（它必然属于第 1 周）
+	// 1. Find January 4th of this ISO year (it necessarily belongs to week 1)
 	jan4 := time.Date(isoYear, time.January, 4, 0, 0, 0, 0, date.Location())
 
-	// 2. 找到第 1 周的周四
-	// (jan4.Weekday() + 6) % 7 将周一~周日映射为 0~6
+	// 2. Find the Thursday of week 1
+	// (jan4.Weekday() + 6) % 7 maps Monday..Sunday to 0..6
 	daysToMonday := (int(jan4.Weekday()) + 6) % 7
 	mondayOfWeek1 := jan4.AddDate(0, 0, -daysToMonday)
 	thursdayOfWeek1 := mondayOfWeek1.AddDate(0, 0, 3)
 
-	// 3. 计算目标周的周四
-	// 目标周四 = 第一周周四 + (isoWeek-1) * 7天
+	// 3. Compute the Thursday of the target week
+	// target Thursday = Thursday of week 1 + (isoWeek-1) * 7 days
 	targetThursday := thursdayOfWeek1.AddDate(0, 0, (isoWeek-1)*7)
 
-	// 4. 返回该周四所在的自然月份
+	// 4. Return the calendar month that Thursday falls in
 	return int(targetThursday.Month())
 }
 
@@ -164,7 +164,7 @@ func HumanizeDiffTime(a, b time.Time, lang string) string {
 }
 
 func humanizeDiffTime(a, b time.Time) (year, month, day, hour, min, sec int) {
-	// 感谢 https://stackoverflow.com/a/36531443/1043233
+	// Thanks to https://stackoverflow.com/a/36531443/1043233
 
 	if a.Location() != b.Location() {
 		b = b.In(a.Location())

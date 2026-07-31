@@ -193,7 +193,7 @@ export class AgentSessionPanel {
 
             const actionBtn = hasClosestByClassName(target, "b3-list-item__action");
             if (actionBtn) {
-                // "更多"按钮：弹出文件夹（桌面端）和删除操作。
+                // "More" button: pops up folder (desktop) and delete actions.
                 if (actionBtn.classList.contains("agent-session-more")) {
                     e.stopPropagation();
                     const id = (actionBtn as HTMLElement).getAttribute("data-id") || "";
@@ -311,8 +311,10 @@ export class AgentSessionPanel {
         }
     }
 
-    // 跨实例会话变更（ws agentSessionChanged）时由 AgentChat.onWsMessage 调用，刷新已打开的列表。
-    // popup 未打开时直接返回（下次 toggle/render 会拉取最新数据），避免无谓请求。
+    // Called by AgentChat.onWsMessage on a cross-instance session change (ws agentSessionChanged), to
+    // refresh the currently open list.
+    // Returns immediately when the popup is not open (the next toggle/render will fetch fresh data),
+    // avoiding a pointless request.
     async refresh() {
         const itemsContainer = this.popup?.querySelector(".b3-list") as HTMLElement;
         if (!itemsContainer) {
@@ -326,7 +328,7 @@ export class AgentSessionPanel {
     }
 
     private showMoreMenu(anchor: HTMLElement, id: string) {
-        // 内嵌子菜单（b3-menu__submenu），点击 toggle 展开/关闭。
+        // Inline submenu (b3-menu__submenu), toggled open/closed by clicking.
         if (anchor.classList.contains("b3-menu__item--show")) {
             anchor.classList.remove("b3-menu__item--show");
             return;
@@ -335,8 +337,9 @@ export class AgentSessionPanel {
         anchor.classList.add("b3-menu__item--show");
         const submenu = anchor.querySelector(".b3-menu__submenu") as HTMLElement | null;
         if (submenu) {
-            // 使用 position: fixed 定位子菜单，避免在可滚动列表内触发滚动条。
-            // 在按钮左侧展开；左侧空间不够则在右侧展开。
+            // Position the submenu with position: fixed, to avoid triggering a scrollbar inside the
+            // scrollable list.
+            // Expand to the left of the button; if there is not enough space on the left, expand to the right.
             const anchorRect = anchor.getBoundingClientRect();
             const submenuRect = submenu.getBoundingClientRect();
             let left = anchorRect.left - submenuRect.width - 4;
@@ -344,11 +347,11 @@ export class AgentSessionPanel {
             if (left < 0) {
                 left = anchorRect.right + 4;
             }
-            // 防止超出屏幕底部
+            // Prevent overflowing past the bottom of the screen
             if (top + submenuRect.height > window.innerHeight) {
                 top = window.innerHeight - submenuRect.height - 4;
             }
-            // 防止超出屏幕顶部
+            // Prevent overflowing past the top of the screen
             if (top < 0) {
                 top = 4;
             }
@@ -356,7 +359,7 @@ export class AgentSessionPanel {
             submenu.style.left = left + "px";
             submenu.style.zIndex = (++window.siyuan.zIndex).toString();
 
-            // 子菜单项 hover 高亮（限定 b3-menu__items 内的项）。
+            // Highlight submenu items on hover (limited to items inside b3-menu__items).
             const itemsContainer = submenu.querySelector(".b3-menu__items");
             if (itemsContainer) {
                 itemsContainer.addEventListener("mouseover", (e: MouseEvent) => {
@@ -368,7 +371,8 @@ export class AgentSessionPanel {
                     item.classList.add("b3-menu__item--current");
                 });
             }
-            // 关闭子菜单：点击子菜单项执行操作后关闭，或点击外部关闭。
+            // Close the submenu: closes after clicking a submenu item to perform an action, or when
+            // clicking outside it.
             const onClose = () => {
                 anchor.classList.remove("b3-menu__item--show");
                 submenu.querySelectorAll(".b3-menu__item--current").forEach((el) => {
@@ -383,7 +387,7 @@ export class AgentSessionPanel {
                 onClose();
             };
             document.addEventListener("mousedown", onOutside, {once: true});
-            // 子菜单项 click 事件委托。
+            // Click event delegation for submenu items.
             if (!submenu.dataset.eventsBound) {
                 submenu.dataset.eventsBound = "1";
                 submenu.addEventListener("click", (e: MouseEvent) => {

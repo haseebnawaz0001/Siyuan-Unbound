@@ -47,14 +47,14 @@ func HookDesktopUIProcJob() {
 	}
 
 	if firstRunHookDesktopUIProcJob {
-		// 等待启动结束再监控
+		// Wait for startup to finish before monitoring
 		time.Sleep(30 * time.Second)
 		firstRunHookDesktopUIProcJob = false
 		return
 	}
 
 	if 0 < util.CountSessions() {
-		// 如果存在活动的会话则说明 UI 进程还在运行
+		// An active session means the UI process is still running
 		return
 	}
 
@@ -83,7 +83,7 @@ func HookDesktopUIProcJob() {
 
 var uiProcNames = []string{"siyuan", "electron"}
 
-// getAttachedUIProcCount 获取已经附加的 UI 进程数。
+// getAttachedUIProcCount returns the number of already-attached UI processes.
 func getAttachedUIProcCount() (ret int) {
 	util.UIProcessIDs.Range(func(uiProcIDArg, _ any) bool {
 		uiProcID, err := strconv.Atoi(uiProcIDArg.(string))
@@ -117,7 +117,7 @@ func getAttachedUIProcCount() (ret int) {
 	return
 }
 
-// getUIProcCount 获取 UI 进程数。
+// getUIProcCount returns the number of UI processes.
 func getUIProcCount() (ret int) {
 	pid := os.Getpid()
 	procs, _ := goPS.Processes()

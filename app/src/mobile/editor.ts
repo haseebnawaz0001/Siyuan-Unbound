@@ -51,7 +51,7 @@ export const openMobileFileById = (app: App, id: string, action: TProtyleAction[
                 scrollCenter(window.siyuan.mobile.editor.protyle, blockElement, scrollPosition);
             }
             closePanel();
-            // 更新文档浏览时间
+            // Update the document view time
             fetchPost("/api/storage/updateRecentDocViewTime", {rootID: window.siyuan.mobile.editor.protyle.block.rootID});
             afterOpen?.(window.siyuan.mobile.editor.protyle);
             return;
@@ -136,7 +136,8 @@ export const openMobileFileById = (app: App, id: string, action: TProtyleAction[
                 });
             }
             window.siyuan.mobile.editor.protyle.undo.clear();
-            // 切换文档后校准新文档的撤销镜像（语义 B：各文档栈隔离）
+            // After switching documents, calibrate the undo mirror for the new document
+            // (semantics B: each document's undo stack is isolated)
             if (window.siyuan.mobile.editor.protyle.block?.rootID) {
                 initMirror(window.siyuan.mobile.editor.protyle.block.rootID);
             }

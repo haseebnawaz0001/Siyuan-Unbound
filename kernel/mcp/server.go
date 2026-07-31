@@ -26,8 +26,9 @@ import (
 )
 
 func Serve(ginServer *gin.Engine) {
-	// MCP 工具暴露任意工作区文件读写删、SQL、插件分发等管理级原语，必须要求管理员角色，
-	// 否则 Publish 匿名模式注入的 RoleReader JWT 可经此链路越权调用全部工具。
+	// MCP tools expose admin-level primitives such as reading/writing/deleting any workspace file, SQL, and
+	// plugin distribution, so the admin role must be required here; otherwise a RoleReader JWT injected by
+	// Publish's anonymous mode could use this path to escalate privileges and call every tool.
 	ginServer.POST("/mcp", model.CheckAuth, model.CheckAdminRole, model.CheckReadonly, handlePost)
 	ginServer.GET("/mcp", model.CheckAuth, model.CheckAdminRole, func(c *gin.Context) {
 		c.Status(http.StatusMethodNotAllowed)

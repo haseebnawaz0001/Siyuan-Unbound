@@ -1,6 +1,7 @@
 /**
- * 将相对路径段合并进已有段数组：`..` 向上一级（已在根时不再上移），`.` 与空段忽略。
- * 会就地修改 `pathSegments` 并返回同一数组。
+ * Merges relative path segments into an existing segments array: `..` goes up one level (no
+ * further up once already at the root), and `.` and empty segments are ignored.
+ * Modifies `pathSegments` in place and returns the same array.
  */
 export const mergePathSegments = (pathSegments: string[], segments: string[]): string[] => {
     for (const segment of segments) {

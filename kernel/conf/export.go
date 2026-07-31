@@ -17,34 +17,34 @@
 package conf
 
 type Export struct {
-	ParagraphBeginningSpace bool `json:"paragraphBeginningSpace"` // 是否使用中文排版段落开头空两格
-	AddTitle                bool `json:"addTitle"`                // 是否添加标题
-	// 内容块引用导出模式
-	//   2：锚文本块链
-	//   3：仅锚文本
-	//   4：块引转脚注+锚点哈希
-	//  （5：锚点哈希 https://github.com/siyuan-note/siyuan/issues/10265 已经废弃 https://github.com/siyuan-note/siyuan/issues/13331）
-	//  （0：使用原始文本，1：使用 Blockquote，都已经废弃 https://github.com/siyuan-note/siyuan/issues/3155）
+	ParagraphBeginningSpace bool `json:"paragraphBeginningSpace"` // Whether to indent paragraph beginnings by two spaces, per Chinese typographic convention
+	AddTitle                bool `json:"addTitle"`                // Whether to add a title
+	// Content block reference export mode
+	//   2: anchor text block chain
+	//   3: anchor text only
+	//   4: convert block ref to footnote + anchor hash
+	//  (5: anchor hash https://github.com/siyuan-note/siyuan/issues/10265, already deprecated https://github.com/siyuan-note/siyuan/issues/13331)
+	//  (0: use raw text, 1: use Blockquote, both already deprecated https://github.com/siyuan-note/siyuan/issues/3155)
 	BlockRefMode          int    `json:"blockRefMode"`
-	BlockEmbedMode        int    `json:"blockEmbedMode"`        // 内容块引用导出模式，0：使用原始文本，1：使用 Blockquote
-	BlockRefTextLeft      string `json:"blockRefTextLeft"`      // 内容块引用导出锚文本左侧符号，默认留空
-	BlockRefTextRight     string `json:"blockRefTextRight"`     // 内容块引用导出锚文本右侧符号，默认留空
-	TagOpenMarker         string `json:"tagOpenMarker"`         // 标签开始标记符，默认是 #
-	TagCloseMarker        string `json:"tagCloseMarker"`        // 标签结束标记符，默认是 #
-	FileAnnotationRefMode int    `json:"fileAnnotationRefMode"` // 文件标注引用导出模式，0：文件名 - 页码 - 锚文本，1：仅锚文本
-	PandocBin             string `json:"pandocBin"`             // Pandoc 可执行文件路径
-	PandocParams          string `json:"pandocParams"`          // Pandoc 额外参数
-	DocxTemplate          string `json:"docxTemplate"`          // Docx 导出时模板文件路径 TODO 已经废弃，计划于 2026 年 6 月 30 日后删除 https://github.com/siyuan-note/siyuan/issues/16845
-	RemoveAssetsID        bool   `json:"removeAssetsID"`        // Markdown 导出时是否移除资源文件名 ID 部分 https://github.com/siyuan-note/siyuan/issues/16065
-	MarkdownYFM           bool   `json:"markdownYFM"`           // Markdown 导出时是否添加 YAML Front Matter https://github.com/siyuan-note/siyuan/issues/7727
-	InlineMemo            bool   `json:"inlineMemo"`            // 是否导出行级备注 https://github.com/siyuan-note/siyuan/issues/14605
-	IncludeSubDocs        bool   `json:"includeSubDocs"`        // 是否导出子文档 https://github.com/siyuan-note/siyuan/issues/13635
-	IncludeRelatedDocs    bool   `json:"includeRelatedDocs"`    // 是否导出关联文档 https://github.com/siyuan-note/siyuan/issues/13635
-	PDFFooter             string `json:"pdfFooter"`             // PDF 导出时页脚内容
-	PDFWatermarkStr       string `json:"pdfWatermarkStr"`       // PDF 导出时水印文本或水印文件路径
-	PDFWatermarkDesc      string `json:"pdfWatermarkDesc"`      // PDF 导出时水印位置、大小和样式等
-	ImageWatermarkStr     string `json:"imageWatermarkStr"`     // 图片导出时水印文本或水印文件路径
-	ImageWatermarkDesc    string `json:"imageWatermarkDesc"`    // 图片导出时水印位置、大小和样式等
+	BlockEmbedMode        int    `json:"blockEmbedMode"`        // Content block embed export mode, 0: use raw text, 1: use Blockquote
+	BlockRefTextLeft      string `json:"blockRefTextLeft"`      // Symbol to the left of a content block ref's exported anchor text, empty by default
+	BlockRefTextRight     string `json:"blockRefTextRight"`     // Symbol to the right of a content block ref's exported anchor text, empty by default
+	TagOpenMarker         string `json:"tagOpenMarker"`         // Tag opening marker, default is #
+	TagCloseMarker        string `json:"tagCloseMarker"`        // Tag closing marker, default is #
+	FileAnnotationRefMode int    `json:"fileAnnotationRefMode"` // File annotation ref export mode, 0: file name - page number - anchor text, 1: anchor text only
+	PandocBin             string `json:"pandocBin"`             // Pandoc executable path
+	PandocParams          string `json:"pandocParams"`          // Extra Pandoc parameters
+	DocxTemplate          string `json:"docxTemplate"`          // Template file path used for Docx export TODO deprecated, planned for removal after June 30, 2026 https://github.com/siyuan-note/siyuan/issues/16845
+	RemoveAssetsID        bool   `json:"removeAssetsID"`        // Whether to strip the ID portion of asset file names on Markdown export https://github.com/siyuan-note/siyuan/issues/16065
+	MarkdownYFM           bool   `json:"markdownYFM"`           // Whether to add YAML Front Matter on Markdown export https://github.com/siyuan-note/siyuan/issues/7727
+	InlineMemo            bool   `json:"inlineMemo"`            // Whether to export inline memos https://github.com/siyuan-note/siyuan/issues/14605
+	IncludeSubDocs        bool   `json:"includeSubDocs"`        // Whether to export subdocuments https://github.com/siyuan-note/siyuan/issues/13635
+	IncludeRelatedDocs    bool   `json:"includeRelatedDocs"`    // Whether to export related documents https://github.com/siyuan-note/siyuan/issues/13635
+	PDFFooter             string `json:"pdfFooter"`             // Footer content for PDF export
+	PDFWatermarkStr       string `json:"pdfWatermarkStr"`       // Watermark text or watermark file path for PDF export
+	PDFWatermarkDesc      string `json:"pdfWatermarkDesc"`      // Watermark position, size, style, etc for PDF export
+	ImageWatermarkStr     string `json:"imageWatermarkStr"`     // Watermark text or watermark file path for image export
+	ImageWatermarkDesc    string `json:"imageWatermarkDesc"`    // Watermark position, size, style, etc for image export
 }
 
 func NewExport() *Export {

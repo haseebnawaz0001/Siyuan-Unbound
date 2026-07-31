@@ -169,7 +169,7 @@ func getBacklink2(c *gin.Context) {
 	var boxID string
 	var backlinks, backmentions []*model.Path
 	var linkRefsCount, mentionsCount int
-	// 加密笔记本的反链面板走 InBox 版（查加密 content db）
+	// The backlinks panel for an encrypted notebook goes through the InBox variant (queries the encrypted content db)
 	if notebook, ok := arg["notebook"].(string); ok && notebook != "" && model.IsEncryptedBox(notebook) {
 		boxID, backlinks, backmentions, linkRefsCount, mentionsCount = model.GetBacklink2InBox(id, keyword, mentionKeyword, sort, mentionSort, containChildren, notebook)
 	} else {
@@ -218,7 +218,7 @@ func getBacklink(c *gin.Context) {
 	var boxID string
 	var backlinks, backmentions []*model.Path
 	var linkRefsCount, mentionsCount int
-	// 加密笔记本的反链面板走 InBox 版（查加密 content db）
+	// The backlinks panel for an encrypted notebook goes through the InBox variant (queries the encrypted content db)
 	if notebook, ok := arg["notebook"].(string); ok && notebook != "" && model.IsEncryptedBox(notebook) {
 		boxID, backlinks, backmentions, linkRefsCount, mentionsCount = model.GetBacklinkInBox(id, keyword, mentionKeyword, beforeLen, containChildren, notebook)
 	} else {

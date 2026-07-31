@@ -317,7 +317,7 @@ func getEmbedBlock(c *gin.Context) {
 	for _, includeID := range includeIDsArg {
 		includeIDs = append(includeIDs, includeID.(string))
 	}
-	headingMode := 0 // 0：显示标题与下方的块，1：仅显示标题，2：仅显示标题下方的块
+	headingMode := 0 // 0: show the heading and the blocks below it, 1: heading only, 2: only the blocks below the heading
 	headingModeArg := arg["headingMode"]
 	if nil != headingModeArg {
 		headingMode = int(headingModeArg.(float64))
@@ -391,7 +391,7 @@ func searchEmbedBlock(c *gin.Context) {
 		}
 		excludeIDs = append(excludeIDs, excludeID.(string))
 	}
-	headingMode := 0 // 0：显示标题与下方的块，1：仅显示标题，2：仅显示标题下方的块
+	headingMode := 0 // 0: show the heading and the blocks below it, 1: heading only, 2: only the blocks below the heading
 	headingModeArg := arg["headingMode"]
 	if nil != headingModeArg {
 		headingMode = int(headingModeArg.(float64))
@@ -472,7 +472,7 @@ func searchRefBlock(c *gin.Context) {
 	id := arg["id"].(string)
 	keyword := arg["k"].(string)
 	beforeLen := int(arg["beforeLen"].(float64))
-	// 加密笔记本内的块引搜索走 InBox 版（只搜该 box 自己的加密 db，阻止跨加密边界引用）
+	// Block-ref search within an encrypted notebook goes through the InBox variant (only searches that box's own encrypted db, preventing references across encryption boundaries)
 	var blocks []*model.Block
 	var newDoc bool
 	if notebook, ok := arg["notebook"].(string); ok && notebook != "" && model.IsEncryptedBox(notebook) {
@@ -513,7 +513,7 @@ func fullTextSearchBlock(c *gin.Context) {
 	var blocks []*model.Block
 	var matchedBlockCount, matchedRootCount, pageCount int
 	var docMode bool
-	// 加密笔记本的全文搜索走 InBox 版（查加密 content db + blocks_fts）
+	// Full-text search for an encrypted notebook goes through the InBox variant (queries the encrypted content db + blocks_fts)
 	if notebook, ok := arg["notebook"].(string); ok && notebook != "" && model.IsEncryptedBox(notebook) {
 		blocks, matchedBlockCount, matchedRootCount, pageCount, docMode = model.FullTextSearchBlockInBox(query, boxes, paths, types, subTypes, method, orderBy, groupBy, page, pageSize, notebook)
 	} else {
@@ -560,8 +560,10 @@ func parseSearchBlockArgs(arg map[string]any) (page, pageSize int, query string,
 			path := p.(string)
 			box := strings.TrimSpace(strings.Split(path, "/")[0])
 			path = strings.TrimSpace(strings.TrimPrefix(path, box))
-			// 入口校验：拒绝带 SQL 元字符的非法笔记本 ID 与文档路径，阻止 SQL 注入。
-			// 与既有静默去重风格一致，对非法整条丢弃而非中断请求。
+			// Input validation: reject invalid notebook IDs and document paths containing SQL metacharacters, to
+			// prevent SQL injection.
+			// Consistent with the existing silent-dedup style: an invalid entry is dropped entirely rather than
+			// aborting the request.
 			if !model.IsValidSearchBoxPath(box, path) {
 				continue
 			}
@@ -592,19 +594,21 @@ func parseSearchBlockArgs(arg map[string]any) (page, pageSize int, query string,
 		}
 	}
 
-	// method：0：关键字，1：查询语法，2：SQL，3：正则表达式
+	// method: 0: keyword, 1: query syntax, 2: SQL, 3: regular expression
 	methodArg := arg["method"]
 	if nil != methodArg {
 		method = int(methodArg.(float64))
 	}
 
-	// orderBy：0：按块类型（默认），1：按创建时间升序，2：按创建时间降序，3：按更新时间升序，4：按更新时间降序，5：按内容顺序（仅在按文档分组时），6：按相关度升序，7：按相关度降序
+	// orderBy: 0: by block type (default), 1: by creation time ascending, 2: by creation time descending, 3: by
+	// update time ascending, 4: by update time descending, 5: by content order (only when grouped by document),
+	// 6: by relevance ascending, 7: by relevance descending
 	orderByArg := arg["orderBy"]
 	if nil != orderByArg {
 		orderBy = int(orderByArg.(float64))
 	}
 
-	// groupBy： 0：不分组，1：按文档分组
+	// groupBy: 0: no grouping, 1: group by document
 	groupByArg := arg["groupBy"]
 	if nil != groupByArg {
 		groupBy = int(groupByArg.(float64))
@@ -642,13 +646,13 @@ func parseSearchAssetContentArgs(arg map[string]any) (page, pageSize int, query 
 		}
 	}
 
-	// method：0：关键字，1：查询语法，2：SQL，3：正则表达式
+	// method: 0: keyword, 1: query syntax, 2: SQL, 3: regular expression
 	methodArg := arg["method"]
 	if nil != methodArg {
 		method = int(methodArg.(float64))
 	}
 
-	// orderBy：0：按相关度降序，1：按相关度升序，2：按更新时间升序，3：按更新时间降序
+	// orderBy: 0: by relevance descending, 1: by relevance ascending, 2: by update time ascending, 3: by update time descending
 	orderByArg := arg["orderBy"]
 	if nil != orderByArg {
 		orderBy = int(orderByArg.(float64))

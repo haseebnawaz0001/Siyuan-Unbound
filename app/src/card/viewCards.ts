@@ -275,7 +275,7 @@ ${unicode2Emoji(item.ial.icon, "b3-list-item__graphic", true)}
 </div>`;
             isFirst = false;
         } else {
-            // 块被删除的情况
+            // Case where the block has been deleted
             listHTML += `<div data-type="card-item" class="b3-list-item${isMobile() ? "" : " b3-list-item--hide-action"}">
 <span class="b3-list-item__text">${item.content}</span>
 <span data-position="parentE" data-type="remove" data-id="${item.id}" class="b3-list-item__action b3-list-item__action--warning ariaLabel" aria-label="${window.siyuan.languages.removeDeck}">

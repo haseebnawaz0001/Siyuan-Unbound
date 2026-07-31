@@ -22,8 +22,9 @@ import (
 	"testing"
 )
 
-// TestIsSensitivePathCredentialDotfiles 覆盖 GHSA 报告中遗漏的家目录凭据 dotfile，
-// 确保它们在 globalCopyFiles 等接受工作空间外绝对路径的接口处被拒绝。
+// TestIsSensitivePathCredentialDotfiles covers home directory credential dotfiles that were missing from the GHSA
+// report, ensuring they are rejected at interfaces like globalCopyFiles that accept absolute paths outside the
+// workspace.
 func TestIsSensitivePathCredentialDotfiles(t *testing.T) {
 	tmpHome := t.TempDir()
 	tmpWorkspace := t.TempDir()
@@ -31,10 +32,10 @@ func TestIsSensitivePathCredentialDotfiles(t *testing.T) {
 	HomeDir, WorkspaceDir = tmpHome, tmpWorkspace
 	t.Cleanup(func() { HomeDir, WorkspaceDir = origHome, origWorkspace })
 
-	// 报告点名的攻击面 + 常见云/包管理器凭据。
+	// The attack surface named in the report, plus common cloud/package manager credentials.
 	cases := []struct {
 		name string
-		rel  string // 相对 HomeDir 的路径
+		rel  string // Path relative to HomeDir
 	}{
 		{"git-credentials", ".git-credentials"},
 		{"netrc", ".netrc"},
@@ -46,7 +47,7 @@ func TestIsSensitivePathCredentialDotfiles(t *testing.T) {
 		{"azure token", filepath.Join(".azure", "accessTokens.json")},
 		{"npmrc", ".npmrc"},
 		{"pypirc", ".pypirc"},
-		// 原有黑名单项不应回归。
+		// Existing blacklist entries should not regress.
 		{"ssh id_rsa", filepath.Join(".ssh", "id_rsa")},
 		{"bashrc", ".bashrc"},
 		{"config dir", filepath.Join(".config", "some-app")},
@@ -59,8 +60,8 @@ func TestIsSensitivePathCredentialDotfiles(t *testing.T) {
 	}
 }
 
-// TestIsSensitivePathSymlinkBypass 验证通过符号链接绕过黑名单的尝试会被拦截：
-// 在非敏感目录下放置一个指向 ~/.ssh/id_rsa 的符号链接，解析后应判定为敏感。
+// TestIsSensitivePathSymlinkBypass verifies that attempts to bypass the blacklist via a symlink are blocked:
+// place a symlink pointing to ~/.ssh/id_rsa in a non-sensitive directory; once resolved, it should be judged sensitive.
 func TestIsSensitivePathSymlinkBypass(t *testing.T) {
 	tmpHome := t.TempDir()
 	tmpWorkspace := t.TempDir()
@@ -76,20 +77,20 @@ func TestIsSensitivePathSymlinkBypass(t *testing.T) {
 		t.Fatalf("write target: %v", err)
 	}
 
-	// 在一个看起来无害的位置（家目录外的临时目录）放符号链接。
+	// Place the symlink in a location that looks harmless (a temp directory outside the home directory).
 	innocentDir := t.TempDir()
 	link := filepath.Join(innocentDir, "link")
 	if err := os.Symlink(target, link); err != nil {
 		t.Skipf("symlink not supported on this platform: %v", err)
 	}
 
-	// link 自身的路径不命中黑名单，但解析后指向 .ssh，应被拒绝。
+	// link's own path doesn't hit the blacklist, but once resolved it points into .ssh, so it should be rejected.
 	if got := IsSensitivePath(link); !got {
 		t.Errorf("IsSensitivePath(symlink -> .ssh) = false, want true")
 	}
 }
 
-// TestIsSensitivePathWorkspaceFilesNotBlocked 确保工作空间内的合法文件不会被误判。
+// TestIsSensitivePathWorkspaceFilesNotBlocked ensures legitimate files inside the workspace are not misjudged.
 func TestIsSensitivePathWorkspaceFilesNotBlocked(t *testing.T) {
 	tmpWorkspace := t.TempDir()
 	origWorkspace := WorkspaceDir

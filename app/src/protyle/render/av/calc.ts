@@ -141,7 +141,7 @@ export const openCalcMenu = async (protyle: IProtyle, calcElement: HTMLElement, 
         target: calcElement
     });
     if (panelData?.data && type !== "checkbox") {
-        // 汇总字段汇总方式中才有“显示唯一值”选项 Add "Show unique values" to the calculation of the database rollup field https://github.com/siyuan-note/siyuan/issues/15852
+        // Only a rollup field's aggregation method has a "Show unique values" option. Add "Show unique values" to the calculation of the database rollup field https://github.com/siyuan-note/siyuan/issues/15852
         calcItem({
             menu,
             protyle,
@@ -291,8 +291,9 @@ export const openCalcMenu = async (protyle: IProtyle, calcElement: HTMLElement, 
     }
     let rollupIsNumber = false;
     if (type === "rollup") {
-        // 行级汇总结果本身就是数字的操作（如计数、百分比、复选统计），即使目标字段不是数字类型，
-        // 底部计算也应支持 Sum/Average 等数字计算方式
+        // For row-level rollup operations whose result is itself numeric (e.g. count, percentage,
+        // checkbox stats), the footer calculation should support numeric methods like Sum/Average
+        // even when the target field is not a numeric type
         const numericRowCalcOperators = [
             "Count all", "Count values", "Count unique values", "Count empty", "Count not empty",
             "Percent empty", "Percent not empty", "Percent unique values",
@@ -439,8 +440,9 @@ export const openCalcMenu = async (protyle: IProtyle, calcElement: HTMLElement, 
             target: calcElement
         });
     }
-    // 底部计算支持自定义模板统计
-    // 获取当前列已有的模板内容（footer 路径下需异步拉取列数据）
+    // The footer calculation supports custom template statistics
+    // Get the current template content already set for this column (needs an async fetch of column
+    // data on the footer path)
     let currentTemplate = "";
     if (panelData?.data) {
         const colData = getFieldsByData(panelData.data).find((item) => item.id === colId);
@@ -450,7 +452,8 @@ export const openCalcMenu = async (protyle: IProtyle, calcElement: HTMLElement, 
         const colData = getFieldsByData(avResponse.data).find((item) => item.id === colId);
         currentTemplate = colData?.calc?.template || "";
     }
-    // 提交模板统计：将底部计算切换为 Template 并写入模板内容；模板为空时恢复为“无”
+    // Submit the template statistic: switch the footer calculation to Template and write the
+    // template content; when the template is empty, revert it to "None"
     const submitTemplate = (templateContent: string) => {
         const isEmpty = "" === templateContent.trim();
         const doData: IAVCalc = isEmpty ? {operator: ""} : {operator: "Template", template: templateContent};
@@ -516,7 +519,7 @@ export const getCalcValue = (column: IAVColumn) => {
         (column.calc.operator === "Range" && ["date", "created", "updated"].includes(column.type))) {
         resultCalc = column.calc.result[column.type as "date"];
     } else if (column.calc.operator === "Template") {
-        // 自定义模板统计：数字输出走 number，文本输出走 text
+        // Custom template statistic: numeric output goes through number, text output goes through text
         resultCalc = column.calc.result.number || column.calc.result.text;
     }
     let value = "";
@@ -593,7 +596,7 @@ export const getNameByOperator = (operator: string, isRollup: boolean) => {
         case undefined:
         case "":
             return isRollup ? window.siyuan.languages.original : window.siyuan.languages.calcOperatorNone;
-        case "Unique values": // 仅汇总字段的汇总方式在使用
+        case "Unique values": // Only used by a rollup field's aggregation method
             return window.siyuan.languages.uniqueValues;
         case "Count all":
             return window.siyuan.languages.calcOperatorCountAll;

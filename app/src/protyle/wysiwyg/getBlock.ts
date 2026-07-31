@@ -18,7 +18,7 @@ export const getEmbedChildOperationContext = (element: Node): IEmbedChildOperati
     if (!targetID) {
         return;
     }
-    // 单独查询列表项时，渲染器会在目标外补充一个无 ID 的列表节点。
+    // When a list item is queried standalone, the renderer adds an ID-less list node wrapping the target.
     const targetElement = Array.from(resultElement.querySelectorAll(`[data-node-id="${targetID}"]`)).find(item =>
         item.getAttribute("data-type")?.startsWith("Node") &&
         hasClosestByClassName(item, "protyle-wysiwyg__embed") === resultElement);
@@ -26,7 +26,7 @@ export const getEmbedChildOperationContext = (element: Node): IEmbedChildOperati
         resultElement,
         targetID,
         targetElement,
-        // 文档块不会渲染自身节点，查询结果容器就是它的子块边界。
+        // A document block doesn't render its own node, so the query result container is its child-block boundary.
         boundaryElement: targetElement || resultElement,
     };
 };
@@ -396,7 +396,8 @@ export const getPreviousFileLi = (current: Element) => {
     return false;
 };
 
-// 相邻标签之间插入空格区隔，避免 SpinBlockDOM 解析时合并为一个标签 https://github.com/siyuan-note/siyuan/issues/18191
+// Insert a space between adjacent tags as a separator, to avoid SpinBlockDOM merging them into a single tag
+// during parsing https://github.com/siyuan-note/siyuan/issues/18191
 export const fixAdjacentTags = (editableElement: Element) => {
     if (!editableElement) {
         return;
@@ -408,7 +409,7 @@ export const fixAdjacentTags = (editableElement: Element) => {
             const tagSpan = node as HTMLElement;
             if (tagSpan.tagName === "SPAN" &&
                 (tagSpan.getAttribute("data-type") || "").split(" ").includes("tag")) {
-                // 向后查找跳过 ZWSP 文本节点和 <wbr> 后的下一个节点
+                // Search forward, skipping ZWSP text nodes and <wbr>, to find the next node after them
                 let after = next;
                 while (after && ((after.nodeType === 3 && after.textContent === Constants.ZWSP) ||
                     (after.nodeType === 1 && (after as HTMLElement).tagName === "WBR"))) {

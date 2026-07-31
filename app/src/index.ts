@@ -317,12 +317,13 @@ window.openFileByURL = (openURL) => {
 
 /// #if BROWSER
 window.showKeyboardToolbar = () => {
-    // 防止 Pad 端报错
+    // Prevent errors on Pad devices
 };
 window.processIOSPurchaseResponse = processIOSPurchaseResponse;
-// 移动端容器（Android/鸿蒙）启用桌面模式时，原生壳默认禁用 WebView 自身键盘行为、等待 JS 调用
-// showKeyboard 弹键盘，而桌面 bundle 不会调用它，导致键盘无法弹出。这里把键盘控制权交还给
-// WebView 自身管理（与平板走桌面 bundle 时的行为一致）
+// When desktop mode is enabled in the mobile container (Android/HarmonyOS), the native shell disables the WebView's
+// own keyboard behavior by default and waits for JS to call showKeyboard to pop up the keyboard. However, the
+// desktop bundle never calls it, so the keyboard can't pop up. Hand keyboard control back to the WebView itself
+// here (matching the behavior when tablets use the desktop bundle).
 // On-screen keyboard pops up when using desktop mode on HarmonyOS and Android https://github.com/siyuan-note/siyuan/issues/18028
 if (window.JSAndroid?.setWebViewFocusable) {
     window.JSAndroid.setWebViewFocusable(true);

@@ -55,13 +55,14 @@ var (
 
 	initDatabaseLock = sync.RWMutex{}
 
-	// encryptedDBs 维护已打开的加密笔记本独立 db 连接，按 boxID 索引。
-	// UnlockBox 时打开并注册，LockBox/Unmount 时关闭并移除。
+	// encryptedDBs holds the open per-notebook db connections for encrypted notebooks, indexed by boxID.
+	// Opened and registered on UnlockBox; closed and removed on LockBox/Unmount.
 	encryptedDBs = &sync.Map{} // boxID -> *sql.DB
 
-	// IsEncryptedBoxFn 由 model 层注入，用于判断 boxID 是否为加密笔记本。
-	// sql 包不直接 import model（循环依赖），路由函数据此 fail-closed：
-	// 加密笔记本未解锁时绝不回退全局库，避免加密笔记本索引污染全局明文库。
+	// IsEncryptedBoxFn is injected by the model layer to determine whether a boxID is an encrypted notebook.
+	// The sql package doesn't import model directly (circular dependency), so routing functions rely on this to
+	// fail closed: when an encrypted notebook isn't unlocked, they never fall back to the global database, to
+	// avoid an encrypted notebook's index polluting the global plaintext database.
 	IsEncryptedBoxFn func(boxID string) bool
 )
 
@@ -103,9 +104,10 @@ func initDatabase(forceRebuild bool) {
 	treenode.InitBlockTree(forceRebuild)
 
 	if !forceRebuild {
-		// 检查数据库结构版本，如果版本不一致的话说明改过表结构，需要重建
+		// Check the database schema version; if it doesn't match, the table structure has changed and a rebuild is needed
 		if util.DatabaseVer == getDatabaseVer() {
-			// 老库版本一致但缺少新加的列时，做幂等迁移（不升 DatabaseVer，避免全库重建丢失已嵌入向量）
+			// When the old database's version matches but it's missing newly added columns, migrate idempotently
+			// (without bumping DatabaseVer, to avoid losing already-embedded vectors from a full rebuild)
 			migrateBlockEmbeddingsSchema()
 			recoverIndexQueue()
 			return
@@ -114,7 +116,7 @@ func initDatabase(forceRebuild bool) {
 		clearIndexQueueEntries()
 	}
 
-	// 不存在库或者版本不一致都会走到这里
+	// Execution reaches here when the database doesn't exist or the version doesn't match
 
 	closeDatabase()
 	treenode.CloseDatabase()
@@ -261,9 +263,11 @@ func initFTSBlocks() (err error) {
 	if err != nil {
 		return
 	}
-	// 采用 external content 模式：blocks_fts 不再物理存储列值，仅维护倒排索引，
-	// 原文由 content 指向的 blocks 表提供，按 content_rowid（blocks 的隐式 rowid）回表取值。
-	// 因此 FTS 行的 rowid 必须与 blocks 行的 rowid 严格一致，所有写路径需显式传 rowid。
+	// Uses external content mode: blocks_fts no longer physically stores column values, it only maintains the
+	// inverted index. The original text comes from the blocks table pointed to by content, looked up by
+	// content_rowid (the blocks table's implicit rowid).
+	// This means an FTS row's rowid must exactly match the corresponding blocks row's rowid, so every write path
+	// must pass rowid explicitly.
 	_, err = db.Exec("CREATE VIRTUAL TABLE blocks_fts USING fts5(id UNINDEXED, parent_id UNINDEXED, root_id UNINDEXED, hash UNINDEXED, box UNINDEXED, path UNINDEXED, hpath UNINDEXED, name, alias, memo, tag, content, fcontent, markdown UNINDEXED, length UNINDEXED, type UNINDEXED, subtype UNINDEXED, ial, sort UNINDEXED, created UNINDEXED, updated UNINDEXED, content='blocks', content_rowid='rowid', tokenize=\"" + ftsTokenize() + "\")")
 	return
 }
@@ -273,9 +277,10 @@ func RebuildFTSIndex() (err error) {
 		return
 	}
 
-	// external content 模式下使用 'rebuild' 命令重建索引：
-	// FTS5 会扫描 blocks 表，并用 blocks 的 rowid 作为 FTS rowid，保证两者对齐。
-	// 不能再用 INSERT...SELECT FROM blocks，否则 FTS 会自分配 rowid 导致与 blocks 脱钩。
+	// In external content mode, rebuild the index using the 'rebuild' command:
+	// FTS5 scans the blocks table and uses the blocks table's rowid as the FTS rowid, keeping the two aligned.
+	// INSERT...SELECT FROM blocks must not be used instead, otherwise FTS5 would auto-assign rowids and become
+	// disconnected from blocks.
 	stmt := "INSERT INTO blocks_fts(blocks_fts) VALUES('rebuild')"
 	_, err = db.Exec(stmt)
 	return
@@ -480,8 +485,9 @@ func SetHanSensitive(b bool) {
 	util.SearchHanSensitive = b
 }
 
-// ftsTokenize 返回 blocks FTS 表的 tokenize 参数。
-// 分词器参数在 CREATE VIRTUAL TABLE 时固化，切换区分大小写或区分繁简后需要重建索引。
+// ftsTokenize returns the tokenize parameter for the blocks FTS table.
+// The tokenizer parameter is fixed at CREATE VIRTUAL TABLE time, so toggling case sensitivity or
+// simplified/traditional Chinese sensitivity requires rebuilding the index.
 func ftsTokenize() string {
 	ret := "siyuan"
 	if !caseSensitive {
@@ -558,7 +564,7 @@ func isRepeatedRef(refs []*Ref, ref *Ref) bool {
 }
 
 func buildRef(tree *parse.Tree, refNode *ast.Node) *Ref {
-	// 多个类型可能会导致渲染的 Markdown 不正确，所以这里只保留 block-ref 类型
+	// Multiple types can cause the rendered Markdown to be incorrect, so only the block-ref type is kept here
 	tmpTyp := refNode.TextMarkType
 	refNode.TextMarkType = "block-ref"
 	markdown := treenode.ExportNodeStdMd(refNode, luteEngine)
@@ -609,7 +615,7 @@ func buildEmbedRef(tree *parse.Tree, embedNode *ast.Node) *Ref {
 		RootID:           tree.ID,
 		Box:              tree.Box,
 		Path:             tree.Path,
-		Content:          "", // 通过嵌入块构建引用时定义块可能还没有入库，所以这里统一不填充内容
+		Content:          "", // When building a ref via an embed block, the defining block may not be indexed yet, so content is never filled in here
 		Markdown:         "",
 		Type:             treenode.TypeAbbr(embedNode.Type.String()),
 	}
@@ -629,7 +635,7 @@ func fromTree(node *ast.Node, tree *parse.Tree) (blocks []*Block, spans []*Span,
 			return ast.WalkContinue
 		}
 
-		// 构造行级元素
+		// Build inline-level elements
 		spanBlocks, spanSpans, spanAssets, spanAttrs, walkStatus := buildSpanFromNode(n, tree, rootID, boxID, p)
 		if 0 < len(spanBlocks) {
 			blocks = append(blocks, spanBlocks...)
@@ -644,7 +650,7 @@ func fromTree(node *ast.Node, tree *parse.Tree) (blocks []*Block, spans []*Span,
 			attributes = append(attributes, spanAttrs...)
 		}
 
-		// 构造属性
+		// Build attributes
 		attrs := buildAttributeFromNode(n, rootID, boxID, p)
 		if 0 < len(attrs) {
 			attributes = append(attributes, attrs...)
@@ -653,7 +659,7 @@ func fromTree(node *ast.Node, tree *parse.Tree) (blocks []*Block, spans []*Span,
 			return walkStatus
 		}
 
-		// 构造块级元素
+		// Build block-level elements
 		if "" == n.ID || !n.IsBlock() {
 			return ast.WalkContinue
 		}
@@ -835,7 +841,7 @@ func buildSpanFromNode(n *ast.Node, tree *parse.Tree, rootID, boxID, p string) (
 			return
 		}
 		if 1 > len(nodes) &&
-			ast.NodeHTMLBlock != n.Type { // HTML 块若内容为空时无法在数据库中查询到 https://github.com/siyuan-note/siyuan/issues/4691
+			ast.NodeHTMLBlock != n.Type { // If an HTML block's content is empty, it can't be found in the database https://github.com/siyuan-note/siyuan/issues/4691
 			walkStatus = ast.WalkContinue
 			return
 		}
@@ -847,7 +853,7 @@ func buildSpanFromNode(n *ast.Node, tree *parse.Tree, rootID, boxID, p string) (
 		}
 
 		if ast.NodeInlineHTML == n.Type {
-			// 没有行级 HTML，只有块级 HTML，这里转换为块
+			// There's no inline HTML, only block-level HTML, so convert it to a block here
 			n.ID = ast.NewNodeID()
 			n.SetIALAttr("id", n.ID)
 			n.SetIALAttr("updated", n.ID[:14])
@@ -944,7 +950,7 @@ func buildBlockFromNode(n *ast.Node, tree *parse.Tree) (block *Block, attributes
 		fcontent = nodeStaticContent(fc, nil, true, false, true, true)
 
 		parentID = n.Parent.ID
-		if h := treenode.HeadingParent(n); nil != h { // 如果在标题块下方，则将标题块作为父节点
+		if h := treenode.HeadingParent(n); nil != h { // If this is under a heading block, use the heading block as the parent node
 			parentID = h.ID
 		}
 		length = utf8.RuneCountInString(fcontent)
@@ -962,12 +968,12 @@ func buildBlockFromNode(n *ast.Node, tree *parse.Tree) (block *Block, attributes
 		length = utf8.RuneCountInString(content)
 	}
 
-	// 剔除零宽空格 Database index content/markdown values no longer contain zero-width spaces https://github.com/siyuan-note/siyuan/issues/15204
+	// Strip zero-width spaces: Database index content/markdown values no longer contain zero-width spaces https://github.com/siyuan-note/siyuan/issues/15204
 	fcontent = strings.ReplaceAll(fcontent, editor.Zwsp, "")
 	content = strings.ReplaceAll(content, editor.Zwsp, "")
 	markdown = strings.ReplaceAll(markdown, editor.Zwsp, "")
 
-	// 剔除标签结尾处的零宽连字符 Improve search for emojis in tags https://github.com/siyuan-note/siyuan/issues/15391
+	// Strip the zero-width joiner at the end of a tag: Improve search for emojis in tags https://github.com/siyuan-note/siyuan/issues/15391
 	fcontent = strings.ReplaceAll(fcontent, string(gulu.ZWJ)+"#", "#")
 	content = strings.ReplaceAll(content, string(gulu.ZWJ)+"#", "#")
 	markdown = strings.ReplaceAll(markdown, string(gulu.ZWJ)+"#", "#")
@@ -1115,19 +1121,20 @@ func deleteBlocksByIDs(tx *sql.Tx, ids []string) (err error) {
 		return
 	}
 
-	// block_embeddings 表在加密 db 中不存在（加密笔记本不参与嵌入向量化），对该表不存在的错误容错
+	// The block_embeddings table doesn't exist in an encrypted db (encrypted notebooks don't participate in
+	// embedding vectorization), so tolerate an error indicating that table doesn't exist
 	stmt = "DELETE FROM block_embeddings WHERE id IN (" + strings.Join(ftsIDs, ",") + ")"
 	if _, embedErr := tx.Exec(stmt); embedErr != nil {
 		if !strings.Contains(embedErr.Error(), "no such table") {
-			err = embedErr // 非"表不存在"的真实错误照常返回
+			err = embedErr // A genuine error other than "table does not exist" is still returned as usual
 		}
 	}
 	return
 }
 
 func deleteBlocksByBoxTx(tx *sql.Tx, box string) (err error) {
-	// external content 模式下 FTS 行需按 rowid 删除，rowid 来自 blocks 表，
-	// 因此必须先删 FTS（此时 blocks 尚在），再删 blocks，否则子查询查不到 rowid。
+	// In external content mode, FTS rows must be deleted by rowid, and the rowid comes from the blocks table, so
+	// FTS must be deleted first (while blocks still exists), then blocks; otherwise the subquery can't find the rowid.
 	stmt := "DELETE FROM blocks_fts WHERE rowid IN (SELECT rowid FROM blocks WHERE box = ?)"
 	if err = execStmtTx(tx, stmt, box); err != nil {
 		return
@@ -1221,7 +1228,7 @@ func deleteFileAnnotationRefsByBoxTx(tx *sql.Tx, box string) (err error) {
 }
 
 func deleteByRootID(tx *sql.Tx, rootID string, context map[string]any) (err error) {
-	// external content 模式下 FTS 行需按 rowid 删除，必须先删 FTS 再删 blocks。
+	// In external content mode, FTS rows must be deleted by rowid, so FTS must be deleted before blocks.
 	stmt := "DELETE FROM blocks_fts WHERE rowid IN (SELECT rowid FROM blocks WHERE root_id = ?)"
 	if err = execStmtTx(tx, stmt, rootID); err != nil {
 		return
@@ -1262,7 +1269,7 @@ func batchDeleteByRootIDs(tx *sql.Tx, rootIDs []string, context map[string]any) 
 
 	ids := strings.Join(rootIDs, "','")
 	ids = "('" + ids + "')"
-	// external content 模式下 FTS 行需按 rowid 删除，必须先删 FTS 再删 blocks。
+	// In external content mode, FTS rows must be deleted by rowid, so FTS must be deleted before blocks.
 	stmt := "DELETE FROM blocks_fts WHERE rowid IN (SELECT rowid FROM blocks WHERE root_id IN " + ids + ")"
 	if err = execStmtTx(tx, stmt); err != nil {
 		return
@@ -1297,7 +1304,7 @@ func batchDeleteByRootIDs(tx *sql.Tx, rootIDs []string, context map[string]any) 
 }
 
 func batchDeleteByPathPrefix(tx *sql.Tx, boxID, pathPrefix string) (err error) {
-	// external content 模式下 FTS 行需按 rowid 删除，必须先删 FTS 再删 blocks。
+	// In external content mode, FTS rows must be deleted by rowid, so FTS must be deleted before blocks.
 	stmt := "DELETE FROM blocks_fts WHERE rowid IN (SELECT rowid FROM blocks WHERE box = ? AND path LIKE ?)"
 	if err = execStmtTx(tx, stmt, boxID, pathPrefix+"%"); err != nil {
 		return
@@ -1381,8 +1388,9 @@ func batchUpdateHPath(tx *sql.Tx, tree *parse.Tree, context map[string]any) (err
 
 func CloseDatabase() {
 	closeIndexQueue()
-	// 退出时删除所有已打开的加密 db 文件：加密索引可由 box.Index() 全量重建，
-	// 文件无需持久化，删除可避免重启后残留旧索引数据导致下次解锁叠加重复行。
+	// On exit, delete all open encrypted db files: the encrypted index can be fully rebuilt by box.Index(), so the
+	// files don't need to persist, and deleting them avoids leftover old index data causing duplicate rows to pile
+	// up on the next unlock after a restart.
 	RemoveAllEncryptedDBFiles()
 	treenode.RemoveAllEncryptedBlockTreeDBFiles()
 	if err := db.Close(); err != nil {
@@ -1435,8 +1443,10 @@ func query(query string, args ...any) (*sql.Rows, error) {
 	return db.Query(query, args...)
 }
 
-// queryRowForBox 按 box 路由查询单行。加密笔记本用独立 db，否则用全局 db。boxID 为空走全局。
-// 加密笔记本未解锁（db 未打开）时返回 nil——绝不回退全局库，避免加密笔记本查询命中全局明文库。
+// queryRowForBox routes a single-row query by box. An encrypted notebook uses its own db, otherwise the global db
+// is used. An empty boxID goes to the global db.
+// When an encrypted notebook isn't unlocked (its db isn't open), this returns nil -- it never falls back to the
+// global db, to avoid an encrypted notebook query hitting the global plaintext database.
 func queryRowForBox(boxID, query string, args ...any) *sql.Row {
 	query = strings.TrimSpace(query)
 	if "" == query {
@@ -1447,7 +1457,7 @@ func queryRowForBox(boxID, query string, args ...any) *sql.Row {
 		return boxDB.QueryRow(query, args...)
 	}
 	if IsEncryptedBoxFn != nil && IsEncryptedBoxFn(boxID) {
-		// 加密笔记本未解锁：fail-closed，不回退全局库
+		// The encrypted notebook isn't unlocked: fail closed, don't fall back to the global db
 		return nil
 	}
 	if nil == db {
@@ -1456,8 +1466,9 @@ func queryRowForBox(boxID, query string, args ...any) *sql.Row {
 	return db.QueryRow(query, args...)
 }
 
-// queryForBox 按 box 路由查询多行。加密笔记本用独立 db，否则用全局 db。boxID 为空走全局。
-// 加密笔记本未解锁时返回错误——绝不回退全局库。
+// queryForBox routes a multi-row query by box. An encrypted notebook uses its own db, otherwise the global db is
+// used. An empty boxID goes to the global db.
+// When an encrypted notebook isn't unlocked, this returns an error -- it never falls back to the global db.
 func queryForBox(boxID, query string, args ...any) (*sql.Rows, error) {
 	query = strings.TrimSpace(query)
 	if "" == query {
@@ -1488,14 +1499,16 @@ func Exec(stmt string, args ...any) error {
 	return err
 }
 
-// migrateBlockEmbeddingsSchema 为 block_embeddings 幂等补充失败重试与忽略类型相关的列。
-// 不升 DatabaseVer（避免全库重建丢失已嵌入向量）；列已存在时跳过，老行自动取默认值 0。
+// migrateBlockEmbeddingsSchema idempotently adds the failure-retry- and ignored-type-related columns to
+// block_embeddings.
+// Doesn't bump DatabaseVer (to avoid losing already-embedded vectors from a full rebuild); skips columns that
+// already exist, and old rows automatically get the default value of 0.
 func migrateBlockEmbeddingsSchema() {
 	if nil == db {
 		return
 	}
 
-	// PRAGMA table_info 返回每列的定义，name 字段即列名
+	// PRAGMA table_info returns the definition of each column; the name field is the column name
 	rows, err := db.Query("PRAGMA table_info(block_embeddings)")
 	if err != nil {
 		logging.LogErrorf("check block_embeddings columns failed: %s", err)
@@ -1516,7 +1529,7 @@ func migrateBlockEmbeddingsSchema() {
 		existing[name] = true
 	}
 
-	// 表不存在（首次启动还没建）时 existing 为空，跳过；待 initDBTables 建表
+	// When the table doesn't exist (not yet created on first startup), existing is empty, so skip; initDBTables will create the table
 	if 0 == len(existing) {
 		return
 	}
@@ -1526,7 +1539,7 @@ func migrateBlockEmbeddingsSchema() {
 		"ALTER TABLE block_embeddings ADD COLUMN last_tried INTEGER NOT NULL DEFAULT 0",
 		"ALTER TABLE block_embeddings ADD COLUMN ignored_type INTEGER NOT NULL DEFAULT 0",
 	}
-	// SQLite 的 ALTER TABLE ADD COLUMN 无法在单条语句里加多列，逐条执行；列已存在会报错，忽略
+	// SQLite's ALTER TABLE ADD COLUMN can't add multiple columns in a single statement, so run them one at a time; ignore the error if a column already exists
 	addColumn := func(name, ddl string) {
 		if existing[name] {
 			return
@@ -1837,17 +1850,18 @@ func vacuum() {
 	}
 }
 
-// OpenEncryptedDB 打开加密笔记本的独立 SQLCipher db 并注册到 encryptedDBs。
-// dek 是该 box 的 32 字节数据密钥；先用 HKDF 派生 content 子密钥（用途分离），DSN 用 raw key 格式 x'<hex>'。
-// 首次打开会建表（幂等 IF NOT EXISTS）。UnlockBox 时调用。
+// OpenEncryptedDB opens the per-notebook SQLCipher db for an encrypted notebook and registers it in encryptedDBs.
+// dek is that box's 32-byte data encryption key; a content subkey is first derived via HKDF (for purpose
+// separation), and the DSN uses the raw key format x'<hex>'.
+// Tables are created on first open (idempotent, IF NOT EXISTS). Called by UnlockBox.
 func OpenEncryptedDB(boxID string, dek []byte) (err error) {
 	if _, loaded := encryptedDBs.Load(boxID); loaded {
-		return nil // 已打开
+		return nil // Already open
 	}
 	dbPath := util.EncryptedDBPath(boxID)
-	// 派生 content 子密钥，与 blocktree/assets/file/AV 用途分离
+	// Derive the content subkey, kept separate in purpose from blocktree/assets/file/AV
 	contentKey := util.DeriveSubKey(dek, "siyuan/sqlcipher/content")
-	// SQLCipher DSN：_key=x'<hex>' 让 go-sqlite3 执行 PRAGMA key；其余 PRAGMA 与全局 siyuan.db 对齐
+	// SQLCipher DSN: _key=x'<hex>' makes go-sqlite3 execute PRAGMA key; the other PRAGMAs match the global siyuan.db
 	dsn := dbPath + "?_journal_mode=WAL&_synchronous=OFF&_mmap_size=4294967296&_secure_delete=OFF" +
 		"&_cache_size=-128000&_page_size=32768&_busy_timeout=7000&_ignore_check_constraints=ON" +
 		"&_temp_store=MEMORY&_case_sensitive_like=OFF&_key=x'" + hex.EncodeToString(contentKey) + "'"
@@ -1865,8 +1879,9 @@ func OpenEncryptedDB(boxID string, dek []byte) (err error) {
 	return nil
 }
 
-// CloseEncryptedDB 仅关闭加密笔记本的 db 连接（不删文件）。UnlockBox 创建失败回滚时调用。
-// 关闭/锁定加密笔记本请用 RemoveEncryptedDBFile（关连接 + 删文件）。
+// CloseEncryptedDB only closes an encrypted notebook's db connection (without deleting the file). Called when
+// UnlockBox's creation fails and needs to roll back.
+// To close/lock an encrypted notebook, use RemoveEncryptedDBFile instead (closes the connection + deletes the file).
 func CloseEncryptedDB(boxID string) {
 	if v, ok := encryptedDBs.LoadAndDelete(boxID); ok {
 		if boxDB, ok := v.(*sql.DB); ok {
@@ -1875,7 +1890,7 @@ func CloseEncryptedDB(boxID string) {
 	}
 }
 
-// GetEncryptedDB 返回加密笔记本的 db 句柄；未打开返回 nil。
+// GetEncryptedDB returns the db handle for an encrypted notebook; returns nil if it isn't open.
 func GetEncryptedDB(boxID string) *sql.DB {
 	if v, ok := encryptedDBs.Load(boxID); ok {
 		if boxDB, ok := v.(*sql.DB); ok {
@@ -1885,7 +1900,7 @@ func GetEncryptedDB(boxID string) *sql.DB {
 	return nil
 }
 
-// GetEncryptedBoxIDs 返回所有已打开的加密 content db 对应的 boxID。
+// GetEncryptedBoxIDs returns the boxIDs of every currently open encrypted content db.
 func GetEncryptedBoxIDs() (ret []string) {
 	encryptedDBs.Range(func(key, value any) bool {
 		if boxID, ok := key.(string); ok {
@@ -1896,7 +1911,8 @@ func GetEncryptedBoxIDs() (ret []string) {
 	return
 }
 
-// RemoveEncryptedDBFile 关闭连接并删除加密 db 文件（含 WAL/SHM）。删除笔记本、关闭加密笔记本时调用。
+// RemoveEncryptedDBFile closes the connection and deletes the encrypted db file (including WAL/SHM). Called when
+// deleting a notebook or closing an encrypted notebook.
 func RemoveEncryptedDBFile(boxID string) {
 	CloseEncryptedDB(boxID)
 	dbPath := util.EncryptedDBPath(boxID)
@@ -1907,17 +1923,20 @@ func RemoveEncryptedDBFile(boxID string) {
 	}
 }
 
-// RemoveAllEncryptedDBFiles 关闭所有已打开的加密 content db 连接并删除其文件（含 WAL/SHM）。
-// 进程退出（CloseDatabase）时调用，避免重启后残留旧索引数据导致下次解锁叠加重复行。
+// RemoveAllEncryptedDBFiles closes every open encrypted content db connection and deletes their files (including
+// WAL/SHM).
+// Called on process exit (CloseDatabase), to avoid leftover old index data causing duplicate rows to pile up on
+// the next unlock after a restart.
 func RemoveAllEncryptedDBFiles() {
 	for _, boxID := range GetEncryptedBoxIDs() {
 		RemoveEncryptedDBFile(boxID)
 	}
 }
 
-// beginTxForBox 按 box 选 db 开事务。加密笔记本用其独立 db，否则用全局 db。
-// beginTxForBox 按 box 选 db 开事务。加密笔记本用其独立 db，否则用全局 db。
-// 加密笔记本未解锁时返回错误——绝不回退全局库，避免加密笔记本的索引写操作污染全局明文库。
+// beginTxForBox picks a db by box and starts a transaction. An encrypted notebook uses its own db, otherwise the
+// global db is used.
+// When an encrypted notebook isn't unlocked, this returns an error -- it never falls back to the global db, to
+// avoid an encrypted notebook's index writes polluting the global plaintext database.
 func beginTxForBox(box string) (tx *sql.Tx, err error) {
 	if boxDB := GetEncryptedDB(box); boxDB != nil {
 		if tx, err = boxDB.Begin(); err != nil {
@@ -1927,14 +1946,15 @@ func beginTxForBox(box string) (tx *sql.Tx, err error) {
 		return
 	}
 	if IsEncryptedBoxFn != nil && IsEncryptedBoxFn(box) {
-		// 加密笔记本未解锁：fail-closed，不回退全局库
+		// The encrypted notebook isn't unlocked: fail closed, don't fall back to the global db
 		return nil, errors.New("encrypted box db not opened for box " + box)
 	}
 	return beginTx()
 }
 
-// initEncryptedDBTables 在加密笔记本db 上建内容表（幂等）。结构与全局 siyuan.db 的内容表一致，
-// 但不含 stat 表（加密 db 不参与版本管理）。首次打开时调用。
+// initEncryptedDBTables creates the content tables on an encrypted notebook's db (idempotent). The structure
+// matches the global siyuan.db's content tables, but without the stat table (an encrypted db doesn't participate
+// in version management). Called on first open.
 func initEncryptedDBTables(boxDB *sql.DB) (err error) {
 	tables := []string{
 		"CREATE TABLE IF NOT EXISTS blocks (id, parent_id, root_id, hash, box, path, hpath, name, alias, memo, tag, content, fcontent, markdown, length, type, subtype, ial, sort, created, updated)",
@@ -1949,7 +1969,7 @@ func initEncryptedDBTables(boxDB *sql.DB) (err error) {
 			return
 		}
 	}
-	// FTS5 external-content 虚拟表，tokenize 与全局保持一致（siyuan 分词器）
+	// FTS5 external-content virtual table, with tokenize kept consistent with the global one (siyuan tokenizer)
 	ftsStmt := "CREATE VIRTUAL TABLE IF NOT EXISTS blocks_fts USING fts5(id UNINDEXED, parent_id UNINDEXED, root_id UNINDEXED, hash UNINDEXED, box UNINDEXED, path UNINDEXED, hpath UNINDEXED, name, alias, memo, tag, content, fcontent, markdown UNINDEXED, length UNINDEXED, type UNINDEXED, subtype UNINDEXED, ial, sort UNINDEXED, created UNINDEXED, updated UNINDEXED, content='blocks', content_rowid='rowid', tokenize=\"" + ftsTokenize() + "\")"
 	if _, err = boxDB.Exec(ftsStmt); err != nil {
 		return

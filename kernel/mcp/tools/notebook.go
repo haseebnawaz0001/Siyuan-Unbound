@@ -188,7 +188,7 @@ func notebookSetIcon(args map[string]any) (CallToolResult, error) {
 		return CallToolResult{Content: []ContentItem{{Type: "text", Text: "id is required"}}, IsError: true}, nil
 	}
 
-	// 校验笔记本存在，避免对一个不存在的 id 静默写入图标。
+	// Verify the notebook exists, to avoid silently writing an icon for a non-existent id.
 	exists := false
 	if notebooks, err := model.ListNotebooks(); err == nil {
 		for _, nb := range notebooks {
@@ -202,7 +202,7 @@ func notebookSetIcon(args map[string]any) (CallToolResult, error) {
 		return CallToolResult{Content: []ContentItem{{Type: "text", Text: "notebook not found: " + id}}, IsError: true}, nil
 	}
 
-	// icon 取值格式与 attr 工具一致；SetBoxIcon 内部对自定义图片名做 XSS 过滤。
+	// The icon value format matches the attr tool; SetBoxIcon internally applies XSS filtering to custom image names.
 	model.SetBoxIcon(id, icon)
 	util.PushReloadFiletree()
 
@@ -217,7 +217,7 @@ func notebookRandomIcon(args map[string]any) (CallToolResult, error) {
 		return CallToolResult{Content: []ContentItem{{Type: "text", Text: "list notebooks failed: " + err.Error()}}, IsError: true}, nil
 	}
 
-	// 目标范围：传 id 仅换该笔记本；不传 id 则对全部笔记本各随机换一个。
+	// Target scope: passing id changes only that notebook; without id, each notebook gets a random icon.
 	targets := notebooks
 	if id != "" {
 		var found bool

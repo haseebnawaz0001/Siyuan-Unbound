@@ -41,7 +41,8 @@ export const exportAsset = (src: string) => {
     };
 };
 
-// 复制资源文件到系统剪贴板，在文件资源管理器中可粘贴为文件（仅 Windows、macOS 桌面端支持）
+// Copy an asset file to the system clipboard, so it can be pasted as a file in the file explorer (only supported
+// on Windows and macOS desktop)
 export const writeAssetToClipboard = (src: string) => {
     /// #if !BROWSER
     if (["windows", "darwin"].includes(window.siyuan.config.system.os)) {
@@ -210,8 +211,10 @@ export const copyPNGByLink = (link: string) => {
         window.JSAndroid.writeImageClipboard(link);
         return;
     }
-    // 通过 fetch 拿到 blob 后再写入剪贴板，避免跨域图片直接 drawImage 污染 canvas 导致 toBlob 失败
-    // （浏览器访问 Docker 部署时常见，报错：Tainted canvases may not be exported）
+    // Fetch the blob and then write it to the clipboard, to avoid directly drawImage-ing a cross-origin image,
+    // which taints the canvas and makes toBlob fail
+    // (common when accessing a Docker deployment from a browser; the error is "Tainted canvases may not be
+    // exported")
     const writePNGBlob = (blob: Blob) => {
         try {
             navigator.clipboard.write([
@@ -223,11 +226,13 @@ export const copyPNGByLink = (link: string) => {
                 showMessage(window.siyuan.languages.clipboardPermissionDenied);
             });
         } catch (e) {
-            // http 等非安全上下文下 navigator.clipboard 可能为 undefined，这里会同步抛错
+            // navigator.clipboard may be undefined in non-secure contexts such as http, which throws synchronously
+            // here
             showMessage(window.siyuan.languages.clipboardPermissionDenied);
         }
     };
-    // 把任意图片 blob 画进 canvas 再导出为 PNG；blob URL 为同源，不会污染 canvas
+    // Draw an arbitrary image blob into a canvas and export it as PNG; a blob URL is same-origin, so it won't
+    // taint the canvas
     const blobToPNGClipboard = (blob: Blob) => {
         if (blob.type === "image/png") {
             writePNGBlob(blob);
@@ -258,7 +263,7 @@ export const copyPNGByLink = (link: string) => {
         }
         blobToPNGClipboard(await response.blob());
     }).catch(() => {
-        // fetch 失败时回退：以 CORS 模式加载后再导出（需目标服务器返回 ACAO）
+        // Fallback when fetch fails: load in CORS mode and then export (requires the target server to return ACAO)
         const canvas = document.createElement("canvas");
         const tempElement = document.createElement("img");
         tempElement.crossOrigin = "anonymous";

@@ -1,22 +1,28 @@
 /**
- * 新建文档路径解析。输入为内核渲染后的路径模板。
+ * Resolves the path for a new document. The input is the path template as rendered by the kernel.
  *
- * 调用方先采集 `path`，再转为 `hPath` 传入；跨笔记本时 `hPath` 固定为 `/`。
+ * Callers first collect `path`, then convert it to `hPath` before passing it in; when crossing
+ * notebooks, `hPath` is fixed to `/`.
  *
- * 标题优先级：`name` > 路径末段（文档名模式）> 空。`name` 替换末段，非拼接。
+ * Title priority: `name` > the last path segment (document-name mode) > empty. `name` replaces
+ * the last segment rather than being appended to it.
  *
- * 三种形态：
- * - 尾 `/` → 父文档路径：路径为父文档链，新文档建在最内层父文档内；未传 `name` 时空标题
- * - 非尾 `/` → 文档名：末段为标题，其余为父路径
- * - 空 → 同笔记本 + 有上下文则当前文档子文档；跨笔记本或无上下文则目标笔记本根路径
+ * Three shapes:
+ * - Trailing `/` -> parent document path: the path is a chain of parent documents, and the new
+ *   document is created inside the innermost parent; the title is empty when `name` is not passed
+ * - No trailing `/` -> document name: the last segment is the title, the rest is the parent path
+ * - Empty -> same notebook + has context means a subdocument of the current document; crossing
+ *   notebooks or no context means the target notebook's root path
  *
- * `/` 开头从根解析，否则相对 `hPath`；`..` 向上一级，已在根则停在 `/`。
- * 跨笔记本时相对路径在开头补 `/`，按目标笔记本根解析；空路径也回退到目标笔记本根路径。
+ * A leading `/` resolves from the root, otherwise it is relative to `hPath`; `..` goes up one
+ * level, stopping at `/` if already at the root.
+ * When crossing notebooks, a relative path is prefixed with `/` and resolved against the target
+ * notebook's root; an empty path also falls back to the target notebook's root path.
  */
 
 import {mergePathSegments} from "./mergePathSegments";
 
-/** 内核 `createDocsByHPath` 按 HPath 逐级创建 */
+/** The kernel's `createDocsByHPath` creates documents level by level according to the HPath */
 export type NewDocTargetByHPath = {
     kind: "hPath";
     targetNotebookId: string;
@@ -24,7 +30,7 @@ export type NewDocTargetByHPath = {
     title: string;
 };
 
-/** 在已知父路径下创建子文档 */
+/** Creates a subdocument under a known parent path */
 export type NewDocTargetSubDoc = {
     kind: "subDoc";
     targetNotebookId: string;
@@ -34,7 +40,7 @@ export type NewDocTargetSubDoc = {
 
 export type NewDocTarget = NewDocTargetByHPath | NewDocTargetSubDoc;
 
-/** 按保存路径配置解析新建目标 */
+/** Resolves the new-document target from the save-path configuration */
 export const getNewDocTargetFromSavePath = (request: {
     templatePath: string;
     hPath: string;
@@ -49,13 +55,17 @@ export const getNewDocTargetFromSavePath = (request: {
     let templatePath = request.templatePath.trim();
     let isAbsolute = templatePath.startsWith("/");
     if (targetNotebookId !== request.currentNotebookId && templatePath && !isAbsolute) {
-        // 跨笔记本时相对路径无锚点，在开头补 `/` 按目标笔记本根路径解析
+        // A relative path has no anchor when crossing notebooks, so prefix it with `/` to resolve
+        // it against the target notebook's root path
         templatePath = "/" + templatePath;
         isAbsolute = true;
     }
 
-    // 空路径 + 同笔记本 + 有上下文 + 无 name：在已知父路径下建空标题子文档
-    // 跨笔记本时 currentPath 属于当前笔记本，在目标笔记本中无效，落到下方 hPath 逻辑回退到目标笔记本根
+    // Empty path + same notebook + has context + no name: create an empty-title subdocument under
+    // the known parent path.
+    // When crossing notebooks, currentPath belongs to the current notebook and is invalid in the
+    // target notebook, so it falls through to the hPath logic below, which falls back to the
+    // target notebook's root
     if (!templatePath && request.hasFocusTarget && !request.name
         && targetNotebookId === request.currentNotebookId) {
         return {
@@ -69,34 +79,34 @@ export const getNewDocTargetFromSavePath = (request: {
     let parentTemplate: string;
     let title = "";
     if (!templatePath) {
-        // 空路径 + 有上下文 → 当前路径下；空路径 + 无上下文 → 笔记本根
+        // Empty path + has context -> under the current path; empty path + no context -> the notebook root
         parentTemplate = request.hasFocusTarget ? "" : "/";
         title = request.name || "";
     } else if (templatePath.endsWith("/")) {
-        // 尾部有 `/`：解析父文档链，在最内层父文档内新建
+        // Has a trailing `/`: resolve the chain of parent documents, and create the new one inside the innermost parent
         parentTemplate = templatePath;
         title = request.name || "";
     } else {
         const segments = templatePath.split("/").filter(Boolean);
         if (segments.length <= 1) {
-            // 文档名
+            // Document name
             parentTemplate = isAbsolute ? "/" : "";
         } else {
-            // 路径：去掉末段（文档名），余下段拼成父路径模板
+            // Path: drop the last segment (the document name); the remaining segments form the parent path template
             const parentSegmentPath = segments.slice(0, -1).join("/");
             parentTemplate = isAbsolute ? "/" + parentSegmentPath : parentSegmentPath;
         }
         title = request.name || segments[segments.length - 1];
     }
 
-    // 将路径模板合并进 hPath
+    // Merge the path template into hPath
     const templateSegments = parentTemplate.split("/").filter(Boolean);
     let parentPathSegments: string[];
     if (parentTemplate.startsWith("/")) {
-        // 绝对路径：从笔记本根起算
+        // Absolute path: computed from the notebook root
         parentPathSegments = mergePathSegments([], templateSegments);
     } else {
-        // 相对路径：从当前 hPath 起算
+        // Relative path: computed from the current hPath
         parentPathSegments = mergePathSegments(request.hPath.split("/").filter(Boolean), templateSegments);
     }
 
@@ -104,7 +114,8 @@ export const getNewDocTargetFromSavePath = (request: {
     if (title) {
         hPath = "/" + [...parentPathSegments, title].join("/");
     } else {
-        // 空标题时保留尾 `/` 使 hPath 末段为空，内核按父文档链在其内新建子文档
+        // With an empty title, keep the trailing `/` so hPath's last segment is empty; the kernel
+        // then creates the new subdocument inside the parent document chain
         hPath = parentPathSegments.length === 0 ? "/" : "/" + parentPathSegments.join("/") + "/";
     }
 
@@ -116,7 +127,10 @@ export const getNewDocTargetFromSavePath = (request: {
     };
 };
 
-/** 文件树指定位置：在 `currentPath` 下建子文档，标题规则同保存路径 */
+/**
+ * A specific location in the file tree: creates a subdocument under `currentPath`, with the same
+ * title rules as the save path
+ */
 export const getNewDocTargetFromTree = (request: {
     templatePath: string;
     currentNotebookId: string;

@@ -1,6 +1,6 @@
 import {createConfigNamespaceApi} from "../util/namespaceApi";
 
-/** 搜索 Tab 命名空间：设置面板注册项 save */
+/** Search config namespace, used as the save handler of the items registered in the setting panel */
 export const searchConfigApi = createConfigNamespaceApi<Config.ISearch>({
     namespace: "search",
     getConfig: () => window.siyuan.config.search,

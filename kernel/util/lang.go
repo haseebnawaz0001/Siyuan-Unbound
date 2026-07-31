@@ -16,7 +16,7 @@
 
 package util
 
-// langLegacyToBCP47 从历史下划线标识映射到 BCP 47 标准语言代码。
+// langLegacyToBCP47 maps legacy underscore-style identifiers to standard BCP 47 language codes.
 var LangLegacyToBCP47 = map[string]string{
 	"zh_CN":  "zh-CN",
 	"zh_CHT": "zh-TW",
@@ -41,7 +41,7 @@ var LangLegacyToBCP47 = map[string]string{
 	"sk_SK":  "sk",
 }
 
-// langBCP47ToLegacy 从 BCP 47 标准语言代码映射到历史下划线标识。
+// langBCP47ToLegacy maps standard BCP 47 language codes to legacy underscore-style identifiers.
 var langBCP47ToLegacy map[string]string
 
 func init() {
@@ -51,8 +51,8 @@ func init() {
 	}
 }
 
-// LangToBCP47 把历史下划线标识映射为 BCP 47 标准语言代码（如 zh_CN → zh-CN）。
-// 不是历史下划线标识时原样返回。
+// LangToBCP47 maps a legacy underscore-style identifier to a standard BCP 47 language code (e.g. zh_CN -> zh-CN).
+// Returns the input unchanged if it isn't a legacy underscore-style identifier.
 func LangToBCP47(lang string) string {
 	if v, ok := LangLegacyToBCP47[lang]; ok {
 		return v
@@ -60,8 +60,8 @@ func LangToBCP47(lang string) string {
 	return lang
 }
 
-// LangToLegacy 把 BCP 47 标准语言代码映射为历史下划线标识（如 zh-CN → zh_CN）。
-// 不是 BCP 47 标准语言代码时原样返回。
+// LangToLegacy maps a standard BCP 47 language code to a legacy underscore-style identifier (e.g. zh-CN -> zh_CN).
+// Returns the input unchanged if it isn't a standard BCP 47 language code.
 func LangToLegacy(lang string) string {
 	if legacy, ok := langBCP47ToLegacy[lang]; ok {
 		return legacy

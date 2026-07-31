@@ -29,7 +29,7 @@ import (
 	"github.com/siyuan-note/siyuan/kernel/util"
 )
 
-// LocaleStrings 表示按语种 key 的字符串表，key 为语种如 "default"、"en_US"、"zh_CN" 等
+// LocaleStrings represents a string table keyed by locale, where the key is a locale such as "default", "en_US", "zh_CN", etc
 type LocaleStrings map[string]string
 
 type Funding struct {
@@ -39,8 +39,9 @@ type Funding struct {
 	Custom         []string `json:"custom"`
 }
 
-// Package 描述了集市包元数据和传递给前端的其他信息。
-//   - 集市包新增元数据字段需要同步修改 bazaar 的工作流，参考 https://github.com/siyuan-note/bazaar/commit/aa36d0003139c52d8e767c6e18a635be006323e2
+// Package describes bazaar package metadata and other info passed to the frontend.
+//   - Adding a new metadata field for bazaar packages requires updating the bazaar workflow in sync;
+//     see https://github.com/siyuan-note/bazaar/commit/aa36d0003139c52d8e767c6e18a635be006323e2
 type Package struct {
 	Author            string        `json:"author"`
 	URL               string        `json:"url"`
@@ -61,8 +62,8 @@ type Package struct {
 	PreferredDesc    string `json:"preferredDesc"`
 	PreferredReadme  string `json:"preferredReadme"`
 
-	Name       string `json:"name"`    // 包名，不一定是仓库名
-	RepoURL    string `json:"repoURL"` // 形式为 https://github.com/owner/repo
+	Name       string `json:"name"`    // package name, not necessarily the repo name
+	RepoURL    string `json:"repoURL"` // in the form https://github.com/owner/repo
 	RepoHash   string `json:"repoHash"`
 	PreviewURL string `json:"previewURL"`
 	IconURL    string `json:"iconURL"`
@@ -82,35 +83,35 @@ type Package struct {
 	Downloads               int    `json:"downloads"`
 	DisallowInstall         bool   `json:"disallowInstall"`
 	DisallowUpdate          bool   `json:"disallowUpdate"`
-	UpdateRequiredMinAppVer string `json:"updateRequiredMinAppVer,omitempty"` // 升级目标要求的最小应用版本
+	UpdateRequiredMinAppVer string `json:"updateRequiredMinAppVer,omitempty"` // the minimum app version required by the update target
 
-	// 专用字段，nil 时不序列化
-	InstalledIncompatible *bool     `json:"installedIncompatible,omitempty"` // Plugin：本地已安装版本是否不兼容
-	BazaarIncompatible    *bool     `json:"bazaarIncompatible,omitempty"`    // Plugin：在线集市版本是否不兼容
-	Enabled               *bool     `json:"enabled,omitempty"`               // Plugin：是否启用
-	Modes                 *[]string `json:"modes,omitempty"`                 // Theme：支持的模式列表
+	// dedicated fields, not serialized when nil
+	InstalledIncompatible *bool     `json:"installedIncompatible,omitempty"` // Plugin: whether the locally installed version is incompatible
+	BazaarIncompatible    *bool     `json:"bazaarIncompatible,omitempty"`    // Plugin: whether the online bazaar version is incompatible
+	Enabled               *bool     `json:"enabled,omitempty"`               // Plugin: whether it's enabled
+	Modes                 *[]string `json:"modes,omitempty"`                 // Theme: the list of supported modes
 }
 
 type StageRepo struct {
-	URL         string `json:"url"` // owner/repo@hash 形式
+	URL         string `json:"url"` // in the form owner/repo@hash
 	Updated     string `json:"updated"`
 	Stars       int    `json:"stars"`
 	OpenIssues  int    `json:"openIssues"`
 	Size        int64  `json:"size"`
 	InstallSize int64  `json:"installSize"`
 
-	// Package 与 stage/*.json 内嵌的完整 package 一致，可直接用于构建列表
+	// Package is identical to the full package embedded in stage/*.json, and can be used directly to build the list
 	Package *Package `json:"package"`
 }
 
 type StageIndex struct {
 	Repos []*StageRepo `json:"repos"`
 
-	reposByURL map[string]*StageRepo // 不序列化，首次按 URL 查找时懒构建，随整份索引一起过期
+	reposByURL map[string]*StageRepo // not serialized; lazily built on the first lookup by URL, and expires along with the whole index
 	reposOnce  sync.Once
 }
 
-// ParsePackageJSON 解析集市包 JSON 文件
+// ParsePackageJSON parses a bazaar package JSON file
 func ParsePackageJSON(filePath string) (ret *Package, err error) {
 	if !filelock.IsExist(filePath) {
 		err = os.ErrNotExist
@@ -130,7 +131,8 @@ func ParsePackageJSON(filePath string) (ret *Package, err error) {
 	return
 }
 
-// unescapePackageDisplayStrings 将在线 stage 中已 HTML 转义的展示字段还原为原文，与本地 JSON 一致。
+// unescapePackageDisplayStrings restores display fields that were HTML-escaped in the online stage back to
+// their original text, matching the local JSON.
 func unescapePackageDisplayStrings(pkg *Package) {
 	if pkg == nil {
 		return
@@ -157,7 +159,8 @@ func unescapePackageDisplayStrings(pkg *Package) {
 	}
 }
 
-// GetPreferredLocaleString 从 LocaleStrings 中按当前语种取值，无则回退 default、en、en_US（历史命名兼容），再回退 fallback。
+// GetPreferredLocaleString takes the value from LocaleStrings for the current locale; if absent, falls back to
+// default, en, en_US (for legacy naming compatibility), then falls back to fallback.
 func GetPreferredLocaleString(m LocaleStrings, fallback string) string {
 	if len(m) == 0 {
 		return fallback
@@ -165,7 +168,7 @@ func GetPreferredLocaleString(m LocaleStrings, fallback string) string {
 	if v := strings.TrimSpace(m[util.Lang]); "" != v {
 		return v
 	}
-	// 兼容集市 JSON 数据中历史下划线 key（zh_CN、en_US 等）
+	// compatible with legacy underscore keys in bazaar JSON data (zh_CN, en_US, etc)
 	if v := strings.TrimSpace(m[util.LangToLegacy(util.Lang)]); "" != v {
 		return v
 	}
@@ -181,7 +184,7 @@ func GetPreferredLocaleString(m LocaleStrings, fallback string) string {
 	return fallback
 }
 
-// getPreferredFunding 获取包的首选赞助链接
+// getPreferredFunding gets the package's preferred funding link
 func getPreferredFunding(funding *Funding) string {
 	if nil == funding {
 		return ""
@@ -215,7 +218,7 @@ func normalizeFundingURL(s, base string) string {
 	return base + s
 }
 
-// FilterPackages 按关键词过滤集市包列表
+// FilterPackages filters the bazaar package list by keyword
 func FilterPackages(packages []*Package, keyword string) []*Package {
 	keywords := getSearchKeywords(keyword)
 	if 0 == len(keywords) {
@@ -279,7 +282,7 @@ func packageContainsKeyword(pkg *Package, kw string) bool {
 			return true
 		}
 	}
-	if strings.Contains(strings.ToLower(path.Base(pkg.RepoURL)), kw) { // 仓库名，不一定是包名
+	if strings.Contains(strings.ToLower(path.Base(pkg.RepoURL)), kw) { // repo name, not necessarily the package name
 		return true
 	}
 	return false

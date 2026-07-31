@@ -24,12 +24,12 @@ import (
 type PushMode int
 
 const (
-	PushModeBroadcast                   PushMode = 0 // 所有应用所有会话广播
-	PushModeSingleSelf                  PushMode = 1 // 自我应用会话单播
-	PushModeBroadcastExcludeSelf        PushMode = 2 // 非自我会话广播
-	PushModeBroadcastExcludeSelfApp     PushMode = 4 // 非自我应用所有会话广播
-	PushModeBroadcastApp                PushMode = 5 // 单个应用内所有会话广播
-	PushModeBroadcastMainExcludeSelfApp PushMode = 6 // 非自我应用主会话广播
+	PushModeBroadcast                   PushMode = 0 // Broadcast to all sessions of all apps
+	PushModeSingleSelf                  PushMode = 1 // Unicast to the calling app's own session
+	PushModeBroadcastExcludeSelf        PushMode = 2 // Broadcast to sessions other than the caller's own
+	PushModeBroadcastExcludeSelfApp     PushMode = 4 // Broadcast to all sessions of apps other than the caller's own
+	PushModeBroadcastApp                PushMode = 5 // Broadcast to all sessions within a single app
+	PushModeBroadcastMainExcludeSelfApp PushMode = 6 // Broadcast to the main session of apps other than the caller's own
 )
 
 type Result struct {

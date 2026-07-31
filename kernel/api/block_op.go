@@ -155,7 +155,7 @@ func batchUpdateTaskListItemMarker(c *gin.Context) {
 		if util.InvalidIDPattern(id, ret) {
 			return
 		}
-		// 相同 id 保留最后一个 marker
+		// For the same id, keep the last marker
 		idToMarker[id] = marker
 		idsInOrder = append(idsInOrder, id)
 	}
@@ -512,7 +512,7 @@ func moveBlock(c *gin.Context) {
 		return
 	}
 
-	// 仅靠 parentID 定位目标时（无 previousID），目标必须是容器块，否则非法嵌套
+	// When the target is located solely by parentID (no previousID), the target must be a container block, otherwise the nesting is invalid
 	if "" == previousID && "" != parentID {
 		if err := treenode.CheckListItemNesting(parentID, id); err != nil {
 			ret.Code = -1
@@ -563,7 +563,7 @@ func appendBlock(c *gin.Context) {
 	if util.InvalidIDPattern(parentID, ret) {
 		return
 	}
-	// append 只用 parentID 定位目标，目标必须是容器块，否则非法嵌套
+	// append locates the target using only parentID, so the target must be a container block, otherwise the nesting is invalid
 	if err := treenode.CheckContainerParent(parentID); err != nil {
 		ret.Code = -1
 		ret.Msg = err.Error()
@@ -619,7 +619,7 @@ func batchAppendBlock(c *gin.Context) {
 		if util.InvalidIDPattern(parentID, ret) {
 			return
 		}
-		// append 只用 parentID 定位目标，目标必须是容器块，否则非法嵌套
+		// append locates the target using only parentID, so the target must be a container block, otherwise the nesting is invalid
 		if err := treenode.CheckContainerParent(parentID); err != nil {
 			ret.Code = -1
 			ret.Msg = err.Error()
@@ -668,7 +668,7 @@ func prependBlock(c *gin.Context) {
 	if util.InvalidIDPattern(parentID, ret) {
 		return
 	}
-	// prepend 只用 parentID 定位目标，目标必须是容器块，否则非法嵌套
+	// prepend locates the target using only parentID, so the target must be a container block, otherwise the nesting is invalid
 	if err := treenode.CheckContainerParent(parentID); err != nil {
 		ret.Code = -1
 		ret.Msg = err.Error()
@@ -724,7 +724,7 @@ func batchPrependBlock(c *gin.Context) {
 		if util.InvalidIDPattern(parentID, ret) {
 			return
 		}
-		// prepend 只用 parentID 定位目标，目标必须是容器块，否则非法嵌套
+		// prepend locates the target using only parentID, so the target must be a container block, otherwise the nesting is invalid
 		if err := treenode.CheckContainerParent(parentID); err != nil {
 			ret.Code = -1
 			ret.Msg = err.Error()
@@ -789,7 +789,7 @@ func insertBlock(c *gin.Context) {
 		}
 	}
 
-	// 仅靠 parentID 定位目标时（无 previousID/nextID），目标必须是容器块，否则非法嵌套
+	// When the target is located solely by parentID (no previousID/nextID), the target must be a container block, otherwise the nesting is invalid
 	if "" != parentID && "" == previousID && "" == nextID {
 		if err := treenode.CheckContainerParent(parentID); err != nil {
 			ret.Code = -1
@@ -883,7 +883,7 @@ func updateBlock(c *gin.Context) {
 		for n := oldTree.Root.FirstChild; nil != n; n = n.Next {
 			toRemoves = append(toRemoves, n)
 			ops = append(ops, &model.Operation{Action: "delete", ID: n.ID, Data: map[string]any{
-				"createEmptyParagraph": false, // 清空文档后前端不要创建空段落
+				"createEmptyParagraph": false, // After clearing the document, the frontend should not create an empty paragraph
 			}})
 		}
 		for _, n := range toRemoves {
@@ -895,11 +895,11 @@ func updateBlock(c *gin.Context) {
 		})
 	} else {
 		if "NodeListItem" == block.Type && ast.NodeList == tree.Root.FirstChild.Type {
-			// 使用 API `api/block/updateBlock` 更新列表项时渲染错误 https://github.com/siyuan-note/siyuan/issues/4658
-			tree.Root.AppendChild(tree.Root.FirstChild.FirstChild) // 将列表下的第一个列表项移到文档结尾，移动以后根下面直接挂列表项，渲染器可以正常工作
-			tree.Root.FirstChild.Unlink()                          // 删除列表
+			// Rendering error when updating a list item via the API `api/block/updateBlock` https://github.com/siyuan-note/siyuan/issues/4658
+			tree.Root.AppendChild(tree.Root.FirstChild.FirstChild) // Move the list's first list item to the end of the document; once moved, the list item hangs directly under root, and the renderer works correctly
+			tree.Root.FirstChild.Unlink()                          // Remove the list
 			if nil != tree.Root.FirstChild && ast.NodeKramdownBlockIAL == tree.Root.FirstChild.Type {
-				tree.Root.FirstChild.Unlink() // 继续删除列表 IAL
+				tree.Root.FirstChild.Unlink() // Also remove the list's IAL
 			}
 		}
 
@@ -967,7 +967,7 @@ func batchInsertBlock(c *gin.Context) {
 			}
 		}
 
-		// 仅靠 parentID 定位目标时（无 previousID/nextID），目标必须是容器块，否则非法嵌套
+		// When the target is located solely by parentID (no previousID/nextID), the target must be a container block, otherwise the nesting is invalid
 		if "" != parentID && "" == previousID && "" == nextID {
 			if err := treenode.CheckContainerParent(parentID); err != nil {
 				ret.Code = -1
@@ -1091,7 +1091,7 @@ func batchUpdateBlock(c *gin.Context) {
 			for n := oldTree.Root.FirstChild; nil != n; n = n.Next {
 				toRemoves = append(toRemoves, n)
 				ops = append(ops, &model.Operation{Action: "delete", ID: n.ID, Data: map[string]any{
-					"createEmptyParagraph": false, // 清空文档后前端不要创建空段落
+					"createEmptyParagraph": false, // After clearing the document, the frontend should not create an empty paragraph
 				}})
 			}
 			for _, n := range toRemoves {
@@ -1100,10 +1100,10 @@ func batchUpdateBlock(c *gin.Context) {
 			ops = append(ops, &model.Operation{Action: "appendInsert", Data: data, ParentID: id})
 		} else {
 			if "NodeListItem" == block.Type && ast.NodeList == tree.Root.FirstChild.Type {
-				// 使用 API `api/block/updateBlock` 更新列表项时渲染错误 https://github.com/siyuan-note/siyuan/issues/4658
-				tree.Root.AppendChild(tree.Root.FirstChild.FirstChild) // 将列表下的第一个列表项移到文档结尾，移动以后根下面直接挂列表项，渲染器可以正常工作
-				tree.Root.FirstChild.Unlink()                          // 删除列表
-				tree.Root.FirstChild.Unlink()                          // 继续删除列表 IAL
+				// Rendering error when updating a list item via the API `api/block/updateBlock` https://github.com/siyuan-note/siyuan/issues/4658
+				tree.Root.AppendChild(tree.Root.FirstChild.FirstChild) // Move the list's first list item to the end of the document; once moved, the list item hangs directly under root, and the renderer works correctly
+				tree.Root.FirstChild.Unlink()                          // Remove the list
+				tree.Root.FirstChild.Unlink()                          // Also remove the list's IAL
 			}
 			tree.Root.FirstChild.SetIALAttr("id", id)
 
@@ -1162,11 +1162,11 @@ func broadcastTransactions(transactions []*model.Transaction) {
 }
 
 func dataBlockDOM(data string, luteEngine *lute.Lute) (ret string, err error) {
-	luteEngine.SetHTMLTag2TextMark(true) // API `/api/block/**` 无法使用 `<u>foo</u>` 与 `<kbd>bar</kbd>` 插入/更新行内元素 https://github.com/siyuan-note/siyuan/issues/6039
+	luteEngine.SetHTMLTag2TextMark(true) // The API `/api/block/**` can't use `<u>foo</u>` or `<kbd>bar</kbd>` to insert/update inline elements https://github.com/siyuan-note/siyuan/issues/6039
 
 	ret, tree := luteEngine.Md2BlockDOMTree(data, true)
 	if "" == ret {
-		// 使用 API 插入空字符串出现错误 https://github.com/siyuan-note/siyuan/issues/3931
+		// Error when using the API to insert an empty string https://github.com/siyuan-note/siyuan/issues/3931
 		blankParagraph := treenode.NewParagraph("")
 		ret = luteEngine.RenderNodeBlockDOM(blankParagraph)
 	}

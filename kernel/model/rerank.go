@@ -16,10 +16,12 @@
 
 package model
 
-// defaultRerankCandidateCount 向量召回后默认送入重排的候选文档数，与 conf.defaultRerank 保持一致。
+// defaultRerankCandidateCount is the default number of candidate documents sent to reranking after
+// vector retrieval, kept in sync with conf.defaultRerank.
 const defaultRerankCandidateCount = 30
 
-// isRerankEnabled 判断重排是否可用：配置已开启且填了 APIKey。语义搜索在召回后会据此决定是否走重排。
+// isRerankEnabled reports whether reranking is available: the setting is enabled and an APIKey is
+// configured. Semantic search uses this after retrieval to decide whether to rerank.
 func isRerankEnabled() bool {
 	return nil != Conf.AI.Rerank && Conf.AI.Rerank.Enabled && len(Conf.AI.Rerank.APIKey) > 0
 }
@@ -52,7 +54,8 @@ func rerankTimeout() int {
 	return 30
 }
 
-// rerankCandidateCount 返回向量召回后送入重排的候选文档数。Normalize 已保证落在 [5,100]，这里做兜底。
+// rerankCandidateCount returns the number of candidate documents sent to reranking after vector
+// retrieval. Normalize already guarantees this falls within [5,100]; this is just a fallback.
 func rerankCandidateCount() int {
 	if nil != Conf.AI.Rerank && Conf.AI.Rerank.Enabled && 0 < Conf.AI.Rerank.CandidateCount {
 		return Conf.AI.Rerank.CandidateCount

@@ -109,7 +109,8 @@ export const keydown = (protyle: IProtyle, editorElement: HTMLElement) => {
         }
         if (protyle.disabled ||
             (!protyle.selectElement.classList.contains("fn__none") && !protyle.selectElement.getAttribute("data-empty") &&
-             // 框选块时放行 ⌘C，以便复制选中的块 https://github.com/siyuan-note/siyuan/issues/18043
+             // Let ⌘C through during a rubber-band block selection, so the selected blocks can be copied
+             // https://github.com/siyuan-note/siyuan/issues/18043
              !matchHotKey("⌘C", event))) {
             event.stopPropagation();
             event.preventDefault();
@@ -118,9 +119,9 @@ export const keydown = (protyle: IProtyle, editorElement: HTMLElement) => {
         protyle.wysiwyg.preventKeyup = false;
         hideElements(["util"], protyle);
         if (event.shiftKey && event.key.indexOf("Arrow") > -1) {
-            // 防止连续选中的时候抖动 https://github.com/siyuan-note/insider/issues/657#issuecomment-851391217
+            // Prevent jitter while continuously extending a selection https://github.com/siyuan-note/insider/issues/657#issuecomment-851391217
         } else if (!event.repeat &&
-            event.code !== "") { // 悬浮工具会触发但 code 为空 https://github.com/siyuan-note/siyuan/issues/6573
+            event.code !== "") { // A hover toolbar can trigger this with an empty code https://github.com/siyuan-note/siyuan/issues/6573
             hideElements(["toolbar"], protyle);
         }
         const range = getEditorRange(protyle.wysiwyg.element);
@@ -149,7 +150,7 @@ export const keydown = (protyle: IProtyle, editorElement: HTMLElement) => {
                 event.stopPropagation();
                 event.preventDefault();
                 protyle.wysiwyg.element.blur();
-                // 阻止中文输入的残留
+                // Prevent leftover Chinese IME input
                 setTimeout(() => {
                     insertEmptyBlock(protyle, "afterend");
                 }, 100);
@@ -171,28 +172,28 @@ export const keydown = (protyle: IProtyle, editorElement: HTMLElement) => {
         // https://github.com/siyuan-note/siyuan/issues/2261
         if (!["⌘", "⇧", "⌥", "⌃"].includes(Constants.KEYCODELIST[event.keyCode])) {
             if (Constants.KEYCODELIST[event.keyCode] === "/" ||
-                // 德语
+                // German keyboard
                 event.key === "/" ||
-                // windows 中文
+                // Windows Chinese IME
                 (event.code === "Slash" && event.key === "Process" && event.keyCode === 229)) {
                 protyle.hint.enableSlash = true;
             } else if (Constants.KEYCODELIST[event.keyCode] === "\\" ||
-                // 德语
+                // German keyboard
                 event.key === "\\" ||
-                // Mac 日文-罗马字 https://github.com/siyuan-note/siyuan/issues/13725
+                // Mac Japanese-Romaji input https://github.com/siyuan-note/siyuan/issues/13725
                 (event.key === "," && event.keyCode === 229) ||
-                // windows 中文
+                // Windows Chinese IME
                 (event.code === "Backslash" && event.key === "Process" && event.keyCode === 229)) {
                 protyle.hint.enableSlash = false;
                 hideElements(["hint"], protyle);
-                // 此处不能返回，否则无法撤销 https://github.com/siyuan-note/siyuan/issues/2795
+                // Can't return here, otherwise undo wouldn't work https://github.com/siyuan-note/siyuan/issues/2795
             }
         }
-        // 有可能输入 shift+. ，因此需要使用 event.key 来进行判断
+        // shift+. may be typed, so event.key must be used for the check
         if (typeof event.key === "string" && event.key !== "PageUp" && event.key !== "PageDown" && event.key !== "Home" && event.key !== "End" && event.key.indexOf("Arrow") === -1 &&
             event.key !== "Escape" && event.key !== "Shift" && event.key !== "Meta" && event.key !== "Alt" && event.key !== "Control" && event.key !== "CapsLock" &&
             !isNotEditBlock(nodeElement) && !/^F\d{1,2}$/.test(event.key) &&
-            // 微软双拼使用 compositionstart，否则 focusByRange 导致无法输入文字
+            // Microsoft Shuangpin uses compositionstart; otherwise focusByRange would prevent text input
             event.key !== "Process") {
             setInsertWbrHTML(nodeElement, range, protyle);
             protyle.wysiwyg.preventKeyup = true;
@@ -299,7 +300,7 @@ export const keydown = (protyle: IProtyle, editorElement: HTMLElement) => {
             }
         }
 
-        // 仅处理以下快捷键操作
+        // Only the following hotkey operations are handled here
         if (event.key !== "PageUp" && event.key !== "PageDown" && event.key !== "Home" && event.key !== "End" && event.key.indexOf("Arrow") === -1 &&
             isNotCtrl(event) && event.key !== "Escape" && !event.shiftKey && !event.altKey && !/^F\d{1,2}$/.test(event.key) &&
             event.key !== "Enter" && event.key !== "Tab" && event.key !== "Backspace" && event.key !== "Delete" && event.key !== "ContextMenu") {
@@ -502,7 +503,7 @@ export const keydown = (protyle: IProtyle, editorElement: HTMLElement) => {
             (event.shiftKey && !event.altKey && isOnlyMeta(event) && (event.key === "Home" || event.key === "End") && !isMac())) {
             const topElement = hasTopClosestByAttribute(nodeElement, "data-node-id", null);
             if (topElement) {
-                // 超级块内已选中某个块
+                // A block within the superblock is already selected
                 topElement.querySelectorAll(".protyle-wysiwyg--select").forEach(item => {
                     item.classList.remove("protyle-wysiwyg--select");
                 });
@@ -530,7 +531,7 @@ export const keydown = (protyle: IProtyle, editorElement: HTMLElement) => {
         if ((event.key === "Home" || event.key === "End") && !event.shiftKey && !event.altKey && isNotCtrl(event)) {
             hideElements(["hint"], protyle);
         }
-        // 向上/下滚动一屏
+        // Scroll up/down one screen
         if (!event.altKey && !event.shiftKey && isNotCtrl(event) && (event.key === "PageUp" || event.key === "PageDown")) {
             if (event.key === "PageUp") {
                 protyle.contentElement.scrollTop = protyle.contentElement.scrollTop - protyle.contentElement.clientHeight + 60;
@@ -552,7 +553,7 @@ export const keydown = (protyle: IProtyle, editorElement: HTMLElement) => {
             event.preventDefault();
             return;
         }
-        // hint: 上下、回车选择
+        // hint: up/down/Enter selection
         if (!event.altKey && !event.shiftKey &&
             ((event.key.indexOf("Arrow") > -1 && isNotCtrl(event)) || event.key === "Enter") &&
             !protyle.hint.element.classList.contains("fn__none") && protyle.hint.select(event, protyle)) {
@@ -625,9 +626,9 @@ export const keydown = (protyle: IProtyle, editorElement: HTMLElement) => {
         }
         const selectText = range.toString();
 
-        // 上下左右光标移动
+        // Caret movement with the arrow keys
         if (!event.altKey && !event.shiftKey && isNotCtrl(event) && !event.isComposing && (event.key.indexOf("Arrow") > -1)) {
-            // 需使用 editabled，否则代码块会把语言字数算入
+            // Must use editabled, otherwise a code block would count the language name's characters too
             const tdElement = hasClosestByTag(range.startContainer, "TD") || hasClosestByTag(range.startContainer, "TH");
             let tdStatus;
             if (tdElement) {
@@ -639,19 +640,20 @@ export const keydown = (protyle: IProtyle, editorElement: HTMLElement) => {
             const nodeEditableElement = (tdElement || getContenteditableElement(nodeElement) || nodeElement) as HTMLElement;
             const position = getSelectionOffset(nodeEditableElement, protyle.wysiwyg.element, range);
             if (nodeElement.classList.contains("code-block") && position.end === nodeEditableElement.innerText.length) {
-                // 代码块换最后一个 /n 肉眼是无法区分是否在其后的，因此统一在之前
+                // In a code block, whether the caret is before or after the final trailing \n is visually
+                // indistinguishable, so it's always treated as before it
                 position.end -= 1;
 
             }
             if (event.key === "ArrowUp") {
                 const firstEditElement = getContenteditableElement(protyle.wysiwyg.element.firstElementChild);
                 if ((
-                        !getPreviousBlock(nodeElement) &&  // 列表第一个块为嵌入块，第二个块为段落块，上键应选中第一个块 https://ld246.com/article/1652667912155
+                        !getPreviousBlock(nodeElement) &&  // When a list's first block is an embed block and the second is a paragraph, ArrowUp should select the first block https://ld246.com/article/1652667912155
                         nodeElement.contains(firstEditElement)
                     ) ||
                     (!firstEditElement && nodeElement === protyle.wysiwyg.element.firstElementChild)) {
-                    // 不能用\n判断，否则文字过长折行将错误 https://github.com/siyuan-note/siyuan/issues/6156
-                    // 空行 getSelectionPosition 计算有问题导致 https://github.com/siyuan-note/siyuan/issues/17602
+                    // Can't check for \n, otherwise long wrapped text would be handled incorrectly https://github.com/siyuan-note/siyuan/issues/6156
+                    // Caused by a getSelectionPosition calculation bug on empty lines https://github.com/siyuan-note/siyuan/issues/17602
                     const diff = getSelectionPosition(nodeEditableElement, range).top - nodeEditableElement.getBoundingClientRect().top;
                     if ((diff < 20 && diff !== 0) || nodeElement.classList.contains("av")) {
                         if (protyle.title && protyle.title.editElement &&
@@ -675,27 +677,30 @@ export const keydown = (protyle: IProtyle, editorElement: HTMLElement) => {
                             previousElement = getLastBlock(previousElement) as HTMLElement;
                             if (previousElement) {
                                 const foldElement = hasTopClosestByAttribute(previousElement, "fold", "1") as HTMLElement;
-                                // 代码块或以软换行结尾的块移动光标 ↑ 会跳过 https://github.com/siyuan-note/siyuan/issues/5498
-                                // 代码块全选后 ↑ 光标不会上移 https://github.com/siyuan-note/siyuan/issues/11581
-                                // 段落块不能设置，否则 ↑ 后光标位置不能保持 https://github.com/siyuan-note/siyuan/issues/12710
+                                // Moving the caret up (ArrowUp) skips over a code block or a block ending in a
+                                // soft line break https://github.com/siyuan-note/siyuan/issues/5498
+                                // After select-all in a code block, ArrowUp doesn't move the caret up https://github.com/siyuan-note/siyuan/issues/11581
+                                // This must not be set for paragraph blocks, otherwise the caret position isn't
+                                // preserved after ArrowUp https://github.com/siyuan-note/siyuan/issues/12710
                                 if (!foldElement && previousElement.classList.contains("code-block")) {
                                     focusBlock(previousElement, undefined, false);
                                     scrollCenter(protyle, previousElement);
                                     event.stopPropagation();
                                     event.preventDefault();
                                 } else if (foldElement) {
-                                    // 遇到折叠块
+                                    // A fold block was encountered
                                     foldElement.scrollTop = 0;
                                     focusBlock(foldElement, undefined, true);
                                     scrollCenter(protyle, foldElement);
                                     event.stopPropagation();
                                     event.preventDefault();
                                 } else {
-                                    // 修正光标上移至 \n 结尾的块时落点错误 https://github.com/siyuan-note/siyuan/issues/14443
+                                    // Fix the caret landing in the wrong place when moving up into a block ending in \n
+                                    // https://github.com/siyuan-note/siyuan/issues/14443
                                     const prevEditableElement = getContenteditableElement(previousElement) as HTMLElement;
                                     if (prevEditableElement && prevEditableElement.lastChild?.nodeType === 3 &&
                                         prevEditableElement.lastChild?.textContent.endsWith("\n")) {
-                                        //  不能移除 /n, 否则两个 /n 导致界面异常
+                                        // Don't remove the \n, otherwise having two \n would break the UI
                                         focusBlock(previousElement, undefined, false);
                                         event.preventDefault();
                                         event.stopPropagation();
@@ -708,9 +713,9 @@ export const keydown = (protyle: IProtyle, editorElement: HTMLElement) => {
                 }
             } else if (selectText === "" && (event.key === "ArrowDown" || event.key === "ArrowRight") &&
                 nodeElement === getLastBlock(protyle.wysiwyg.element.lastElementChild)) {
-                // 末尾按向下/右箭头丢失焦点 https://ld246.com/article/1629954026096
+                // Pressing ArrowDown/ArrowRight at the very end loses focus https://ld246.com/article/1629954026096
                 const lastEditElement = getContenteditableElement(nodeElement);
-                // 代码块需替换最后一个 /n  https://github.com/siyuan-note/siyuan/issues/3221
+                // The final trailing \n needs to be replaced in a code block https://github.com/siyuan-note/siyuan/issues/3221
                 if (lastEditElement && !nodeElement.classList.contains("table") &&
                     !lastEditElement.querySelector(".emoji") &&
                     lastEditElement.textContent.replace(/\n$/, "").length <= getSelectionOffset(lastEditElement, undefined, range).end) {
@@ -719,7 +724,7 @@ export const keydown = (protyle: IProtyle, editorElement: HTMLElement) => {
                     focusByRange(range);
                 }
             } else if (selectText === "" && event.key === "ArrowLeft" && nodeElement === getFirstBlock(protyle.wysiwyg.element.firstElementChild)) {
-                // 页面向左箭头丢失焦点 https://github.com/siyuan-note/siyuan/issues/2768
+                // Pressing ArrowLeft at the start of the page loses focus https://github.com/siyuan-note/siyuan/issues/2768
                 const firstEditElement = getContenteditableElement(nodeElement);
                 if (firstEditElement && !nodeElement.classList.contains("table") &&
                     range.startOffset === 0 && range.collapsed &&
@@ -731,9 +736,9 @@ export const keydown = (protyle: IProtyle, editorElement: HTMLElement) => {
             }
             if (event.key === "ArrowDown") {
                 const nextElement = getNextBlock(nodeElement);
-                // 末尾块/单元格统一移动到末尾 https://github.com/siyuan-note/siyuan/issues/17116
+                // The last block/cell is uniformly moved to the end https://github.com/siyuan-note/siyuan/issues/17116
                 if (tdElement && tdStatus === "last" && nodeType === "NodeTable" && !nextElement &&
-                    // 需使用 innerText 否则表格内 br 无法转换为 /n
+                    // Must use innerText, otherwise a <br> inside a table can't be converted to \n
                     nodeEditableElement?.innerText.trimRight().substr(position.start).indexOf("\n") === -1) {
                     setLastNodeRange(nodeEditableElement, range, false);
                     range.collapse(false);
@@ -751,7 +756,7 @@ export const keydown = (protyle: IProtyle, editorElement: HTMLElement) => {
                 }
                 const foldElement = hasClosestByAttribute(range.startContainer, "fold", "1");
                 if (foldElement) {
-                    // 本身为折叠块
+                    // It's a fold block itself
                     let nextElement = getNextBlock(foldElement) as HTMLElement;
                     if (nextElement) {
                         if (nextElement.getAttribute("fold") === "1"
@@ -766,7 +771,9 @@ export const keydown = (protyle: IProtyle, editorElement: HTMLElement) => {
                     event.stopPropagation();
                     event.preventDefault();
                 } else if (nodeEditableElement?.innerText.substr(position.end).indexOf("\n") === -1 || position.end >= nodeEditableElement.innerText.trimEnd().length) {
-                    // 需使用 innerText，否则 td 中的 br 无法转换为 \n; position.end 不能加1，否则倒数第二行行末无法下移
+                    // Must use innerText, otherwise a <br> inside a td can't be converted to \n; position.end
+                    // must not be incremented by 1, otherwise moving down from the end of the second-to-last
+                    // line wouldn't work
                     range.collapse(false);
                     if (nextElement &&
                         (nextElement.getAttribute("fold") === "1" || nextElement.classList.contains("code-block")) &&
@@ -791,8 +798,8 @@ export const keydown = (protyle: IProtyle, editorElement: HTMLElement) => {
             return;
         }
 
-        // 删除，不可使用 isNotCtrl(event)，否则软删除回导致 https://github.com/siyuan-note/siyuan/issues/5607
-        // 不可使用 !event.shiftKey，否则 https://ld246.com/article/1666434796806
+        // Deletion: isNotCtrl(event) can't be used here, otherwise soft delete would cause https://github.com/siyuan-note/siyuan/issues/5607
+        // !event.shiftKey can't be used, otherwise https://ld246.com/article/1666434796806
         if ((!event.altKey && (event.key === "Backspace" || event.key === "Delete")) ||
             matchHotKey("⌃D", event)) {
             if (protyle.wysiwyg.element.querySelector(".protyle-wysiwyg--select")) {
@@ -820,7 +827,7 @@ export const keydown = (protyle: IProtyle, editorElement: HTMLElement) => {
                 if (previousSibling.classList.contains("img")) {
                     previousSibling.classList.add("img--select");
                 } else if (previousSibling.getAttribute("data-type")?.indexOf("inline-math") > -1) {
-                    // 数学公式相邻中有 zwsp,无法删除
+                    // There's a zwsp adjacent to a math formula that can't be deleted normally
                     previousSibling.after(document.createElement("wbr"));
                     const oldHTML = nodeElement.outerHTML;
                     range.startContainer.textContent = "";
@@ -859,7 +866,7 @@ export const keydown = (protyle: IProtyle, editorElement: HTMLElement) => {
                 const position = getSelectionOffset(editElement, protyle.wysiwyg.element, range);
                 if (event.key === "Delete" || matchHotKey("⌃D", event)) {
                     if (range.startOffset === 0 && range.startContainer.textContent.length === 1) {
-                        // 图片后为空格，在空格后删除 https://github.com/siyuan-note/siyuan/issues/13949
+                        // There's a space after an image, deleting right after the space https://github.com/siyuan-note/siyuan/issues/13949
                         const rangePreviousElement = hasPreviousSibling(range.startContainer) as HTMLElement;
                         const rangeNextElement = hasNextSibling(range.startContainer) as HTMLElement;
                         if (rangePreviousElement && rangePreviousElement.nodeType === 1 && rangePreviousElement.classList.contains("img") &&
@@ -873,9 +880,9 @@ export const keydown = (protyle: IProtyle, editorElement: HTMLElement) => {
                             event.preventDefault();
                             return;
                         }
-                        // 图片前有一个字符，在字符后删除 https://github.com/siyuan-note/siyuan/issues/15911
+                        // There's one character before an image, deleting right after that character https://github.com/siyuan-note/siyuan/issues/15911
                         if (position.start === 0 &&
-                            range.startContainer.textContent !== Constants.ZWSP &&  // 如果为 zwsp 需前移光标
+                            range.startContainer.textContent !== Constants.ZWSP &&  // the caret needs to move back if it's a zwsp
                             !rangePreviousElement &&
                             rangeNextElement && rangeNextElement.nodeType === 1 && rangeNextElement.classList.contains("img")) {
                             const wbrElement = document.createElement("wbr");
@@ -888,8 +895,8 @@ export const keydown = (protyle: IProtyle, editorElement: HTMLElement) => {
                             return;
                         }
                     }
-                    // 需使用 innerText，否则 br 无法转换为 /n https://github.com/siyuan-note/siyuan/issues/12066
-                    // 段末反向删除 https://github.com/siyuan-note/insider/issues/274
+                    // Must use innerText, otherwise a <br> can't be converted to \n https://github.com/siyuan-note/siyuan/issues/12066
+                    // Forward-deleting at the end of a paragraph https://github.com/siyuan-note/insider/issues/274
                     if (isEndOfBlock(range) || editElement.textContent.substring(position.start) === "\n") {
                         const cloneRange = range.cloneRange();
                         const nextElement = getNextBlock(getTopAloneElement(nodeElement));
@@ -902,7 +909,8 @@ export const keydown = (protyle: IProtyle, editorElement: HTMLElement) => {
                                         (nextBlockElement.classList.contains("code-block") &&
                                             (getContenteditableElement(nextBlockElement).textContent == "\n") || nextBlockElement.parentElement.classList.contains("li")))
                                 ) {
-                                    // 反向删除合并为一个块时，光标应保持在尾部 https://github.com/siyuan-note/siyuan/issues/14290#issuecomment-2849810529
+                                    // When forward-deletion merges into one block, the caret should stay at the
+                                    // end https://github.com/siyuan-note/siyuan/issues/14290#issuecomment-2849810529
                                     cloneRange.insertNode(document.createElement("wbr"));
                                     removeBlock(protyle, nextBlockElement, nextRange, "Delete");
                                 }
@@ -916,7 +924,7 @@ export const keydown = (protyle: IProtyle, editorElement: HTMLElement) => {
                         event.preventDefault();
                         return;
                     } else {
-                        // 图片前 Delete 无效 https://github.com/siyuan-note/siyuan/issues/11209
+                        // Delete has no effect right before an image https://github.com/siyuan-note/siyuan/issues/11209
                         let nextSibling = hasNextSibling(range.startContainer) as Element;
                         if (nextSibling) {
                             if (nextSibling.nodeType === 3 && nextSibling.textContent === Constants.ZWSP) {
@@ -934,7 +942,7 @@ export const keydown = (protyle: IProtyle, editorElement: HTMLElement) => {
                             }
 
                             if (nextSibling.nodeType === 1 && nextSibling.classList.contains("img")) {
-                                // 光标需在图片前 https://github.com/siyuan-note/siyuan/issues/12452
+                                // The caret needs to end up right before the image https://github.com/siyuan-note/siyuan/issues/12452
                                 const textPosition = getSelectionOffset(range.startContainer, protyle.wysiwyg.element, range);
                                 if (textPosition.start === range.startContainer.textContent.length ||
                                     (textPosition.start === 0 && range.startContainer.textContent === Constants.ZWSP)) {
@@ -951,7 +959,7 @@ export const keydown = (protyle: IProtyle, editorElement: HTMLElement) => {
                     if (position.start === 0 && (
                         range.startOffset === 0 ||
                         (currentNode && currentNode.nodeType === 3 && !hasPreviousSibling(currentNode) &&
-                            // 需使用 textContent，文本元素没有 innerText
+                            // Must use textContent, a text node has no innerText
                             currentNode.textContent === "") // https://ld246.com/article/1649251218696
                     )) {
                         if (!nodeElement.classList.contains("code-block") ||
@@ -973,7 +981,7 @@ export const keydown = (protyle: IProtyle, editorElement: HTMLElement) => {
                         event.preventDefault();
                         return;
                     }
-                    // 图片后为 br，在 br 后删除 https://github.com/siyuan-note/siyuan/issues/4963
+                    // There's a br after an image, deleting right after the br https://github.com/siyuan-note/siyuan/issues/4963
                     if (currentNode && currentNode.nodeType !== 3 && currentNode.classList.contains("img")) {
                         removeImage(currentNode, nodeElement, range, protyle);
                         event.stopPropagation();
@@ -981,7 +989,7 @@ export const keydown = (protyle: IProtyle, editorElement: HTMLElement) => {
                         return;
                     }
                     const rangeNextElement = hasNextSibling(range.startContainer) as HTMLElement;
-                    // \n1`2` 1后按 Backspace 光标错误 https://github.com/siyuan-note/siyuan/issues/15424
+                    // In \n1`2`, pressing Backspace right after the 1 puts the caret in the wrong place https://github.com/siyuan-note/siyuan/issues/15424
                     if (rangeNextElement && rangeNextElement.nodeType === 1 &&
                         ["code", "tag", "kbd"].includes(rangeNextElement.dataset.type)) {
                         if (position.start === 1 || range.startContainer.textContent.slice(-2, -1) === "\n") {
@@ -990,7 +998,7 @@ export const keydown = (protyle: IProtyle, editorElement: HTMLElement) => {
                         }
                     }
                     if (range.startOffset === 1 && range.startContainer.textContent.length === 1) {
-                        // 图片后为空格，在空格后删除 https://github.com/siyuan-note/siyuan/issues/13949
+                        // There's a space after an image, deleting right after the space https://github.com/siyuan-note/siyuan/issues/13949
                         const rangePreviousElement = hasPreviousSibling(range.startContainer) as HTMLElement;
                         if (rangePreviousElement && rangePreviousElement.nodeType === 1 && rangePreviousElement.classList.contains("img") &&
                             rangeNextElement && rangeNextElement.nodeType === 1 && rangeNextElement.classList.contains("img")) {
@@ -1003,9 +1011,9 @@ export const keydown = (protyle: IProtyle, editorElement: HTMLElement) => {
                             event.preventDefault();
                             return;
                         }
-                        // 图片前有一个字符，在字符后删除
+                        // There's one character before an image, deleting right after that character
                         if (position.start === 1 &&
-                            range.startContainer.textContent !== Constants.ZWSP &&  // 如果为 zwsp 需前移光标
+                            range.startContainer.textContent !== Constants.ZWSP &&  // the caret needs to move back if it's a zwsp
                             !rangePreviousElement &&
                             rangeNextElement && rangeNextElement.nodeType === 1 && rangeNextElement.classList.contains("img")) {
                             const wbrElement = document.createElement("wbr");
@@ -1018,7 +1026,7 @@ export const keydown = (protyle: IProtyle, editorElement: HTMLElement) => {
                             return;
                         }
                     }
-                    // 代码块中空行 ⌘+Del 异常 https://ld246.com/article/1663166544901
+                    // ⌘+Del misbehaves on an empty line inside a code block https://ld246.com/article/1663166544901
                     if (nodeElement.classList.contains("code-block") && isOnlyMeta(event) &&
                         range.startContainer.nodeType === 3 && range.startContainer.textContent.substring(range.startOffset - 1, range.startOffset) === "\n") {
                         event.stopPropagation();
@@ -1030,9 +1038,9 @@ export const keydown = (protyle: IProtyle, editorElement: HTMLElement) => {
                     if (position.start === 2 && inlineElement &&
                         getSelectionOffset(inlineElement, protyle.wysiwyg.element, range).start === 1 &&
                         inlineElement.innerText.startsWith(Constants.ZWSP) &&
-                        // 7.1 ctrl+g 后删除 https://github.com/siyuan-note/siyuan/issues/14290#issuecomment-2867478746
+                        // Deleting after 7.1's ctrl+g https://github.com/siyuan-note/siyuan/issues/14290#issuecomment-2867478746
                         inlineElement.innerText !== Constants.ZWSP &&
-                        // 需排除行内代码前有一个字符的情况
+                        // The case of one character before inline code must be excluded
                         editElement.innerText.startsWith(Constants.ZWSP)) {
                         focusBlock(nodeElement);
                         event.stopPropagation();
@@ -1050,7 +1058,7 @@ export const keydown = (protyle: IProtyle, editorElement: HTMLElement) => {
                     }
                 }
             } else if (nodeElement.classList.contains("code-block") && editElement.textContent === "\n") {
-                // 空代码块全选删除异常 https://github.com/siyuan-note/siyuan/issues/6706
+                // Select-all delete misbehaves in an empty code block https://github.com/siyuan-note/siyuan/issues/6706
                 range.collapse(true);
                 event.stopPropagation();
                 event.preventDefault();
@@ -1058,14 +1066,14 @@ export const keydown = (protyle: IProtyle, editorElement: HTMLElement) => {
             } else if (selectText !== "") {
                 const position = getSelectionOffset(editElement, protyle.wysiwyg.element, range);
                 if (range.startOffset === 0 && range.endContainer.textContent.length === range.endOffset) {
-                    // 图片后为空格，在空格后删除 https://github.com/siyuan-note/siyuan/issues/13949
-                    // 图片前有一个字符，在字符后删除 https://github.com/siyuan-note/siyuan/issues/15911
+                    // There's a space after an image, deleting right after the space https://github.com/siyuan-note/siyuan/issues/13949
+                    // There's one character before an image, deleting right after that character https://github.com/siyuan-note/siyuan/issues/15911
                     const rangePreviousElement = hasPreviousSibling(range.startContainer) as HTMLElement;
                     const rangeNextElement = hasNextSibling(range.endContainer) as HTMLElement;
                     if ((rangePreviousElement && rangePreviousElement.nodeType === 1 && rangePreviousElement.classList.contains("img") &&
                             rangeNextElement && rangeNextElement.nodeType === 1 && rangeNextElement.classList.contains("img")) ||
                         (position.start === 0 &&
-                            range.startContainer.textContent !== Constants.ZWSP &&  // 如果为 zwsp 需前移光标
+                            range.startContainer.textContent !== Constants.ZWSP &&  // the caret needs to move back if it's a zwsp
                             !rangePreviousElement &&
                             rangeNextElement && rangeNextElement.nodeType === 1 && rangeNextElement.classList.contains("img"))) {
                         range.insertNode(document.createElement("wbr"));
@@ -1082,16 +1090,16 @@ export const keydown = (protyle: IProtyle, editorElement: HTMLElement) => {
             }
         }
 
-        // 软换行
+        // Soft line break
         if (selectText === "" && matchHotKey("⇧↩", event) && softEnter(range, nodeElement, protyle)) {
             event.stopPropagation();
             event.preventDefault();
             return;
         }
 
-        // 代码块修改语言 https://github.com/siyuan-note/siyuan/issues/14126
-        // 列表插入末尾子项 https://github.com/siyuan-note/siyuan/issues/11164
-        // 提示块修改类型和标题 https://github.com/siyuan-note/siyuan/issues/16678
+        // Changing a code block's language https://github.com/siyuan-note/siyuan/issues/14126
+        // Inserting a trailing child item into a list https://github.com/siyuan-note/siyuan/issues/11164
+        // Changing a callout's type and title https://github.com/siyuan-note/siyuan/issues/16678
         if (selectText === "" && matchHotKey("⌥↩", event) && !isIncludesHotKey("⌥↩")) {
             const selectElements = Array.from(protyle.wysiwyg.element.querySelectorAll(".protyle-wysiwyg--select"));
             if (selectElements.length === 0) {
@@ -1123,7 +1131,7 @@ export const keydown = (protyle: IProtyle, editorElement: HTMLElement) => {
             return;
         }
 
-        // 回车
+        // Enter
         if (matchHotKey("↩", event) ||
             (matchHotKey("⇧↩", event) && nodeType === "NodeHeading")) {
             enter(nodeElement, range, protyle);
@@ -1159,9 +1167,9 @@ export const keydown = (protyle: IProtyle, editorElement: HTMLElement) => {
         /// #endif
 
         if (matchHotKey(window.siyuan.config.keymap.editor.general.copyText.custom, event)) {
-            // 用于标识复制文本 *
+            // Used to mark copied text with *
             if (selectText !== "") {
-                // 和复制块引用保持一致 https://github.com/siyuan-note/siyuan/issues/9093
+                // Consistent with copying a block reference https://github.com/siyuan-note/siyuan/issues/9093
                 getContentByInlineHTML(range, (content) => {
                     writeText(`${content.trim()} ((${nodeElement.getAttribute("data-node-id")} "*"))`);
                 });
@@ -1240,15 +1248,16 @@ export const keydown = (protyle: IProtyle, editorElement: HTMLElement) => {
         const isNewNameFile = matchHotKey(window.siyuan.config.keymap.editor.general.newNameFile.custom, event);
         if (isNewNameFile || matchHotKey(window.siyuan.config.keymap.editor.general.newNameSettingFile.custom, event)) {
             if (!selectText.trim() && (nodeElement.querySelector("tr") || nodeElement.querySelector("span"))) {
-                // 没选中时，都是纯文本就创建子文档 https://ld246.com/article/1663073488381/comment/1664804353295#comments
+                // When nothing is selected and it's all plain text, create a sub-document https://ld246.com/article/1663073488381/comment/1664804353295#comments
             } else {
                 if (!selectText.trim() &&
                     getContenteditableElement(nodeElement).textContent  // https://github.com/siyuan-note/siyuan/issues/8099
                 ) {
                     selectAll(protyle, nodeElement, range);
                 }
-                // 同步 toolbar.range，避免 DOM 已被其他操作（undo/enter 等）替换后变为 detached，
-                // 导致后续异步回调中 setInlineMark 读到无效 range https://github.com/siyuan-note/siyuan/issues/17896
+                // Sync toolbar.range, to avoid it becoming detached after the DOM has been replaced by another
+                // operation (undo/enter, etc.), which would cause setInlineMark in a later async callback to
+                // read an invalid range https://github.com/siyuan-note/siyuan/issues/17896
                 protyle.toolbar.range = range;
                 if (isNewNameFile) {
                     fetchPost("/api/filetree/getHPathByPath", {
@@ -1373,7 +1382,7 @@ export const keydown = (protyle: IProtyle, editorElement: HTMLElement) => {
                     hideElements(["toolbar", "hint", "util"], protyle);
                     protyle.hint.enableExtend = false;
                 } else if (!window.siyuan.menus.menu.element.classList.contains("fn__none")) {
-                    // 防止 ESC 时选中当前块
+                    // Prevent the current block from being selected when pressing Escape
                     window.siyuan.menus.menu.remove(true);
                 } else if (nodeElement.classList.contains("protyle-wysiwyg--select")) {
                     hideElements(["select"], protyle);
@@ -1509,7 +1518,7 @@ export const keydown = (protyle: IProtyle, editorElement: HTMLElement) => {
             const editElement = getContenteditableElement(nodeElement);
             if (editElement) {
                 const html = nodeElement.outerHTML;
-                // 需要 EscapeHTMLStr https://github.com/siyuan-note/siyuan/issues/11451
+                // EscapeHTMLStr is required here https://github.com/siyuan-note/siyuan/issues/11451
                 editElement.innerHTML = "```" + window.siyuan.storage[Constants.LOCAL_CODELANG] + "\n" + Lute.EscapeHTMLStr(editElement.textContent) + "<wbr>\n```";
                 nodeElement.insertAdjacentHTML("afterend", protyle.lute.SpinBlockDOM(nodeElement.outerHTML));
                 const newNodeElement = nodeElement.nextElementSibling;
@@ -1542,7 +1551,8 @@ export const keydown = (protyle: IProtyle, editorElement: HTMLElement) => {
                     return false;
                 }
                 if (matchHotKey(menuItem.hotkey, event)) {
-                    // 设置 lastHTMLs 会导致  protyle.toolbar.range 和 range 不一致，需重置一下 https://github.com/siyuan-note/siyuan/issues/10933
+                    // Setting lastHTMLs makes protyle.toolbar.range inconsistent with range, so it needs to be
+                    // reset here https://github.com/siyuan-note/siyuan/issues/10933
                     protyle.toolbar.range = range;
                     if (["block-ref"].includes(menuItem.name) && protyle.toolbar.range.toString() === "") {
                         return true;
@@ -1873,7 +1883,7 @@ export const keydown = (protyle: IProtyle, editorElement: HTMLElement) => {
             return;
         }
 
-        // tab 需等待 list 和 table 处理完成
+        // Tab must wait for list and table handling to finish
         if (event.key === "Tab" && isNotCtrl(event) && !event.altKey) {
             event.preventDefault();
             if (nodeType === "NodeCodeBlock" && selectText !== "") {
@@ -1921,7 +1931,8 @@ export const keydown = (protyle: IProtyle, editorElement: HTMLElement) => {
                 event.stopPropagation();
                 return true;
             } else if (matchHotKey(window.siyuan.config.keymap.editor.general.refTab.custom, event)) {
-                // 打开块引和编辑器中引用、反链、书签中点击事件需保持一致，都加载上下文
+                // Opening a block reference must be consistent with click behavior for references, backlinks,
+                // and bookmarks in the editor -- all of them load context
                 checkFold(id, (zoomIn) => {
                     openFileById({
                         app: protyle.app,
@@ -2028,7 +2039,7 @@ export const keydown = (protyle: IProtyle, editorElement: HTMLElement) => {
             return;
         }
 
-        // 和自定义 alt+shift+左/右 冲突，降低优先级  https://github.com/siyuan-note/siyuan/issues/14638
+        // Conflicts with the custom alt+shift+left/right, so lower priority is given here https://github.com/siyuan-note/siyuan/issues/14638
         if (event.shiftKey && (event.key === "ArrowLeft" || event.key === "ArrowRight")) {
             const selectElements = protyle.wysiwyg.element.querySelectorAll(".protyle-wysiwyg--select");
             if (selectElements.length > 0) {
@@ -2053,7 +2064,7 @@ export const keydown = (protyle: IProtyle, editorElement: HTMLElement) => {
             }
         }
 
-        // 置于最后，太多快捷键会使用到选中元素
+        // Placed last, since too many hotkeys make use of the selected element
         if (isNotCtrl(event) && event.key !== "Backspace" && event.key !== "Escape" && event.key !== "Delete" && !event.shiftKey && !event.altKey && event.key !== "Enter") {
             hideElements(["select"], protyle);
         }

@@ -11,18 +11,18 @@ export const showTooltip = (
         return;
     }
     let targetRect = target.getBoundingClientRect();
-    // 跨行元素
+    // Element spanning multiple lines
     const clientRects = Array.from(target.getClientRects());
     if (clientRects.length > 1) {
         if (event) {
-            // 选择鼠标附近的矩形
+            // Choose the rect near the mouse
             clientRects.forEach(item => {
                 if (event.clientY >= item.top - 3 && event.clientY <= item.bottom) {
                     targetRect = item;
                 }
             });
         } else {
-            // 选择宽度最大的矩形
+            // Choose the widest rect
             let lastWidth = 0;
             clientRects.forEach(item => {
                 if (item.width > lastWidth) {
@@ -39,7 +39,7 @@ export const showTooltip = (
     const messageElement = document.getElementById("tooltip");
     messageElement.className = tooltipClass ? `tooltip tooltip--${tooltipClass}` : "tooltip";
     messageElement.innerHTML = window.DOMPurify.sanitize(message);
-    // 避免原本的 top 和 left 影响计算
+    // Avoid the original top and left affecting the calculation
     messageElement.removeAttribute("style");
     const position = target.getAttribute("data-position");
     const parentRect = target.parentElement.getBoundingClientRect();
@@ -47,7 +47,7 @@ export const showTooltip = (
     let left;
     let top;
     if (position === "parentE") {
-        // parentE: file tree and outline、backlink & viewcard
+        // parentE: file tree and outline, backlink and viewcard
         top = Math.max(0, parentRect.top - (messageElement.clientHeight - parentRect.height) / 2);
         if (top > window.innerHeight - messageElement.clientHeight) {
             top = window.innerHeight - messageElement.clientHeight;
@@ -57,7 +57,7 @@ export const showTooltip = (
             left = parentRect.left - messageElement.clientWidth - 8;
         }
     } else if (position === "parentW") {
-        // ${number}parentW: av 属性视图 & col & select
+        // ${number}parentW: attribute view & col & select
         top = Math.max(0, parentRect.top - (messageElement.clientHeight - parentRect.height) / 2);
         if (top > window.innerHeight - messageElement.clientHeight) {
             top = window.innerHeight - messageElement.clientHeight;
@@ -67,7 +67,7 @@ export const showTooltip = (
             left = parentRect.right;
         }
     } else if (position?.endsWith("west")) {
-        // west: gutter & 标题图标 & av relation
+        // west: gutter & title icon & av relation
         const positionDiff = parseInt(position) || space;
         top = Math.max(0, targetRect.top - (messageElement.clientHeight - targetRect.height) / 2);
         if (top > window.innerHeight - messageElement.clientHeight) {
@@ -78,7 +78,7 @@ export const showTooltip = (
             left = targetRect.right;
         }
     } else if (position?.endsWith("east")) {
-        // east: 布局菜单
+        // east: layout menu
         const positionDiff = parseInt(position) || space;
         top = Math.max(0, targetRect.top - (messageElement.clientHeight - targetRect.height) / 2);
         if (top > window.innerHeight - messageElement.clientHeight) {
@@ -89,7 +89,7 @@ export const showTooltip = (
             left = targetRect.left - messageElement.clientWidth - positionDiff;
         }
     } else if (position?.endsWith("north")) {
-        // north: av 视图，列，多选描述, protyle-icon
+        // north: av view, column, multi-select description, protyle-icon
         const positionDiff = parseInt(position) || space;
         left = Math.max(0, targetRect.left - (messageElement.clientWidth - targetRect.width) / 2);
         top = targetRect.top - messageElement.clientHeight - positionDiff;
@@ -106,7 +106,7 @@ export const showTooltip = (
             left = window.innerWidth - messageElement.clientWidth;
         }
     } else {
-        // ${number}south & 默认值
+        // ${number}south & default
         const positionDiff = parseInt(position) || space;
         left = Math.max(0, targetRect.left - (messageElement.clientWidth - targetRect.width) / 2);
         top = targetRect.bottom + positionDiff;
@@ -125,7 +125,8 @@ export const showTooltip = (
     }
     messageElement.style.top = top + "px";
     messageElement.style.left = Math.max(0, left) + "px";
-    // 与 data-position 同套风格：触发元素可用 data-delay 指定悬浮延迟（毫秒），未设置时沿用 SCSS 默认值
+    // Follows the same convention as data-position: the trigger element can specify a hover delay in milliseconds
+    // via data-delay; if unset, the SCSS default is used
     const tooltipDelay = target.getAttribute("data-delay");
     if (tooltipDelay) {
         messageElement.style.animationDelay = tooltipDelay + "ms";

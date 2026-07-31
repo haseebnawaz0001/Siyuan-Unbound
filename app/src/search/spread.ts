@@ -51,9 +51,9 @@ export const openSearch = async (options: {
         replaceTypes: Object.assign({}, localData.replaceTypes),
         page: options.key ? 1 : localData.page
     };
-    // 搜索中继续执行 ctrl+F/P 不退出 https://github.com/siyuan-note/siyuan/issues/11637
+    // Pressing ctrl+F/P again while search is open doesn't exit https://github.com/siyuan-note/siyuan/issues/11637
     const exitDialog = window.siyuan.dialogs.find((item) => {
-        // 再次打开
+        // Opened again
         if (item.element.querySelector("#searchList")) {
             const searchElement = item.element.querySelector(".b3-dialog__body");
             const cloneData = JSON.parse(JSON.stringify(item.data)) as Config.IUILayoutTabSearchConfig;

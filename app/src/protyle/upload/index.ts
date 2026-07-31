@@ -111,7 +111,7 @@ const genUploadedLabel = async (responseText: string, protyle: IProtyle) => {
     let insertBlock = true;
     const range = getEditorRange(protyle.wysiwyg.element);
     if (range.toString() === "" && range.startContainer.nodeType === 3 && protyle.toolbar.getCurrentType(range).length > 0) {
-        // 防止链接插入其他元素中 https://ld246.com/article/1676003478664
+        // Prevent the link from being inserted into another element https://ld246.com/article/1676003478664
         range.setEndAfter(range.startContainer.parentElement);
         range.collapse(false);
     }
@@ -130,7 +130,7 @@ const genUploadedLabel = async (responseText: string, protyle: IProtyle) => {
         }
     }
     let successFileText = "";
-    // 插入多个资源文件时按文件名自然升序排列 Use natural ascending order when inserting multiple assets https://github.com/siyuan-note/siyuan/issues/14643
+    // Use natural ascending order when inserting multiple assets https://github.com/siyuan-note/siyuan/issues/14643
     keys.sort((a, b) => a.localeCompare(b, undefined, {numeric: true}));
     const avAssets: IAVCellAssetValue[] = [];
     let hasImage = false;
@@ -247,9 +247,9 @@ const genUploadedLabel = async (responseText: string, protyle: IProtyle) => {
         }
         return;
     }
-    // 避免插入代码块中，其次因为都要独立成块 https://github.com/siyuan-note/siyuan/issues/7607
+    // Avoid inserting into a code block, also because everything needs to be its own block https://github.com/siyuan-note/siyuan/issues/7607
     insertHTML(successFileText, protyle, insertBlock);
-    // 粘贴图片后定位不准确 https://github.com/siyuan-note/siyuan/issues/13336
+    // Positioning is inaccurate after pasting an image https://github.com/siyuan-note/siyuan/issues/13336
     setTimeout(() => {
         scrollCenter(protyle, undefined, "nearest", "smooth");
     }, hasImage ? 0 : Constants.TIMEOUT_LOAD);
@@ -296,7 +296,7 @@ export const uploadFiles = (protyle: IProtyle, files: FileList | DataTransferIte
             fileItem = fileItem.getAsFile();
         }
         if (0 === fileItem.size && "" === fileItem.type && -1 === fileItem.name.indexOf(".")) {
-            // 文件夹
+            // Folder
             uploadLocalFiles([{path: (fileItem as FileWithPath).path, size: null}], protyle, false);
         } else {
             fileList.push(fileItem);
@@ -374,7 +374,7 @@ export const uploadFiles = (protyle: IProtyle, files: FileList | DataTransferIte
             if (xhr.readyState === XMLHttpRequest.DONE) {
                 protyle.upload.isUploading = false;
                 if (!document.body.contains(protyle.element)) {
-                    // 网络较慢时，页签已经关闭
+                    // The tab has already been closed, e.g. due to a slow network
                     destroy(protyle);
                     return;
                 }

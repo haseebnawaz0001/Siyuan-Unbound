@@ -34,7 +34,7 @@ export const genTagList = (listElement: Element, k: string) => {
     });
 };
 
-// 需独立出来，否则移动端引用的时候会引入 pc 端大量无用代码
+// This needs to be kept separate, otherwise referencing it from mobile would pull in a large amount of unused desktop code
 export const renameTag = (labelName: string) => {
     const dialog = new Dialog({
         title: window.siyuan.languages.rename,

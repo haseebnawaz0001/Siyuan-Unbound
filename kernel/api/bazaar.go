@@ -201,7 +201,7 @@ func uninstallBazaarPlugin(c *gin.Context) {
 		return
 	}
 
-	// 兼容旧行为：如果不指定 frontend，则卸载插件但不返回插件列表
+	// Compatible with the old behavior: if frontend isn't specified, uninstall the plugin but don't return the plugin list
 	var packages any
 	if "" == frontend {
 		packages = []any{}
@@ -573,8 +573,8 @@ func installBazaarTheme(c *gin.Context) {
 		return
 	}
 
-	// TODO 安装新主题之后，不应该始终取消外观模式“跟随系统” https://github.com/siyuan-note/siyuan/issues/16990
-	// 安装集市主题后不跟随系统切换外观模式
+	// TODO after installing a new theme, "follow system" appearance mode shouldn't always be turned off https://github.com/siyuan-note/siyuan/issues/16990
+	// After installing a marketplace theme, don't follow the system's appearance mode switch
 	model.Conf.Appearance.ModeOS = false
 	model.Conf.Save()
 

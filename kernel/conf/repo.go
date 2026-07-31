@@ -23,16 +23,16 @@ import (
 )
 
 type Repo struct {
-	Key []byte `json:"key"` // AES 密钥
+	Key []byte `json:"key"` // AES key
 
-	// 同步索引计时，单位毫秒，超过该时间则提示用户索引性能下降
+	// Sync indexing timing, in milliseconds; exceeding this duration prompts the user that indexing performance has degraded
 	// If the data repo indexing time is greater than 12s, prompt user to purge the data repo https://github.com/siyuan-note/siyuan/issues/9613
 	// Supports configuring data sync index time-consuming prompts https://github.com/siyuan-note/siyuan/issues/9698
 	SyncIndexTiming int64 `json:"syncIndexTiming"`
 
-	// 自动清理数据仓库 Automatic purge for local data repo https://github.com/siyuan-note/siyuan/issues/13091
-	IndexRetentionDays    int `json:"indexRetentionDays"`    // 索引保留天数
-	RetentionIndexesDaily int `json:"retentionIndexesDaily"` // 每日保留索引数
+	// Automatic purge for local data repo https://github.com/siyuan-note/siyuan/issues/13091
+	IndexRetentionDays    int `json:"indexRetentionDays"`    // Index retention days
+	RetentionIndexesDaily int `json:"retentionIndexesDaily"` // Number of indexes retained per day
 }
 
 func NewRepo() *Repo {

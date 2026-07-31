@@ -168,7 +168,7 @@ func indexBox(boxID string) {
 		}
 
 		docIAL := parse.IAL2Map(tree.Root.KramdownIAL)
-		if "" == docIAL["updated"] { // 早期的数据可能没有 updated 属性，这里进行订正
+		if "" == docIAL["updated"] { // older data may be missing the updated attribute, fix it up here
 			updated := util.TimeFromID(tree.Root.ID)
 			tree.Root.SetIALAttr("updated", updated)
 			docIAL["updated"] = updated
@@ -195,7 +195,7 @@ func indexBox(boxID string) {
 		}
 
 		if !ast.IsNodeIDPattern(strings.TrimSuffix(file.name, ".sy")) {
-			// 不以块 ID 命名的 .sy 文件不应该被加载到思源中 https://github.com/siyuan-note/siyuan/issues/16089
+			// A .sy file not named after a block ID should not be loaded into SiYuan https://github.com/siyuan-note/siyuan/issues/16089
 			continue
 		}
 
@@ -209,10 +209,10 @@ func indexBox(boxID string) {
 	waitGroup.Wait()
 	p.Release()
 
-	// 关联数据库和块
+	// Associate databases with blocks
 	av.BatchUpsertBlockRel(avNodes)
 
-	box.UpdateHistoryGenerated() // 初始化历史生成时间为当前时间
+	box.UpdateHistoryGenerated() // initialize the history generation time to now
 	end := time.Now()
 	elapsed := end.Sub(start).Seconds()
 	logging.LogInfof("rebuilt database for notebook [%s] in [%.2fs], tree [count=%d, size=%s]", box.ID, elapsed, treeCount, humanize.BytesCustomCeil(uint64(treeSize), 2))
@@ -226,7 +226,7 @@ func IndexRefs() {
 	util.SetBootDetails(Conf.Language(305))
 
 	var defBlockIDs []string
-	defBlockBoxes := map[string]string{} // defBlockID -> boxID，加密笔记本下需按 box 路由后续加载
+	defBlockBoxes := map[string]string{} // defBlockID -> boxID; for encrypted notebooks subsequent loads need to be routed by box
 	luteEngine := util.NewLute()
 	boxes := Conf.GetOpenedBoxes()
 	for _, box := range boxes {
@@ -236,7 +236,8 @@ func IndexRefs() {
 			for _, treeAbsPath := range paths {
 				p := filepath.ToSlash(strings.TrimPrefix(treeAbsPath, filepath.Join(util.DataDir, box.ID)))
 
-				// 加密笔记本的 .sy 是密文，必须走 filesys.LoadTree 透明解密；无法用 bytes.Contains 预检
+				// The .sy file of an encrypted notebook is ciphertext, so it must go through
+				// filesys.LoadTree for transparent decryption; it can't be precheck-scanned with bytes.Contains
 				var tree *parse.Tree
 				if encryptedBox {
 					loadTree, loadErr := filesys.LoadTree(box.ID, p, luteEngine)
@@ -287,7 +288,7 @@ func IndexRefs() {
 		bootProgressPart := int32(10.0 / float64(size))
 
 		for _, defBlockID := range defBlockIDs {
-			// 加密笔记本的 defBlock 在加密 blocktree db，需按 box 路由加载
+			// A defBlock in an encrypted notebook lives in the encrypted blocktree db, so loading must be routed by box
 			var defTree *parse.Tree
 			var loadErr error
 			if boxID, ok := defBlockBoxes[defBlockID]; ok && IsEncryptedBox(boxID) {
@@ -313,7 +314,7 @@ func IndexRefs() {
 
 var indexEmbedBlockLock = sync.Mutex{}
 
-// IndexEmbedBlockJob 嵌入块支持搜索 https://github.com/siyuan-note/siyuan/issues/7112
+// IndexEmbedBlockJob makes embed blocks searchable https://github.com/siyuan-note/siyuan/issues/7112
 func IndexEmbedBlockJob() {
 	task.AppendTaskWithTimeout(task.DatabaseIndexEmbedBlock, 30*time.Second, autoIndexEmbedBlock)
 }
@@ -328,15 +329,16 @@ func autoIndexEmbedBlock() {
 		markdown = strings.TrimPrefix(markdown, "{{")
 		stmt := strings.TrimSuffix(markdown, "}}")
 
-		// 嵌入块的 Markdown 内容需要反转义
+		// The embed block's Markdown content needs to be unescaped
 		stmt = html.UnescapeString(stmt)
 		stmt = strings.ReplaceAll(stmt, editor.IALValEscNewLine, "\n")
 
-		// 需要移除首尾的空白字符以判断是否具有 //!js 标记
+		// Leading/trailing whitespace must be trimmed to check for the //!js marker
 		stmt = strings.TrimSpace(stmt)
 		if strings.HasPrefix(stmt, "//!js") {
 			// https://github.com/siyuan-note/siyuan/issues/9648
-			// js 嵌入块不支持自动索引，由前端主动调用 /api/search/updateEmbedBlock 接口更新内容 https://github.com/siyuan-note/siyuan/issues/9736
+			// js embed blocks don't support automatic indexing; the frontend must call the
+			// /api/search/updateEmbedBlock endpoint to update the content https://github.com/siyuan-note/siyuan/issues/9736
 			continue
 		}
 
@@ -353,7 +355,7 @@ func autoIndexEmbedBlock() {
 		}
 		sql.UpdateBlockContentQueue(embedBlock)
 
-		if 63 <= i { // 一次任务中最多处理 64 个嵌入块，防止卡顿
+		if 63 <= i { // process at most 64 embed blocks per task to avoid stalling
 			break
 		}
 	}
@@ -365,7 +367,7 @@ func updateEmbedBlockContent(embedBlockID string, queryResultBlocks []*EmbedBloc
 		return
 	}
 
-	embedBlock.Content = "" // 嵌入块每查询一次多一个结果 https://github.com/siyuan-note/siyuan/issues/7196
+	embedBlock.Content = "" // each query on an embed block adds one more result https://github.com/siyuan-note/siyuan/issues/7196
 	for _, block := range queryResultBlocks {
 		embedBlock.Content += block.Block.Markdown
 	}
@@ -385,7 +387,7 @@ var (
 )
 
 func subscribeSQLEvents() {
-	// 使用下面的 EvtSQLInsertBlocksFTS 就可以了
+	// Using EvtSQLInsertBlocksFTS below is sufficient
 	//eventbus.Subscribe(eventbus.EvtSQLInsertBlocks, func(context map[string]any, current, total, blockCount int, hash string) {
 	//
 	//	msg := fmt.Sprintf(Conf.Language(89), current, total, blockCount, hash)

@@ -341,7 +341,7 @@ func printDocumentTable(files []*model.File) {
 func init() {
 	documentListCmd.Flags().String("notebook", "", "notebook ID")
 	documentListCmd.Flags().String("path", "", "internal path (default /)")
-	documentListCmd.Flags().String("hpath", "", "human-readable path, e.g. /归档/文章")
+	documentListCmd.Flags().String("hpath", "", "human-readable path, e.g. /Archive/Articles")
 
 	documentCreateCmd.Flags().String("notebook", "", "notebook ID")
 	documentCreateCmd.Flags().String("title", "", "document title")

@@ -10,29 +10,31 @@ export class Kernel implements IKernelPlugin {
     public rpc: IKernelPluginRpc;
 
     /**
-     * 内核插件所属的应用 ID，用于区分不同应用的内核插件，建立 WebSocket 连接时会携带该 ID，以便内核正确路由消息
+     * The app ID the kernel plugin belongs to, used to distinguish kernel plugins across different apps; it is
+     * sent when establishing the WebSocket connection so the kernel can route messages correctly
      */
     #appId: string;
 
     /**
-     * 内核插件的名称，必须与内核插件注册时使用的名称一致，用于建立 WebSocket 连接和接收通知
+     * The name of the kernel plugin, which must match the name used when the kernel plugin registers itself;
+     * used to establish the WebSocket connection and receive notifications
      */
     #name: string;
 
     /**
-     * 客户端插件的事件总线
+     * The client plugin's event bus
      */
     #eventBus: EventBus;
 
     /**
-     * JSON RPC WebSocket 连接，用于接收内核插件通知类型的 RPC 调用
+     * JSON-RPC WebSocket connection, used to receive notification-type RPC calls from the kernel plugin
      *
-     * 普通的 RPC 调用使用 POST 请求
+     * Regular RPC calls use POST requests
      */
     #rpcWs: WebSocket | null;
 
     /**
-     * 内核插件通知类型的 RPC 调用的处理函数
+     * Handlers for the kernel plugin's notification-type RPC calls
      */
     #handlers: Map<TJsonRpcMethod, Set<TJsonRpcHandler<void>>>;
 
@@ -67,11 +69,13 @@ export class Kernel implements IKernelPlugin {
                     switch (this.#rpcWs.readyState) {
                         case WebSocket.CONNECTING:
                         case WebSocket.OPEN:
-                            // 内核插件正在运行，且 WebSocket 连接已建立或正在建立，无需处理
+                            // The kernel plugin is running and the WebSocket connection is established or being
+                            // established, so nothing needs to be done
                             break;
                         case WebSocket.CLOSING:
                         case WebSocket.CLOSED:
-                            // 内核插件已在运行，但 WebSocket 连接未建立或已断开，尝试重新建立连接
+                            // The kernel plugin is already running, but the WebSocket connection is not
+                            // established or has been disconnected; try to reconnect
                             this.#rpcWs = this.#createJsonRpcWebSocket();
                             break;
                     }
@@ -129,7 +133,7 @@ export class Kernel implements IKernelPlugin {
         const ws = new WebSocket(websocketURL);
         ws.addEventListener("message", (event) => {
             const message = JSON.parse(event.data);
-            // JSON-RPC 通知：无 id 字段，有 method 字段
+            // JSON-RPC notification: no id field, has a method field
             if (message.method && message.id === undefined) {
                 const handlers = this.#handlers.get(message.method);
                 if (handlers) {

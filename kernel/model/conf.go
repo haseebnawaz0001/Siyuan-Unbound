@@ -32,7 +32,6 @@ import (
 	"github.com/88250/gulu"
 	"github.com/88250/lute"
 	"github.com/88250/lute/ast"
-	"github.com/Xuanwo/go-locale"
 	"github.com/siyuan-note/eventbus"
 	"github.com/siyuan-note/filelock"
 	"github.com/siyuan-note/logging"
@@ -42,61 +41,63 @@ import (
 	"github.com/siyuan-note/siyuan/kernel/treenode"
 	"github.com/siyuan-note/siyuan/kernel/util"
 	"golang.org/x/mod/semver"
-	"golang.org/x/text/language"
 )
 
 var Conf *AppConf
 
-// AppConf 维护应用元数据，保存在 ~/.siyuan/conf.json。
+// AppConf maintains the application metadata, persisted to ~/.siyuan/conf.json.
 type AppConf struct {
-	LogLevel       string               `json:"logLevel"`       // 日志级别：off, trace, debug, info, warn, error, fatal
-	Appearance     *conf.Appearance     `json:"appearance"`     // 外观
-	Langs          []*conf.Lang         `json:"langs"`          // 界面语言列表
-	Lang           string               `json:"lang"`           // 选择的界面语言，同 Appearance.Lang
-	FileTree       *conf.FileTree       `json:"fileTree"`       // 文档面板
-	Tag            *conf.Tag            `json:"tag"`            // 标签面板
-	Editor         *conf.Editor         `json:"editor"`         // 编辑器配置
-	Export         *conf.Export         `json:"export"`         // 导出配置
-	Graph          *conf.Graph          `json:"graph"`          // 关系图配置
-	UILayout       *conf.UILayout       `json:"uiLayout"`       // 界面布局。不要直接使用，使用 GetUILayout() 和 SetUILayout() 方法
-	UserData       string               `json:"userData"`       // 社区用户信息，对 User 加密存储
-	User           *conf.User           `json:"-"`              // 社区用户内存结构，不持久化。不要直接使用，使用 GetUser() 和 SetUser() 方法
-	Account        *conf.Account        `json:"account"`        // 帐号配置
-	ReadOnly       bool                 `json:"readonly"`       // 是否是以只读模式运行
-	ServerAddrs    []string             `json:"serverAddrs"`    // 本地服务器地址列表
-	AccessAuthCode string               `json:"accessAuthCode"` // 锁屏密码
-	System         *conf.System         `json:"system"`         // 系统配置
-	Keymap         *conf.Keymap         `json:"keymap"`         // 快捷键配置
-	Sync           *conf.Sync           `json:"sync"`           // 同步配置
-	Search         *conf.Search         `json:"search"`         // 搜索配置
-	Flashcard      *conf.Flashcard      `json:"flashcard"`      // 闪卡配置
-	AI             *conf.AI             `json:"ai"`             // 人工智能配置
-	Secrets        *conf.Secrets        `json:"secrets"`        // 全局密钥库
-	Variables      *conf.Variables      `json:"variables"`      // 全局变量库
-	Bazaar         *conf.Bazaar         `json:"bazaar"`         // 集市配置
-	Stat           *conf.Stat           `json:"stat"`           // 统计
+	LogLevel       string               `json:"logLevel"`       // log level: off, trace, debug, info, warn, error, fatal
+	Appearance     *conf.Appearance     `json:"appearance"`     // appearance settings
+	Langs          []*conf.Lang         `json:"langs"`          // list of available UI languages
+	Lang           string               `json:"lang"`           // the selected UI language, mirrors Appearance.Lang
+	FileTree       *conf.FileTree       `json:"fileTree"`       // file tree panel
+	Tag            *conf.Tag            `json:"tag"`            // tag panel
+	Editor         *conf.Editor         `json:"editor"`         // editor configuration
+	Export         *conf.Export         `json:"export"`         // export configuration
+	Graph          *conf.Graph          `json:"graph"`          // graph view configuration
+	UILayout       *conf.UILayout       `json:"uiLayout"`       // UI layout; do not use directly, use GetUILayout() and SetUILayout() instead
+	UserData       string               `json:"userData"`       // community user info, stores User in encrypted form
+	User           *conf.User           `json:"-"`              // in-memory community user struct, not persisted; do not use directly, use GetUser() and SetUser() instead
+	Account        *conf.Account        `json:"account"`        // account configuration
+	ReadOnly       bool                 `json:"readonly"`       // whether running in read-only mode
+	ServerAddrs    []string             `json:"serverAddrs"`    // list of local server addresses
+	AccessAuthCode string               `json:"accessAuthCode"` // lock screen password
+	System         *conf.System         `json:"system"`         // system configuration
+	Keymap         *conf.Keymap         `json:"keymap"`         // keymap configuration
+	Sync           *conf.Sync           `json:"sync"`           // sync configuration
+	Search         *conf.Search         `json:"search"`         // search configuration
+	Flashcard      *conf.Flashcard      `json:"flashcard"`      // flashcard configuration
+	AI             *conf.AI             `json:"ai"`             // AI configuration
+	Secrets        *conf.Secrets        `json:"secrets"`        // global secrets store
+	Variables      *conf.Variables      `json:"variables"`      // global variables store
+	Bazaar         *conf.Bazaar         `json:"bazaar"`         // bazaar (marketplace) configuration
+	Stat           *conf.Stat           `json:"stat"`           // statistics
 	Api            *conf.API            `json:"api"`            // API
-	Repo           *conf.Repo           `json:"repo"`           // 数据仓库
-	NotebookCrypto *conf.NotebookCrypto `json:"notebookCrypto"` // 加密笔记本密钥管理
-	Publish        *conf.Publish        `json:"publish"`        // 发布服务
-	Onboarding     *conf.Onboarding     `json:"onboarding"`     // 首次使用引导
-	ShowChangelog  bool                 `json:"showChangelog"`  // 是否显示版本更新日志
-	CloudRegion    int                  `json:"cloudRegion"`    // 云端区域，0：中国大陆，1：北美
-	Snippet        *conf.Snpt           `json:"snippet"`        // 代码片段
-	DataIndexState int                  `json:"dataIndexState"` // 数据索引状态，0：已索引，1：未索引
-	CookieKey      string               `json:"cookieKey"`      // 用于加密 Cookie 的密钥
+	Repo           *conf.Repo           `json:"repo"`           // data repo
+	NotebookCrypto *conf.NotebookCrypto `json:"notebookCrypto"` // encrypted notebook key management
+	Publish        *conf.Publish        `json:"publish"`        // publish service
+	Onboarding     *conf.Onboarding     `json:"onboarding"`     // first-run onboarding
+	ShowChangelog  bool                 `json:"showChangelog"`  // whether to show the version changelog
+	CloudRegion    int                  `json:"cloudRegion"`    // cloud region: 0 = mainland China, 1 = North America
+	Snippet        *conf.Snpt           `json:"snippet"`        // code snippets
+	DataIndexState int                  `json:"dataIndexState"` // data index state: 0 = indexed, 1 = not indexed
+	CookieKey      string               `json:"cookieKey"`      // key used to encrypt the cookie
 
-	MCPOAuth string `json:"mcpOAuth"` // MCP OAuth 凭据密文
+	MCPOAuth string `json:"mcpOAuth"` // encrypted MCP OAuth credentials
 
-	m        *sync.RWMutex // 配置数据锁
-	userLock *sync.RWMutex // 用户数据独立锁，避免与配置保存操作竞争
+	m        *sync.RWMutex // lock guarding the config data
+	userLock *sync.RWMutex // separate lock for user data, avoiding contention with config save operations
 }
 
 func NewAppConf() *AppConf {
 	return &AppConf{
 		LogLevel: "debug",
-		m:        &sync.RWMutex{},
-		userLock: &sync.RWMutex{},
+		// English-first build: new installs use the North America cloud. This runs before conf.json is unmarshalled
+		// over it, so an existing workspace keeps whichever region the user already saved.
+		CloudRegion: 1,
+		m:           &sync.RWMutex{},
+		userLock:    &sync.RWMutex{},
 	}
 }
 
@@ -154,14 +155,15 @@ func InitConf() {
 		if data, err := os.ReadFile(confPath); err != nil {
 			logging.LogErrorf("load conf [%s] failed: %s", confPath, err)
 		} else {
-			// 解析失败时保留已成功写入的字段；未导出字段（m、userLock）与未触及的导出字段保持 NewAppConf() 初值。
+			// If parsing fails, keep whatever fields were successfully written; unexported fields (m, userLock) and
+			// untouched exported fields retain their NewAppConf() defaults.
 			if err = gulu.JSON.UnmarshalJSON(data, Conf); err != nil {
 				logging.LogWarnf("parse conf failed, parsed fields retained: %s", err)
 			} else {
 				logging.LogInfof("loaded conf [%s]", confPath)
 			}
 
-			// 启动时检测并完成中断的改密迁移
+			// Detect and complete any interrupted password-change migration on boot
 			recoverMasterPasswordMigration()
 
 			if conf.NeedsAIMigration(data) {
@@ -170,9 +172,10 @@ func InitConf() {
 				logging.LogInfof("migrated AI config [%s]", confPath)
 			}
 
-			// 重启后加密笔记本的 DEK 丢失（仅内存），必须重新解锁。
-			// 强制把所有加密笔记本标记为已关闭，避免启动索引读到无法解密的密文 .sy。
-			// 使用 IsEncryptedBox 统一判定（含 backup fallback）。
+			// After a restart, the DEK of an encrypted notebook is lost (it only ever lived in memory), so it must
+			// be unlocked again. Force-mark every encrypted notebook as closed so the boot-time indexer doesn't
+			// try to read still-encrypted .sy files it can't decrypt.
+			// Use IsEncryptedBox for the check consistently (including backup fallback).
 			changed := false
 			for _, box := range Conf.GetBoxes() {
 				if IsEncryptedBox(box.ID) && !box.Closed {
@@ -193,7 +196,7 @@ func InitConf() {
 	if "" != util.Lang {
 		initialized := false
 		if util.IsMobileContainer() {
-			// 移动端以上次设置的外观语言为准
+			// On mobile, defer to the previously set appearance language
 			if "" != Conf.Lang && util.Lang != Conf.Lang {
 				util.Lang = Conf.Lang
 				logging.LogInfof("use the last specified language [%s]", util.Lang)
@@ -206,46 +209,18 @@ func InitConf() {
 			logging.LogInfof("initialized the specified language [%s]", util.Lang)
 		}
 	} else if "" == Conf.Lang {
-		// 未指定外观语言时使用系统语言
-		// DetectAll 返回按优先级排序的系统语言 Tag 列表（如 en-US、en）
-		deviceLangTags, detectErr := locale.DetectAll()
-		if detectErr != nil {
-			logging.LogDebugf("check device locale failed [%s], using default language [en]", detectErr)
-			util.Lang = "en"
-		} else if len(deviceLangTags) == 0 {
-			logging.LogDebugf("device locale list is empty, using default language [en]")
-			util.Lang = "en"
-		} else {
-			// siYuanLangNames 与 bcp47Tags 按相同顺序排列，Match 返回的 matchIndex 即对应 siYuanLangNames 中的语言名
-			siYuanLangNames := make([]string, 0, len(util.Langs))
-			bcp47Tags := make([]language.Tag, 0, len(util.Langs))
-			for langName := range util.Langs {
-				bcp47Tag, err := language.Parse(langName)
-				if err != nil {
-					logging.LogErrorf("load language [%s] failed: %s", langName, err)
-					continue
-				}
-				siYuanLangNames = append(siYuanLangNames, langName)
-				bcp47Tags = append(bcp47Tags, bcp47Tag)
-			}
-			util.Lang = "en"
-			if len(bcp47Tags) > 0 {
-				matcher := language.NewMatcher(bcp47Tags)
-				_, matchIndex, confidence := matcher.Match(deviceLangTags...)
-				// 系统语言与 SiYuan 支持列表不存在有效匹配时 confidence 为 No，保持默认 en
-				if confidence != language.No {
-					util.Lang = siYuanLangNames[matchIndex]
-				}
-			}
-			logging.LogInfof("initialized language [%s] based on device locale", util.Lang)
-		}
+		// English-first build: the UI language is never inferred from the OS locale, so a fresh install opens in
+		// English everywhere. Users can still pick any bundled language in Settings and the choice is persisted in
+		// conf.json; --lang and SIYUAN_LANG continue to override this (handled by the branch above).
+		util.Lang = "en"
+		logging.LogInfof("initialized the default language [%s]", util.Lang)
 		Conf.Lang = util.Lang
 	} else {
-		// conf.json 已保存外观语言
+		// conf.json already has an appearance language saved
 		util.Lang = Conf.Lang
 	}
 
-	// 历史下划线语言代码迁移为 BCP 47 新值（zh_CN → zh-CN 等）
+	// Migrate legacy underscore-style language codes to their BCP 47 equivalents (zh_CN -> zh-CN, etc.)
 	if migrated := util.LangToBCP47(Conf.Lang); migrated != Conf.Lang {
 		logging.LogInfof("migrate legacy lang [%s] → [%s]", Conf.Lang, migrated)
 		Conf.Lang = migrated
@@ -269,8 +244,8 @@ func InitConf() {
 	}
 	Conf.Appearance.Lang = Conf.Lang
 
-	// 历史下划线命名的 i18n 文件（zh_CN.json 等）已重命名为 BCP 47（zh-CN.json 等），
-	// 清理 ConfDir/appearance/langs/ 下的旧名残留，避免僵尸文件。
+	// Legacy underscore-named i18n files (zh_CN.json, etc.) have been renamed to BCP 47 (zh-CN.json, etc.);
+	// clean up any leftover old-named files under ConfDir/appearance/langs/ so they don't linger as dead files.
 	if langsDir := filepath.Join(util.AppearancePath, "langs"); gulu.File.IsDir(langsDir) {
 		if entries, err := os.ReadDir(langsDir); err == nil {
 			for _, entry := range entries {
@@ -287,7 +262,8 @@ func InitConf() {
 		}
 	}
 	if "ant" == Conf.Appearance.Icon || "material" == Conf.Appearance.Icon {
-		// v3.7.0 移除了 ant/material 图标包，如果用户之前选择了这两个其中之一，升级后改为 litheness 图标包，避免图标显示异常 https://github.com/siyuan-note/siyuan/issues/7976
+		// v3.7.0 removed the ant/material icon packs; if the user had previously selected either one, switch to
+		// the litheness icon pack after upgrading to avoid broken icon rendering https://github.com/siyuan-note/siyuan/issues/7976
 		Conf.Appearance.Icon = "litheness"
 	}
 	os.RemoveAll(filepath.Join(util.IconsPath, "ant"))
@@ -332,11 +308,12 @@ func InitConf() {
 		Conf.FileTree.LargeFileWarningSize = 8
 	}
 	util.LargeFileWarningSize = Conf.FileTree.LargeFileWarningSize
-	if nil == Conf.FileTree.CreateDocAtTop { // v3.4.0 之前的版本没有该字段，设置默认值为 true，即在顶部创建新文档，不改变用户习惯
+	if nil == Conf.FileTree.CreateDocAtTop { // versions before v3.4.0 lacked this field; default it to true (create new docs at the top) to keep users' existing habit
 		Conf.FileTree.CreateDocAtTop = func() *bool { b := true; return &b }()
 	}
 	if nil == Conf.FileTree.BoxDocEnabled {
-		// 历史工作空间默认关闭顶层笔记本文档，新工作空间使用 NewFileTree 中的默认值。
+		// Existing workspaces default to having the top-level notebook document disabled; new workspaces use the
+		// default from NewFileTree.
 		Conf.FileTree.BoxDocEnabled = func() *bool { b := false; return &b }()
 	}
 
@@ -358,7 +335,8 @@ func InitConf() {
 		Conf.Editor = defaultEditor
 	}
 
-	// 新增字段的默认值，使用指针类型来区分字段不存在（nil）和用户设置为 0（非 nil）
+	// Defaults for newly added fields; pointer types are used to distinguish a missing field (nil) from the user
+	// explicitly setting it to 0 (non-nil)
 	if nil == Conf.Editor.BacklinkSort {
 		Conf.Editor.BacklinkSort = defaultEditor.BacklinkSort
 	}
@@ -423,9 +401,9 @@ func InitConf() {
 		Conf.Export = conf.NewExport()
 	}
 	if 0 == Conf.Export.BlockRefMode || 1 == Conf.Export.BlockRefMode || 5 == Conf.Export.BlockRefMode {
-		// 废弃导出选项引用块转换为原始块和引述块 https://github.com/siyuan-note/siyuan/issues/3155
-		// 锚点哈希模式和脚注模式合并 https://github.com/siyuan-note/siyuan/issues/13331
-		Conf.Export.BlockRefMode = 4 // 改为脚注+锚点哈希
+		// Deprecated export options for converting block refs to raw blocks and block quotes https://github.com/siyuan-note/siyuan/issues/3155
+		// The anchor-hash mode and footnote mode have been merged https://github.com/siyuan-note/siyuan/issues/13331
+		Conf.Export.BlockRefMode = 4 // switch to footnote + anchor hash
 	}
 	if "" == Conf.Export.PandocBin {
 		Conf.Export.PandocBin = util.PandocBinPath
@@ -466,7 +444,8 @@ func InitConf() {
 		Conf.System.Name = util.GetDeviceName()
 	}
 	if util.ContainerStd == util.Container {
-		// 设备标识为随机值，仅在首次生成后保持不变，因此这里不再每次启动重新生成，否则同步设备列表会在每次重启后新增条目
+		// The device name is a random value that stays fixed once first generated, so it is not regenerated on
+		// every startup here; otherwise the sync device list would gain a new entry after every restart
 		Conf.System.Name = util.GetDeviceName()
 	}
 	Conf.System.DisabledFeatures = util.DisabledFeatures
@@ -584,11 +563,15 @@ func InitConf() {
 		Conf.NotebookCrypto = conf.NewNotebookCrypto()
 	}
 
-	// 注意：此处不在启动时为已启用但备份缺失的情形回填密钥备份。无 KEK 生成的备份 KEKMAC 必为空，
-	// 而 deriveKEK/恢复路径强制要求 KEKMAC 有效，回填会导致该机永远无法解锁（自相矛盾）。
-	// 当前格式备份必须由主密码验证后生成（见 EnableEncryptedNotebook / tryRestoreNotebookCryptoFromBackupLocked）。
-	// Enabled=true 但备份缺失/无效属配置不完整，解锁时由 deriveKEK 返回恢复提示（Language 315），
-	// 引导用户导入匹配的备份文件后重新验证主密码。
+	// Note: we deliberately do NOT backfill the key backup on boot for the case where it's enabled but the backup
+	// is missing. A backup generated without a KEK would necessarily have an empty KEKMAC, but the deriveKEK/
+	// recovery path requires a valid KEKMAC, so backfilling would leave this machine permanently unable to unlock
+	// (self-contradictory).
+	// A backup in the current format can only be generated after the master password has been verified (see
+	// EnableEncryptedNotebook / tryRestoreNotebookCryptoFromBackupLocked).
+	// Enabled=true with a missing/invalid backup is treated as an incomplete configuration; on unlock, deriveKEK
+	// returns a recovery hint (Language 315) guiding the user to import a matching backup file and re-verify the
+	// master password.
 
 	if nil == Conf.Search {
 		Conf.Search = conf.NewSearch()
@@ -715,7 +698,7 @@ func InitConf() {
 	Conf.AccessAuthCode = strings.TrimSpace(Conf.AccessAuthCode)
 
 	if 1 == Conf.DataIndexState {
-		// 上次未正常完成数据索引，后续会由 recoverIndexQueue() 恢复
+		// Data indexing did not finish normally last time; recoverIndexQueue() will recover it later
 		logging.LogInfof("data index state is [%d], will recover through index queue", Conf.DataIndexState)
 	}
 
@@ -732,12 +715,15 @@ func InitConf() {
 
 	Conf.Save()
 
-	// 安全模式：渲染进程崩溃恢复后由桌面端主进程通过 --safe-mode 注入。
-	// safeMode 是纯运行时状态，不随 conf.json 持久化（Save 时会被排除），故每次启动都按 util.SafeMode 重新赋值。
+	// Safe mode: injected by the desktop main process via --safe-mode after recovering from a renderer process crash.
+	// safeMode is purely a runtime state, not persisted to conf.json (it's excluded on Save), so it's reassigned
+	// from util.SafeMode on every startup.
 	Conf.System.SafeMode = util.SafeMode
 	if util.SafeMode {
-		// 直接覆盖外观、集市、代码片段相关配置并持久化，禁用代码片段、插件、自定义主题与图标，以排除扩展导致再次崩溃的可能。
-		// 注意：这是破坏性操作，会覆盖用户原有配置，后续不会自动恢复。
+		// Directly override and persist appearance, bazaar, and snippet related configuration, disabling snippets,
+		// plugins, custom themes, and icons, to rule out extensions as the cause of another crash.
+		// Note: this is a destructive operation that overwrites the user's existing configuration and is not
+		// automatically restored afterward.
 		Conf.Appearance.ThemeLight = "daylight"
 		Conf.Appearance.ThemeDark = "midnight"
 		Conf.Appearance.Icon = "litheness"
@@ -749,8 +735,9 @@ func InitConf() {
 		logging.LogInfof("booted in safe mode")
 	}
 
-	// CLI 子命令通过 --log-level 显式指定日志级别时（util.CLILogLevel 非空），优先使用命令行级别，
-	// 不再用 conf.json 的 system.logLevel 覆盖，使命令行参数在初始化早期即生效。
+	// When a CLI subcommand explicitly specifies a log level via --log-level (util.CLILogLevel is non-empty), the
+	// command-line level takes priority and is no longer overridden by conf.json's system.logLevel, so the
+	// command-line argument takes effect early during initialization.
 	if "" == util.CLILogLevel {
 		logging.SetLogLevel(Conf.LogLevel)
 	}
@@ -854,25 +841,26 @@ func loadLangs() (ret []*conf.Lang) {
 
 var exitLock = sync.Mutex{}
 
-// Close 退出内核进程.
+// Close exits the kernel process.
 //
-// force：是否不执行同步过程而直接退出
+// force: whether to exit immediately without running the sync process
 //
-// setCurrentWorkspace：是否将当前工作空间放到工作空间列表的最后一个
+// setCurrentWorkspace: whether to move the current workspace to the end of the workspace list
 //
-// execInstallPkg：是否返回新版本安装包
+// execInstallPkg: whether to return the new version's install package
 //
-//	0：默认按照设置项 System.DownloadInstallPkg 检查并推送提示
-//	1：不返回新版本安装包
-//	2：返回新版本安装包路径并退出，由桌面宿主执行安装
+//	0: check per the System.DownloadInstallPkg setting and push a prompt by default
+//	1: never return the new version's install package
+//	2: return the new version's install package path and exit, letting the desktop host run the install
 //
-// 返回值 exitCode：
+// Return value exitCode:
 //
-//	0：正常退出
-//	1：同步执行失败
-//	2：提示新安装包
+//	0: exited normally
+//	1: sync failed
+//	2: a new install package is available
 //
-// 当 force 为 true（强制退出）并且 execInstallPkg 为 0（默认检查更新）并且新版本安装包已经准备就绪时，将安装包路径返回给桌面宿主
+// When force is true (forced exit), execInstallPkg is 0 (the default update check), and a new version's install
+// package is already ready, the install package path is returned to the desktop host
 // https://github.com/siyuan-note/siyuan/issues/10288
 func Close(force, setCurrentWorkspace bool, execInstallPkg int) (exitCode int, installPkgPath string) {
 	exitLock.Lock()
@@ -912,10 +900,10 @@ func Close(force, setCurrentWorkspace bool, execInstallPkg int) (exitCode int, i
 	util.IsExiting.Store(true)
 	newVerInstallPkgPath := getNewVerInstallPkgPath()
 	if !skipNewVerInstallPkg() && "" != newVerInstallPkgPath {
-		if 2 == execInstallPkg || (force && 0 == execInstallPkg) { // 将新版本安装包交给桌面宿主执行
+		if 2 == execInstallPkg || (force && 0 == execInstallPkg) { // hand the new version's install package off to the desktop host to run
 			installPkgPath = newVerInstallPkgPath
 			logging.LogInfof("the new version install pkg is ready for the desktop host [%s]", newVerInstallPkgPath)
-		} else if 0 == execInstallPkg { // 新版本安装包已经准备就绪
+		} else if 0 == execInstallPkg { // the new version's install package is already ready
 			installPkgPath = newVerInstallPkgPath
 			exitCode = 2
 			logging.LogInfof("the new version install pkg is ready [%s], waiting for the user's next instruction", newVerInstallPkgPath)
@@ -924,10 +912,12 @@ func Close(force, setCurrentWorkspace bool, execInstallPkg int) (exitCode int, i
 	}
 
 	Conf.Close()
-	// 退出前关闭已打开的加密笔记本并推送 closeBox，让前端关闭对应的明文文档标签页，避免重启后泄密。
-	// 走 Unmount：落盘 Closed=true + 生成历史 + 锁定清 DEK + 广播 closeBox。
-	// 排除用户指南：Unmount 对用户指南会触发 RemoveBox（mount.go:208-214）。
-	// 放在 BroadcastByType("exit")（第 933 行）之前推送，随后的 time.Sleep(500ms) 留给前端处理事件。
+	// Before exiting, close any open encrypted notebooks and push closeBox so the frontend closes the corresponding
+	// plaintext document tabs, preventing data exposure after a restart.
+	// This goes through Unmount: persist Closed=true + generate history + lock and clear the DEK + broadcast closeBox.
+	// The user guide is excluded: calling Unmount on the user guide would trigger RemoveBox (mount.go:208-214).
+	// This is pushed before BroadcastByType("exit") (line 933 below), and the subsequent time.Sleep(500ms) gives
+	// the frontend time to process the event.
 	for _, box := range Conf.GetOpenedBoxes() {
 		if IsEncryptedBox(box.ID) && !IsUserGuide(box.ID) {
 			Unmount(box.ID)
@@ -941,7 +931,7 @@ func Close(force, setCurrentWorkspace bool, execInstallPkg int) (exitCode int, i
 	clearPortJSON()
 
 	if setCurrentWorkspace {
-		// 将当前工作空间放到工作空间列表的最后一个
+		// Move the current workspace to the end of the workspace list
 		// Open the last workspace by default https://github.com/siyuan-note/siyuan/issues/10570
 		workspacePaths, err := util.ReadWorkspacePaths()
 		if err != nil {
@@ -1039,7 +1029,8 @@ func (conf *AppConf) Save() {
 	if snapshot.Secrets != nil {
 		snapshot.Secrets.Encrypt()
 	}
-	// safeMode 是纯运行时状态（由 --safe-mode 注入），不随 conf.json 持久化，避免跨启动残留。
+	// safeMode is purely a runtime state (injected via --safe-mode) and is never persisted to conf.json, to avoid
+	// it lingering across restarts.
 	if snapshot.System != nil {
 		snapshot.System.SafeMode = false
 	}
@@ -1120,7 +1111,7 @@ func (conf *AppConf) GetBoxes() (ret []*Box) {
 		id := notebook.ID
 		name := notebook.Name
 		closed := notebook.Closed
-		encrypted := IsEncryptedBox(id) // 使用 IsEncryptedBox 统一判定（含 backup fallback）
+		encrypted := IsEncryptedBox(id) // use IsEncryptedBox for the check consistently (including backup fallback)
 		box := &Box{ID: id, Name: name, Closed: closed, Encrypted: encrypted}
 		ret = append(ret, box)
 	}
@@ -1179,7 +1170,7 @@ func InitBoxes() {
 		if _, err := EnsureBoxDoc(box.ID); nil != err {
 			logging.LogErrorf("ensure box document [%s] failed: %s", box.ID, err)
 		}
-		box.UpdateHistoryGenerated() // 初始化历史生成时间为当前时间
+		box.UpdateHistoryGenerated() // initialize the history-generated time to now
 
 		if !initialized {
 			indexBox(box.ID)
@@ -1211,9 +1202,10 @@ const (
 	MaskedAccessAuthCode = "*******"
 )
 
-// GetMaskedConf 获取脱敏后的 Conf
+// GetMaskedConf gets a redacted copy of Conf
 func GetMaskedConf() (ret *AppConf, err error) {
-	// 序列化时持锁，避免与 loadThemes/LoadIcons 等写操作并发导致 slice 在编码过程中被改写而 panic https://github.com/siyuan-note/siyuan/issues/16978
+	// Hold the lock while serializing to avoid a concurrent write (e.g. loadThemes/LoadIcons) mutating a slice
+	// mid-encode and causing a panic https://github.com/siyuan-note/siyuan/issues/16978
 	Conf.m.Lock()
 	data, err := gulu.JSON.MarshalJSON(Conf)
 	Conf.m.Unlock()
@@ -1235,7 +1227,7 @@ func GetMaskedConf() (ret *AppConf, err error) {
 	return
 }
 
-// HideConfSecret 隐藏设置中的秘密信息
+// HideConfSecret hides secret information in the settings
 // REF: https://github.com/siyuan-note/siyuan/issues/11364
 func HideConfSecret(c *AppConf) {
 	c.AI = &conf.AI{}
@@ -1285,7 +1277,7 @@ func clearPortJSON() {
 }
 
 func clearCorruptedNotebooks() {
-	// 数据同步时展开文档树操作可能导致数据丢失 https://github.com/siyuan-note/siyuan/issues/7129
+	// Expanding the document tree during data sync can cause data loss https://github.com/siyuan-note/siyuan/issues/7129
 
 	dirs, err := os.ReadDir(util.DataDir)
 	if err != nil {
@@ -1324,7 +1316,7 @@ func clearWorkspaceTemp(preserveInstallPkgs bool) {
 	os.RemoveAll(filepath.Join(util.TempDir, "base64"))
 	os.RemoveAll(filepath.Join(util.TempDir, "ai"))
 
-	// 退出时自动删除超过 7 天的安装包 https://github.com/siyuan-note/siyuan/issues/6128
+	// Automatically delete install packages older than 7 days on exit https://github.com/siyuan-note/siyuan/issues/6128
 	install := filepath.Join(util.TempDir, "install")
 	if !preserveInstallPkgs && gulu.File.IsDir(install) {
 		monthAgo := time.Now().Add(-time.Hour * 24 * 7)
@@ -1368,16 +1360,16 @@ func clearWorkspaceTemp(preserveInstallPkgs bool) {
 		}
 	}
 
-	// 老版本遗留文件清理
+	// Clean up files left over from older versions
 	os.RemoveAll(filepath.Join(util.DataDir, "assets", ".siyuan", "assets.json"))
 	os.RemoveAll(filepath.Join(util.DataDir, ".siyuan", "history"))
 	os.RemoveAll(filepath.Join(util.WorkspaceDir, "backup"))
 	os.RemoveAll(filepath.Join(util.WorkspaceDir, "sync"))
-	os.RemoveAll(filepath.Join(util.TempDir, "blocktree.msgpack")) // v2.7.2 前旧版的块树数据
-	os.RemoveAll(filepath.Join(util.DataDir, "%"))                 // v3.0.6 生成的错误历史文件夹
-	os.RemoveAll(filepath.Join(util.TempDir, "blocktree"))         // v3.1.0 前旧版的块树数据
+	os.RemoveAll(filepath.Join(util.TempDir, "blocktree.msgpack")) // block tree data from versions before v2.7.2
+	os.RemoveAll(filepath.Join(util.DataDir, "%"))                 // erroneous history folder generated by v3.0.6
+	os.RemoveAll(filepath.Join(util.TempDir, "blocktree"))         // block tree data from versions before v3.1.0
 
-	// v3.7.0-dev 开发版遗留文件清理
+	// Clean up files left over from the v3.7.0-dev development build
 	os.RemoveAll(filepath.Join(util.TempDir, "queue.wal"))
 	os.RemoveAll(filepath.Join(util.TempDir, "queue.wal.lock"))
 	os.RemoveAll(filepath.Join(util.DataDir, "storage", "ai", "agent", "todos"))
@@ -1483,7 +1475,7 @@ func subscribeConfEvents() {
 	})
 }
 
-// NotebookCryptoEnabled 返回加密笔记本功能是否已启用（线程安全）。
+// NotebookCryptoEnabled returns whether the encrypted notebook feature is enabled (thread-safe).
 func NotebookCryptoEnabled() bool {
 	Conf.m.RLock()
 	defer Conf.m.RUnlock()

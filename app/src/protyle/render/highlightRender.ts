@@ -8,7 +8,7 @@ export const highlightRender = (element: Element, cdn = Constants.PROTYLE_CDN, z
     let codeElements: NodeListOf<Element>;
     let isPreview = false;
     if (element.classList.contains("code-block")) {
-        // 编辑器内代码块编辑渲染
+        // Rendering for editing a code block within the editor
         codeElements = element.querySelectorAll(".hljs");
     } else {
         if (element.classList.contains("item__readme")) {
@@ -50,7 +50,7 @@ export const highlightRender = (element: Element, cdn = Constants.PROTYLE_CDN, z
                     while (previousSibling) {
                         startIndex += previousSibling.textContent.length;
                         while (!previousSibling.previousSibling && previousSibling.parentElement.tagName !== "DIV") {
-                            // 高亮 span 中输入
+                            // Typed inside a highlight span
                             previousSibling = previousSibling.parentElement;
                         }
                         previousSibling = previousSibling.previousSibling;
@@ -79,7 +79,8 @@ export const highlightRender = (element: Element, cdn = Constants.PROTYLE_CDN, z
                     hljsElement.style.setProperty("white-space", "pre-wrap");
                     hljsElement.style.setProperty("word-break", "break-word");
                 } else {
-                    // https://ld246.com/article/1684031600711 该属性会导致有 tab 后光标跳至末尾，目前无解
+                    // https://ld246.com/article/1684031600711 This property causes the cursor to jump
+                    // to the end after a tab; there's currently no fix
                     hljsElement.style.setProperty("white-space", "pre");
                     hljsElement.style.setProperty("word-break", "initial");
                 }
@@ -91,7 +92,7 @@ export const highlightRender = (element: Element, cdn = Constants.PROTYLE_CDN, z
                 const codeText = hljsElement.textContent;
                 if (block.firstElementChild) {
                     if (!isPreview && (lineNumber === "true" || (lineNumber !== "false" && window.siyuan.config.editor.codeSyntaxHighlightLineNum))) {
-                        // 需要先添加 class 以防止抖动 https://ld246.com/article/1648116585443
+                        // The class must be added first, to prevent jitter https://ld246.com/article/1648116585443
                         block.firstElementChild.className = "protyle-linenumber__rows";
                         block.firstElementChild.setAttribute("contenteditable", "false");
                         lineNumberRender(block, zoom);
@@ -129,7 +130,7 @@ export const lineNumberRender = (hljsElement: HTMLElement, zoom = 1) => {
     if (hljsElement.firstElementChild.clientHeight === codeElement.clientHeight && codeElement.style.wordBreak !== "break-word") {
         return;
     }
-    // clientHeight 总是取的整数
+    // clientHeight always returns an integer
     hljsElement.parentElement.style.lineHeight = `${((parseInt(hljsElement.parentElement.style.fontSize) || window.siyuan.config.editor.fontSize) * 1.625 * 0.85).toFixed(0)}px`;
     const lineList = codeElement.textContent.split(/\r\n|\r|\n|\u2028|\u2029/g);
     if (lineList[lineList.length - 1] === "" && lineList.length > 1) {
@@ -139,12 +140,12 @@ export const lineNumberRender = (hljsElement: HTMLElement, zoom = 1) => {
     codeElement.style.paddingLeft = `${hljsElement.firstElementChild.clientWidth + 16}px`;
     let lineNumberHTML = "";
     if (codeElement.style.wordBreak === "break-word") {
-        // 代码块开启了换行
+        // The code block has line wrapping enabled
         const codeElementStyle = window.getComputedStyle(codeElement);
         const lineNumberTemp = document.createElement("div");
         lineNumberTemp.className = "hljs";
-        // 不能使用 codeElement.clientWidth，被忽略小数点导致宽度不一致
-        // 需要手动复制字体样式 https://ld246.com/article/1762527296449
+        // codeElement.clientWidth cannot be used, since its decimal part is dropped causing width inconsistency
+        // The font style needs to be manually copied https://ld246.com/article/1762527296449
         lineNumberTemp.innerHTML = `<div contenteditable="true" style="padding-left:${codeElement.style.paddingLeft};
 width: ${codeElement.getBoundingClientRect().width / zoom}px;
 white-space:${codeElementStyle.whiteSpace};

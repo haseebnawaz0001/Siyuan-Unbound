@@ -68,13 +68,13 @@ export const mathRender = (element: Element, cdn = Constants.PROTYLE_CDN, maxWid
                         }
                         const nextSibling = hasNextSibling(mathElement) as HTMLElement;
                         if (!nextSibling) {
-                            // 表格编辑问题 https://ld246.com/article/1629191424824
+                            // Table editing issue https://ld246.com/article/1629191424824
                             if (mathElement.parentElement.tagName !== "TH" && mathElement.parentElement.tagName !== "TD") {
-                                // 光标无法移动到末尾 https://github.com/siyuan-note/siyuan/issues/2112
+                                // Cursor cannot be moved to the end https://github.com/siyuan-note/siyuan/issues/2112
                                 mathElement.insertAdjacentText("afterend", "\n");
                             } else {
-                                // https://ld246.com/article/1651595975481，https://ld246.com/article/1658903123429
-                                // 随着浏览器的升级，从 beforeend 修改为 afterend
+                                // https://ld246.com/article/1651595975481, https://ld246.com/article/1658903123429
+                                // Changed from beforeend to afterend as browsers have been upgraded
                                 mathElement.insertAdjacentText("afterend", Constants.ZWSP);
                             }
                         } else if (nextSibling && nextSibling.nodeType !== 3 &&
@@ -82,21 +82,21 @@ export const mathRender = (element: Element, cdn = Constants.PROTYLE_CDN, maxWid
                                 nextSibling.getAttribute("data-type")?.indexOf("inline-math") > -1 ||
                                 nextSibling.classList.contains("img")
                             )) {
-                            // 相邻的数学公式删除或光标移动有问题
+                            // Deleting an adjacent math formula or moving the cursor has issues
                             mathElement.after(document.createTextNode(Constants.ZWSP));
                         } else if (nextSibling &&
                             !nextSibling.textContent.startsWith("\n") && // https://github.com/siyuan-note/insider/issues/1089
-                            // 输入 $a$ 后，光标移动到其他块，再点击 a 后，光标不显示 https://github.com/siyuan-note/insider/issues/1076#issuecomment-1253215515
+                            // After typing $a$, moving the cursor to another block, then clicking on a, the cursor doesn't show https://github.com/siyuan-note/insider/issues/1076#issuecomment-1253215515
                             nextSibling.textContent !== Constants.ZWSP) {
-                            // 数学公式后一个字符删除多 br https://ld246.com/article/1647157880974
-                            // 数学公式后有 \n 不能再添加 &#xFEFF; https://ld246.com/article/1647329437541
+                            // Deleting the character right after a math formula removes an extra br https://ld246.com/article/1647157880974
+                            // Cannot add &#xFEFF; again when there's already a \n after a math formula https://ld246.com/article/1647329437541
                             mathElement.insertAdjacentHTML("beforeend", "&#xFEFF;");
                         }
-                        // 光标无法移动到段首 https://ld246.com/article/1623551823742
+                        // Cursor cannot be moved to the start of the paragraph https://ld246.com/article/1623551823742
                         if (mathElement.previousSibling?.textContent.endsWith("\n")) {
                             mathElement.insertAdjacentText("beforebegin", Constants.ZWSP);
                         } else if (!hasPreviousSibling(mathElement) && ["TH", "TD"].includes(mathElement.parentElement.tagName)) {
-                            // 单元格中只有数学公式时，光标无法移动到数学公式前
+                            // When a cell contains only a math formula, the cursor cannot be moved before the math formula
                             mathElement.insertAdjacentText("afterbegin", Constants.ZWSP);
                         }
                     }

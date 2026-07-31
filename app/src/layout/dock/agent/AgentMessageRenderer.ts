@@ -48,7 +48,8 @@ export const renderTodoList = (result: string): string => {
     return html;
 };
 
-// hasModel=false 时渲染"未配置模型"提示块替代示例，避免用户点击示例后卡死。
+// When hasModel=false, render a "no model configured" hint block instead of the examples, to avoid
+// the user clicking an example and getting stuck.
 export const renderWelcomeHTML = (hasModel = true): string => {
     const L = window.siyuan.languages;
     if (!hasModel) {
@@ -140,9 +141,9 @@ export const renderToolsLineHTML = (newTools: Array<{name: string; running?: boo
     return detailLines;
 };
 
-// createThinkingCardElement 用于流式过程中的单个思考卡片。
-// 工具调用只接收名字列表（arguments/result 在 assistant entry 存一份）；
-// 标题文本由调用方传入（已通过 i18n 从 duration 生成）。
+// createThinkingCardElement is used for a single thinking card during streaming.
+// Tool calls only receive the name list (arguments/result are stored once in the assistant entry);
+// the title text is passed in by the caller (already generated from duration via i18n).
 export const createThinkingCardElement = (step: {reasoning: string; text: string; toolNames?: string[]; reasoningContent: string}): HTMLElement => {
     let detail = "";
     if (step.toolNames && step.toolNames.length > 0) {
@@ -184,7 +185,8 @@ export const bindThinkingCardToggle = (el: HTMLElement): void => {
         const isExpanded = body.classList.contains("agent-chat__thinking-body--expanded");
         const isDone = el.classList.contains("agent-chat__msg--thinking-done");
         if (isDone) {
-            // 思考完成后：两态 toggle（折叠↔完全展开），不经过预览中间态。
+            // Once thinking is done: a two-state toggle (collapsed <-> fully expanded), without the
+            // preview intermediate state.
             if (isExpanded) {
                 body.classList.remove("agent-chat__thinking-body--expanded");
                 expandIcon.classList.remove("fn__none");
@@ -196,7 +198,8 @@ export const bindThinkingCardToggle = (el: HTMLElement): void => {
                 contractIcon.classList.remove("fn__none");
             }
         } else {
-            // 流式中：三态循环（完全折叠 → 预览 → 完全展开 → 完全折叠）。
+            // While streaming: a three-state cycle (fully collapsed -> preview -> fully expanded ->
+            // fully collapsed).
             const isPreview = body.classList.contains("agent-chat__thinking-body--preview");
             if (isExpanded) {
                 body.classList.remove("agent-chat__thinking-body--expanded");
@@ -214,9 +217,9 @@ export const bindThinkingCardToggle = (el: HTMLElement): void => {
     });
 };
 
-// 为容器内所有代码块（pre）和公式块（div[data-subtype=math]）注入复制按钮。
+// Inject copy buttons into all code blocks (pre) and formula blocks (div[data-subtype=math]) inside the container.
 export const addCopyButtons = (container: HTMLElement): void => {
-    // 代码块复制 code 文本；公式块复制 data-content（KaTeX 渲染前的原始 LaTeX）。
+    // Code blocks copy the code text; formula blocks copy data-content (the raw LaTeX before KaTeX rendering).
     const targets: Array<{ selector: string; getText: (el: HTMLElement) => string }> = [
         {selector: "pre", getText: (el) => (el.querySelector("code")?.textContent || "").trimEnd().replace(/\n$/, "")},
         {selector: '[data-subtype="math"]', getText: (el) => el.getAttribute("data-content") || ""}
@@ -234,7 +237,7 @@ export const addCopyButtons = (container: HTMLElement): void => {
     });
 };
 
-// 构建单个复制按钮，getText 返回要复制的文本。
+// Build a single copy button; getText returns the text to copy.
 const createCopyButton = (getText: () => string): HTMLElement => {
     const btn = document.createElement("span");
     btn.className = "protyle-icon protyle-icon--only ariaLabel";
@@ -279,7 +282,8 @@ export const postRender = (container: HTMLElement, app?: App): void => {
             code.parentElement?.setAttribute("data-language", match[1]);
         }
     });
-    // Assistant 使用 b3-typography，用户消息使用只读 protyle-wysiwyg，两种结构都复用 highlightRender。
+    // Assistant messages use b3-typography, user messages use a read-only protyle-wysiwyg; both
+    // structures reuse highlightRender.
     const contentSelector = ".b3-typography, .protyle-wysiwyg";
     const contentElements = container.matches(contentSelector)
         ? [container as HTMLElement]
@@ -331,7 +335,8 @@ export const postRender = (container: HTMLElement, app?: App): void => {
         return;
     }
     container.dataset.agentLinkBound = "true";
-    // dock 内没有 Protyle WYSIWYG 的点击分派，使用事件委托覆盖流式及嵌入块异步插入的内容。
+    // There is no Protyle WYSIWYG click dispatch inside the dock, so event delegation is used to
+    // cover content inserted asynchronously via streaming and embed blocks.
     container.addEventListener("click", (event: MouseEvent) => {
         if (event.defaultPrevented) {
             return;

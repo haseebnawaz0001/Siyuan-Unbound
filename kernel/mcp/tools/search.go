@@ -205,7 +205,7 @@ func assetSearch(args map[string]any) (CallToolResult, error) {
 		pageSize = 32
 	}
 
-	// ext 入参为逗号分隔的扩展名白名单，底层按 map[string]bool 接收
+	// The ext argument is a comma-separated extension whitelist; the underlying layer accepts it as map[string]bool
 	extSlice := parseStringSlice(args["ext"])
 	types := map[string]bool{}
 	for _, e := range extSlice {

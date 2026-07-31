@@ -14,7 +14,7 @@ export const avKeydown = (event: KeyboardEvent, nodeElement: HTMLElement, protyl
     if (event.isComposing) {
         return true;
     }
-    // 避免浏览器默认快捷键
+    // Avoid the browser's default shortcuts
     if (matchHotKey("⌘B", event) || matchHotKey("⌘I", event) || matchHotKey("⌘U", event)) {
         event.preventDefault();
         return true;
@@ -35,7 +35,8 @@ export const avKeydown = (event: KeyboardEvent, nodeElement: HTMLElement, protyl
             event.stopPropagation();
             return true;
         }
-        // 需在 avPanelElement 之后，否则点击资源单元格后删除，资源面板不会更新
+        // Must come after the avPanelElement check, otherwise deleting after clicking an asset cell
+        // wouldn't update the asset panel
         if (event.key === "Backspace" || event.key === "Delete") {
             updateCellsValue(protyle, nodeElement, undefined, Array.from(nodeElement.querySelectorAll(".av__cell--active, .av__cell--select")));
             event.preventDefault();

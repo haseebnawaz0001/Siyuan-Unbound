@@ -23,13 +23,13 @@ export const processPasteCode = (html: string, text: string, originalTextHTML: s
         isCode = true;
     } else if (tempElement.childElementCount === 1 && tempElement.firstElementChild.tagName === "TABLE" &&
         tempElement.querySelector(".line-number") && tempElement.querySelector(".line-content")) {
-        // 网页源码
+        // Web page source
         isCode = true;
     }
-    /* Mac 上不好识别，先统一移除代码标识 https://github.com/siyuan-note/siyuan/issues/17818
+    /* Hard to detect reliably on Mac, so the code marker is removed uniformly for now https://github.com/siyuan-note/siyuan/issues/17818
     else if (originalTextHTML.indexOf('<meta name="Generator" content="Cocoa HTML Writer">') > -1 &&
         html.indexOf('\n<p class="p1">') === 0 &&
-        //  ChatGPT app 目前没有此标识
+        //  The ChatGPT app currently doesn't have this marker
         originalTextHTML.indexOf('<style type="text/css">\np.p1') > -1) {
         // Xcode
         isCode = true;

@@ -20,7 +20,7 @@ export const addSort = (options: {
     fields.forEach((column) => {
         let hasSort = false;
 
-        // 如果该列是行号类型列，不允许添加排序
+        // If this column is a line number type column, adding a sort is not allowed
         if (column.type === "lineNumber") {
             hasSort = true;
         } else {

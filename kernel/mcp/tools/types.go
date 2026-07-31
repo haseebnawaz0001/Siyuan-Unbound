@@ -31,14 +31,19 @@ type Tool struct {
 	Description  string      `json:"description"`
 	InputSchema  ToolSchema  `json:"inputSchema"`
 	OutputSchema *ToolSchema `json:"outputSchema,omitempty"`
-	// Source 标记工具来源："native"（SiYuan 内置）、"plugin"（插件注册）、"mcp"（外部 MCP 服务）。
-	// 用于 token 分类统计按来源拆分。空值按 "native" 处理（兼容旧调用方）。
+	// Source marks the tool's origin: "native" (SiYuan built-in), "plugin" (registered by a plugin), "mcp"
+	// (external MCP service).
+	// Used to split token breakdown statistics by source. An empty value is treated as "native" (for backward
+	// compatibility with old callers).
 	Source string `json:"source,omitempty"`
-	// ReadOnlyHint 仅在外部工具明确声明只读时为 true；未声明时按可能写入处理并要求确认。
+	// ReadOnlyHint is true only when an external tool explicitly declares itself read-only; when undeclared,
+	// it is treated as a possible write and confirmation is required.
 	ReadOnlyHint bool `json:"readOnlyHint,omitempty"`
-	// EffectScope 描述写操作影响范围，用于判断本地数据仓库快照是否具有回滚价值。
+	// EffectScope describes the scope of impact of a write operation, used to determine whether a local data
+	// repository snapshot has rollback value.
 	EffectScope string `json:"effectScope,omitempty"`
-	// ActionEffects 按 action 描述本地读写、数据外发与外部计费，供智能体精确执行确认和快照策略。
+	// ActionEffects describes, per action, local read/write, data egress, and external cost, for the agent to
+	// precisely drive confirmation and snapshot policy.
 	ActionEffects map[string]ToolEffects `json:"-"`
 
 	Handler        func(args map[string]any) (CallToolResult, error)                      `json:"-"`

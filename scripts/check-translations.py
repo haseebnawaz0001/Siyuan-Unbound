@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-以 zh-CN.json 为基准，检查其他语言文件的翻译质量（精准版）。
-检测规则：
-  1. MISSING_KEY: 键缺失
-  2. UNTRANSLATED: 目标值与中文原文【完全相同】（针对非 zh-CN 语言，含中文且字符串相等）
-  3. PLACEHOLDER_MISMATCH: 占位符/HTML 标签丢失（规范化后比较）
-注意：日语/韩语的汉字使用是合法的，不视为错误，因此仅当整串与原文相同时才报未翻译。
+Check the translation quality of other language files against zh-CN.json as the baseline (precise version).
+Detection rules:
+  1. MISSING_KEY: the key is missing
+  2. UNTRANSLATED: the target value is exactly identical to the Chinese source (for non-zh-CN languages,
+     when the string contains Chinese characters and matches exactly)
+  3. PLACEHOLDER_MISMATCH: placeholders/HTML tags are lost (compared after normalization)
+Note: using Chinese characters in Japanese/Korean is legitimate and not treated as an error, so untranslated
+is only reported when the whole string is identical to the source.
 """
 import json
 import re
@@ -40,7 +42,8 @@ def walk(obj, prefix=""):
 
 
 def norm_placeholders(s):
-    """规范化占位符比较：统一引号、忽略 URL 路径差异、忽略帮助链接域名差异"""
+    """Normalize placeholders for comparison: unify quote characters, ignore URL path differences,
+    and ignore help-link domain differences"""
     s2 = s.replace('"', "'")
     s2 = re.sub(r"b3log\.org/siyuan(/[a-z]{2})?/", "b3log.org/siyuan/", s2)
     s2 = re.sub(r"b3log\.org/siyuan(\?[^\s\"']*)?", "b3log.org/siyuan", s2)
@@ -69,10 +72,10 @@ def main():
                 continue
             if TRIVIAL_RE.match(bv):
                 continue
-            # 完全未翻译：目标值与中文原文完全相同（仅对非 zh-CN 语言）
+            # Completely untranslated: target value is identical to the Chinese source (non-zh-CN languages only)
             if t != "zh-CN" and tv == bv and CN_RE.search(bv):
                 issues.append((k, "UNTRANSLATED", bv[:80]))
-            # 占位符丢失（规范化后比较）
+            # Placeholder lost (compared after normalization)
             bp = norm_placeholders(bv)
             tp = norm_placeholders(tv)
             if bp and bp != tp:

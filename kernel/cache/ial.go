@@ -135,11 +135,13 @@ func GetBlockIALInBox(id, boxID string) (ret map[string]string) {
 	return ial.(map[string]string)
 }
 
-// GetBlockIALWithBoxFallback 先查 box-aware key，未命中再回退到 bare key。
+// GetBlockIALWithBoxFallback checks the box-aware key first, falling back to the bare key on a miss.
 //
-// 写入端存在两套键命名空间：部分路径写 box-aware key（PutBlockIALInBox，用于加密笔记本隔离），
-// 部分历史路径仍写 bare key（PutBlockIAL）。读取端若只查其一会漏掉另一侧的更新，因此这里按
-// box-aware 优先、bare key 回退的顺序查询，与 treenode.GetDynamicRefText 的回退策略保持一致。
+// The write side has two key namespaces: some paths write the box-aware key (PutBlockIALInBox, used for
+// encrypted notebook isolation), while some legacy paths still write the bare key (PutBlockIAL). If the read
+// side only checks one of them, it would miss updates from the other side, so the lookup here follows the
+// order of box-aware first, then falling back to the bare key, consistent with treenode.GetDynamicRefText's
+// fallback strategy.
 func GetBlockIALWithBoxFallback(id, boxID string) (ret map[string]string) {
 	if "" != boxID {
 		if ret = GetBlockIALInBox(id, boxID); nil != ret {

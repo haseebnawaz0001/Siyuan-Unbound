@@ -7,11 +7,12 @@ import {isMobile} from "../../util/functions";
 import {isEncryptedBox} from "../../util/pathName";
 import {saveExportFile} from "../util/compatibility";
 
-// 导出参数对话框 https://github.com/siyuan-note/siyuan/issues/17031
-// 通用部分（8 项）可被各导出格式复用，Markdown 专属部分仅 Markdown 导出使用。
-// 默认值一律取自全局 window.siyuan.config.export，确认后本次导出生效，不修改全局设置、不记忆上次选择。
+// Export options dialog https://github.com/siyuan-note/siyuan/issues/17031
+// The common section (8 items) can be reused by other export formats; the Markdown-specific section is only used for Markdown export.
+// Default values are always taken from the global window.siyuan.config.export; after confirmation
+// they apply only to this export, without modifying the global settings or remembering the last choice.
 
-// 类型别名：约束字段 key 与 Config.IExport 的字段类型对应，避免用 string 索引报错
+// Type aliases: constrain field keys to match Config.IExport's field types, avoiding errors from indexing with string
 type BoolKey = "addTitle" | "inlineMemo" | "includeSubDocs" | "includeRelatedDocs" | "markdownYFM" | "removeAssetsID";
 type IntKey = "blockRefMode" | "blockEmbedMode" | "fileAnnotationRefMode";
 type StringKey = "blockRefTextLeft" | "blockRefTextRight" | "tagOpenMarker" | "tagCloseMarker";
@@ -22,18 +23,22 @@ interface IExportMdOptions {
     notebook?: string;
 }
 
-// openExportOptionsDialog 渲染「通用 + Markdown 专属」两组开关，确认时回调 onConfirm 传出全部 13 项。
-// showSubDocs/showRelatedDocs 控制是否显示「包含子文档/关联文档」项（单文档无对应内容时隐藏）。
+// openExportOptionsDialog renders two groups of toggles, "common + Markdown-specific"; on
+// confirmation the onConfirm callback passes out all 13 items.
+// showSubDocs/showRelatedDocs control whether the "include sub-documents/related documents" items
+// are shown (hidden when a single document has no corresponding content).
 export const openExportOptionsDialog = (onConfirm: (options: IExportMdOptionsPayload) => void, showSubDocs = true, showRelatedDocs = true) => {
     const conf = window.siyuan.config.export;
     const bool = (id: BoolKey) => `<input id="${id}" class="b3-switch fn__flex-center" type="checkbox" ${conf[id] ? "checked" : ""}>`;
-    // 渲染 select：复用设置面板的标准 class（fn__flex-center fn__size200），value 为当前全局值时标记 selected
+    // Render a select: reuse the settings panel's standard class (fn__flex-center fn__size200); mark
+    // selected when the value matches the current global value
     const select = (id: IntKey, options: {value: number; label: string}[]) => {
         const opts = options.map(o =>
             `<option value="${o.value}" ${conf[id] === o.value ? "selected" : ""}>${o.label}</option>`).join("");
         return `<select id="${id}" class="b3-select fn__flex-center fn__size200">${opts}</select>`;
     };
-    // 一行：左侧标题+说明，右侧控件。复用设置面板标准布局 class（config-item config-wrap）
+    // One row: title + description on the left, control on the right. Reuses the settings panel's
+    // standard layout class (config-item config-wrap)
     const row = (title: string, desc: string, control: string) =>
         `<label class="fn__flex b3-label config-item config-wrap">
             <div class="fn__flex-1">
@@ -43,7 +48,7 @@ export const openExportOptionsDialog = (onConfirm: (options: IExportMdOptionsPay
             <span class="fn__space"></span>
             ${control}
         </label>`;
-    // 左右两个输入框，复用设置面板标准宽度 class（fn__size96）
+    // Two input boxes side by side, reusing the settings panel's standard width class (fn__size96)
     const textPair = (leftId: StringKey, rightId: StringKey) =>
         `<input id="${leftId}" class="b3-text-field fn__flex-center fn__size96" value="${conf[leftId] ?? ""}">
         <span class="fn__space"></span>
@@ -52,13 +57,13 @@ export const openExportOptionsDialog = (onConfirm: (options: IExportMdOptionsPay
     const dialog = new Dialog({
         title: window.siyuan.languages.export + " Markdown",
         content: `<div class="b3-dialog__content export-md__content">
-    <!-- 常用 -->
+    <!-- Common -->
     ${row(window.siyuan.languages.export17, window.siyuan.languages.export18, bool("addTitle"))}
     ${showSubDocs ? row(window.siyuan.languages.includeSubDocs, window.siyuan.languages.includeSubDocsTip, bool("includeSubDocs")) : ""}
     ${showRelatedDocs ? row(window.siyuan.languages.includeRelatedDocs, window.siyuan.languages.includeRelatedDocsTip, bool("includeRelatedDocs")) : ""}
     ${row(window.siyuan.languages.export23, window.siyuan.languages.export24, bool("markdownYFM"))}
     ${row(window.siyuan.languages.removeAssetsID, window.siyuan.languages.removeAssetsIDTip, bool("removeAssetsID"))}
-    <!-- 其他 -->
+    <!-- Other -->
     ${row(window.siyuan.languages.export31, window.siyuan.languages.export32, bool("inlineMemo"))}
     ${row(window.siyuan.languages.ref, window.siyuan.languages.export11,
         select("blockRefMode", [
@@ -91,7 +96,7 @@ export const openExportOptionsDialog = (onConfirm: (options: IExportMdOptionsPay
     dialog.element.setAttribute("data-key", Constants.DIALOG_EXPORTMARKDOWN);
 
     const el = dialog.element;
-    // 控件可能未渲染（如无子文档时），此时回退到全局配置值
+    // The control may not be rendered (e.g. when there are no sub-documents); fall back to the global config value in that case
     const boolVal = (id: BoolKey) => {
         const input = el.querySelector("#" + id) as HTMLInputElement;
         return input ? input.checked : conf[id];
@@ -139,14 +144,16 @@ interface IExportMdOptionsPayload {
     removeAssetsID: boolean;
 }
 
-// exportMarkdownZip 为 Markdown .zip 导出入口：弹参数对话框，确认后按 id/ids/notebook 调对应 API。
-// 单文档时先查询文档信息，若无子文档/关联文档则隐藏对应配置项，减少干扰。
+// exportMarkdownZip is the entry point for Markdown .zip export: shows the options dialog, and after
+// confirmation calls the corresponding API based on id/ids/notebook.
+// For a single document, document info is queried first, and the corresponding config items are
+// hidden if there are no sub-documents/related documents, to reduce clutter.
 export const exportMarkdownZip = async(options: IExportMdOptions) => {
     let showSubDocs = true;
     let showRelatedDocs = true;
     let encrypted = false;
     if (options.id) {
-        // 查询文档是否有子文档、引用及绑定的数据库，无则隐藏对应配置项 #17031
+        // Query whether the document has sub-documents, references, and bound databases; hide the corresponding config items if not #17031
         const docInfo = await fetchSyncPost("/api/block/getDocInfo", {id: options.id});
         const data = docInfo.data;
         showSubDocs = 0 < data.subFileCount;

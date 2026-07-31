@@ -337,7 +337,7 @@ export const openTitleMenu = (protyle: IProtyle, position: IPosition, from: stri
             id: "updateAndCreatedAt",
             iconHTML: "",
             type: "readonly",
-            // 不能换行，否则移动端间距过大
+            // Cannot wrap, otherwise the spacing would be too large on mobile
             label: `${window.siyuan.languages.modifiedAt} ${dayjs(response.data.ial.updated).format("YYYY-MM-DD HH:mm:ss")}<br>${window.siyuan.languages.createdAt} ${dayjs(response.data.ial.id.substr(0, 14)).format("YYYY-MM-DD HH:mm:ss")}`
         }).element);
         /// #if MOBILE

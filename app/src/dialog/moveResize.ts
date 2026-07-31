@@ -125,7 +125,7 @@ export const moveResize = (element: HTMLElement, afterCB?: (type: string) => voi
                 return;
             }
             if (window.siyuan.dragElement) {
-                // 反向链接拖拽 https://ld246.com/article/1632915506502
+                // Backlink dragging https://ld246.com/article/1632915506502
                 window.siyuan.dragElement.style.opacity = "";
                 window.siyuan.dragElement = undefined;
             }

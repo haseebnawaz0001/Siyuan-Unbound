@@ -65,7 +65,7 @@ export const initFramework = (app: App, isStart: boolean) => {
     renderSnippet();
     initKeyboardToolbar();
     const sidebarElement = document.getElementById("sidebar");
-    // 不能使用 getEventName，否则点击返回会展开右侧栏
+    // Cannot use getEventName, otherwise clicking back will expand the right sidebar
     const firstToolbarElement = sidebarElement.querySelector(".toolbar--border");
     firstToolbarElement.addEventListener("click", (event: MouseEvent) => {
         const target = event.target as HTMLElement;
@@ -160,7 +160,7 @@ export const initFramework = (app: App, isStart: boolean) => {
             window.siyuan.mobile.docks.tag.update();
         }
     });
-    // 用 touchstart 会导致键盘不收起
+    // Using touchstart would prevent the keyboard from hiding
     document.getElementById("toolbarMore").addEventListener("click", () => {
         popMenu();
     });

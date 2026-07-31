@@ -25,7 +25,7 @@ import (
 	"github.com/siyuan-note/siyuan/kernel/util"
 )
 
-// GetBazaarPackages 返回指定类型的在线集市包列表（plugins 类型需要传递 frontend 参数）。
+// GetBazaarPackages returns the list of online bazaar packages of the given type (the plugins type requires passing the frontend parameter).
 func GetBazaarPackages(pkgType string, frontend string) (packages []*Package) {
 	result := getStageAndBazaar(pkgType)
 
@@ -44,7 +44,7 @@ func GetBazaarPackages(pkgType string, frontend string) (packages []*Package) {
 	return
 }
 
-// GetBazaarPackagesMap 返回按包名索引的在线集市包映射（plugins 类型需要传递 frontend 参数）。
+// GetBazaarPackagesMap returns a map of online bazaar packages indexed by package name (the plugins type requires passing the frontend parameter).
 func GetBazaarPackagesMap(pkgType, frontend string) map[string]*Package {
 	packages := GetBazaarPackages(pkgType, frontend)
 	packagesMap := make(map[string]*Package, len(packages))
@@ -56,7 +56,7 @@ func GetBazaarPackagesMap(pkgType, frontend string) map[string]*Package {
 	return packagesMap
 }
 
-// buildBazaarPackageWithMetadata 从 StageRepo 构建带有在线元数据的集市包。
+// buildBazaarPackageWithMetadata builds a bazaar package with online metadata from a StageRepo.
 func buildBazaarPackageWithMetadata(repo *StageRepo, bazaarStats map[string]*bazaarStats, pkgType string, frontend string) *Package {
 	if nil == repo || nil == repo.Package {
 		return nil
@@ -71,14 +71,14 @@ func buildBazaarPackageWithMetadata(repo *StageRepo, bazaarStats map[string]*baz
 	pkg.RepoURL = "https://github.com/" + repoURLHash[0]
 	pkg.RepoHash = repoURLHash[1]
 
-	// 展示信息
+	// display info
 	pkg.IconURL = util.BazaarOSSServer + "/package/" + repo.URL + "/icon.png"
 	pkg.PreviewURL = util.BazaarOSSServer + "/package/" + repo.URL + "/preview.png?imageslim"
 	pkg.PreferredName = GetPreferredLocaleString(pkg.DisplayName, pkg.Name)
 	pkg.PreferredDesc = GetPreferredLocaleString(pkg.Description, "")
 	pkg.PreferredFunding = getPreferredFunding(pkg.Funding)
 
-	// 更新信息
+	// update info
 	disallowVer := isBelowRequiredAppVersion(&pkg)
 	pkg.DisallowInstall = disallowVer
 	pkg.DisallowUpdate = disallowVer
@@ -92,7 +92,7 @@ func buildBazaarPackageWithMetadata(repo *StageRepo, bazaarStats map[string]*baz
 		}
 	}
 
-	// 统计信息
+	// stats info
 	pkg.Updated = repo.Updated
 	pkg.HUpdated = formatUpdated(pkg.Updated)
 	pkg.Stars = repo.Stars
@@ -101,17 +101,17 @@ func buildBazaarPackageWithMetadata(repo *StageRepo, bazaarStats map[string]*baz
 	pkg.HSize = humanize.BytesCustomCeil(uint64(pkg.Size), 2)
 	pkg.InstallSize = repo.InstallSize
 	pkg.HInstallSize = humanize.BytesCustomCeil(uint64(pkg.InstallSize), 2)
-	if stats := bazaarStats[repoURLHash[0]]; nil != stats { // 通过 bazaarStats[owner/repo] 获取单个包的统计数据
+	if stats := bazaarStats[repoURLHash[0]]; nil != stats { // get the stats for a single package via bazaarStats[owner/repo]
 		pkg.Downloads = stats.Downloads
 	}
-	// TODO 分离本地安装大小和在线 stage 数据的安装大小，不保存到 installSizeCache
+	// TODO separate the local install size from the online stage data's install size, so it's not saved into installSizeCache
 	bazaarMemMu.Lock()
 	installSizeCache[pkg.RepoURL] = pkg.InstallSize
 	bazaarMemMu.Unlock()
 	return &pkg
 }
 
-// formatUpdated 格式化发布日期字符串。
+// formatUpdated formats the release date string.
 func formatUpdated(updated string) (ret string) {
 	t, e := dateparse.ParseIn(updated, time.Now().Location())
 	if nil == e {

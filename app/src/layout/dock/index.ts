@@ -78,7 +78,7 @@ export class Dock {
         }
         const activeElements = [this.elements[0].querySelector(".dock__item--active"),
             this.elements[1].querySelector(".dock__item--active")];
-        // 初始化文件树
+        // Initialize the file tree
         const fileElement = document.querySelector('.dock__item[data-type="file"]');
         if (fileElement && !fileElement.classList.contains("dock__item--active") &&
             (this.elements[0].contains(fileElement) || this.elements[1].contains(fileElement))) {
@@ -88,7 +88,7 @@ export class Dock {
 
         if (!activeElements[0] && !activeElements[1]) {
             this.resizeElement.classList.add("fn__none");
-            // 如果没有打开的侧栏，隐藏 layout 的子元素
+            // If no sidebar panel is open, hide the layout's child elements
             if (this.layout.children.length > 1) {
                 this.layout.children.forEach(child => {
                     child.element.classList.add("fn__none");
@@ -302,7 +302,7 @@ export class Dock {
                 this.hideDock(true);
                 this.layout.element.classList.add("layout--float");
                 this.resizeElement.classList.add("fn__none");
-            });   // 需等待所有 Dock 初始化完成后才有稳定布局，才可进行定位
+            });   // The layout is only stable enough to position once all docks have finished initializing
         }
     }
 
@@ -383,7 +383,7 @@ export class Dock {
         if (!reset && (this.layout.element.style.opacity === "0" || this.pin)) {
             return;
         }
-        // 关系图全屏不应该退出 & https://github.com/siyuan-note/siyuan/issues/11775
+        // Should not exit while the relation graph is fullscreen & https://github.com/siyuan-note/siyuan/issues/11775
         const fullscreenElement = this.layout.element.querySelector(".fullscreen");
         if (fullscreenElement && fullscreenElement.clientHeight > 0) {
             return;
@@ -397,9 +397,9 @@ export class Dock {
         const dialogElement = document.querySelector(".b3-dialog") as HTMLElement;
         const blockElement = document.querySelector(".block__popover") as HTMLElement;
         const menuElement = document.querySelector("#commonMenu:not(.fn__none)") as HTMLElement;
-        if (!reset && ((dialogElement && dialogElement.style.zIndex > this.layout.element.style.zIndex) ||  // 文档树上修改 emoji 时
-            (blockElement && blockElement.style.zIndex > this.layout.element.style.zIndex) ||  // 文档树上弹出悬浮层
-            (menuElement && menuElement.style.zIndex > this.layout.element.style.zIndex))  // 面板上弹出菜单时
+        if (!reset && ((dialogElement && dialogElement.style.zIndex > this.layout.element.style.zIndex) ||  // while editing an emoji on the file tree
+            (blockElement && blockElement.style.zIndex > this.layout.element.style.zIndex) ||  // a popover is shown on the file tree
+            (menuElement && menuElement.style.zIndex > this.layout.element.style.zIndex))  // a menu is popped up on a panel
         ) {
             return;
         }
@@ -458,7 +458,7 @@ export class Dock {
             }
 
             target.classList.remove("dock__item--active", "dock__item--activefocus");
-            // dock 隐藏
+            // Hide the dock
             if (!this.elements[0].querySelector(".dock__item--active") &&
                 !this.elements[1].querySelector(".dock__item--active")) {
                 if (this.position === "Left") {
@@ -482,7 +482,8 @@ export class Dock {
                 const graph = this.data[type] as Graph;
                 graph.destroy();
             }
-            // 关闭 dock 后设置光标，初始化的时候不能设置，否则关闭文档树且多页签时会请求两次 getDoc
+            // Set the cursor after closing the dock; this must not be done during initialization, otherwise
+            // closing the file tree with multiple tabs open would request getDoc twice
             if (isSaveLayout && !document.querySelector(".layout__center .layout__wnd--active")) {
                 const currentElement = document.querySelector(".layout__center ul.layout-tab-bar .item--focus");
                 if (currentElement) {
@@ -622,7 +623,7 @@ export class Dock {
                 this.data[type] = tab.model;
                 setPanelFocus(tab.panelElement);
             } else {
-                // tab 切换
+                // Switch tabs
                 Array.from(wnd.element.querySelector(".layout-tab-container").children).forEach(item => {
                     if (item.getAttribute("data-id") === target.getAttribute("data-id")) {
                         item.classList.remove("fn__none");
@@ -632,7 +633,7 @@ export class Dock {
                     }
                 });
             }
-            // dock 显示
+            // Show the dock
             if (this.position === "Left") {
                 if (this.layout.element.style.width === "0px") {
                     this.layout.element.style.width = this.getMaxSize() + "px";
@@ -657,7 +658,7 @@ export class Dock {
                 this.hideResizeTimeout = window.setTimeout(() => {
                     this.resizeElement.classList.remove("fn__none");
                     adjustLayout();
-                }, Constants.TIMEOUT_TRANSITION);    // 需等待动画完毕后再出现，否则会出现滚动条 https://ld246.com/article/1676596622064
+                }, Constants.TIMEOUT_TRANSITION);    // Must wait for the animation to finish before appearing, otherwise a scrollbar shows up https://ld246.com/article/1676596622064
             }
             if (document.activeElement) {
                 (document.activeElement as HTMLElement).blur();
@@ -668,7 +669,7 @@ export class Dock {
             this.showDock();
         }
 
-        // dock 中两个面板的显示关系
+        // The show relationship between the two panels in the dock
         const anotherIndex = index === 0 ? 1 : 0;
         const anotherWnd = this.layout.children[anotherIndex] as Wnd;
         const anotherHasActive = this.elements[anotherIndex].querySelectorAll(".dock__item--active").length > 0;
@@ -727,7 +728,7 @@ export class Dock {
             graph.onGraph(false);
         }
 
-        // 等待 dock 面板动画结束
+        // Wait for the dock panel animation to finish
         if (this.pin) {
             let rafId: number;
             const updateTabPos = () => {
@@ -754,7 +755,8 @@ export class Dock {
     public add(index: number, sourceElement: Element, previousType?: string) {
         const type = sourceElement.getAttribute("data-type") as TDock;
         const sourceDock = getDockByType(type);
-        // 仅在左右轴与下轴之间跨轴移动时清除尺寸：左右侧之间或下侧内部移动，原有尺寸维度仍然有效
+        // Only clear the size when moving across axes between the left/right axis and the bottom axis:
+        // moving between left/right or within the bottom still keeps the original size dimension valid
         const size: Partial<Config.IUILayoutDockPanelSize> = {};
         if ((sourceDock.position === "Left" || sourceDock.position === "Right") && this.position === "Bottom") {
             sourceElement.setAttribute("data-width", "");
@@ -778,7 +780,7 @@ export class Dock {
             sourceDock.toggleModel(type, false, false, false, false);
         }
         delete sourceDock.data[type];
-        // 目标处理
+        // Handle the destination
         sourceElement.setAttribute("data-index", index.toString());
         if (previousType) {
             this.elements[index].parentElement.querySelector(`[data-type="${previousType}"]`).after(sourceElement);
@@ -791,7 +793,7 @@ export class Dock {
         if (hasActive) {
             this.toggleModel(type, true, false, false, false);
         }
-        // 保存布局需等待动画完毕 https://github.com/siyuan-note/siyuan/issues/13507
+        // Saving the layout must wait for the animation to finish https://github.com/siyuan-note/siyuan/issues/13507
         setTimeout(() => {
             saveLayout();
         }, Constants.TIMEOUT_TRANSITION);
@@ -890,7 +892,7 @@ export class Dock {
             if (typeof tabIndex === "undefined" && !TYPES.includes(item.type)) {
                 return;
             }
-            // https://github.com/siyuan-note/siyuan/issues/7976 历史兼容 3.6.5 -> 3.7.0
+            // https://github.com/siyuan-note/siyuan/issues/7976 Historical compatibility 3.6.5 -> 3.7.0
             if (item.type === "outline") {
                 item.icon = "iconOutline";
             } else if (item.type === "tags") {
@@ -949,7 +951,7 @@ export class Dock {
                 }
                 const dockConfig = window.siyuan.storage[Constants.LOCAL_PLUGIN_DOCKS][pluginItem.name][dockType];
                 Object.keys(options).forEach((item: "position" | "size" | "index" | "show") => {
-                    // size 需按字段合并，否则会整体覆盖、丢失用户已拖动的尺寸
+                    // size must be merged field by field, otherwise it would overwrite the whole object and lose the size the user already dragged
                     if (item === "size") {
                         Object.assign(dockConfig.size, options.size);
                     } else {

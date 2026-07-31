@@ -1,8 +1,8 @@
-/** 配置项标题 */
+/** Title of a setting item */
 export const genConfigItemName = (title: string): string =>
     `<div class="config-name">${title}</div>`;
 
-/** 配置项左侧区域（标题 + 描述） */
+/** Left hand area of a setting item (title and description) */
 export const genConfigItemMainHtml = (title: string, desc?: string): string =>
     `<div class="fn__flex-1">
     ${genConfigItemName(title)}
@@ -19,7 +19,7 @@ export const genSwitchRow = (id: string, title: string, desc: string | undefined
     ${genSwitchInputHtml(id, checked)}
 </label>`;
 
-/** 列表项开关（`b3-list-item` 布局） */
+/** Switch rendered as a list item (`b3-list-item` layout) */
 export const genListSwitchItemHtml = (id: string, label: string, checked: boolean): string =>
     `<label class="b3-list-item">
     <div class="fn__flex-1 ft__on-surface">${label}</div>
@@ -27,7 +27,7 @@ export const genListSwitchItemHtml = (id: string, label: string, checked: boolea
     ${genSwitchInputHtml(id, checked)}
 </label>`;
 
-/** 为指定 `id` 的密码框绑定显隐图标（与 `textBlock` 中 `input-password` 分支的 DOM 结构配套） */
+/** Binds the show / hide icon of the password box with the given `id` (matches the DOM the `input-password` branch of `textBlock` renders) */
 export const bindPasswordIconaToggle = (root: HTMLElement, inputId: string): void => {
     root.querySelector<HTMLElement>(`#${CSS.escape(inputId)} + .b3-form__icona-icon[data-action="togglePassword"]`)?.addEventListener("click", (event) => {
         const svg = event.currentTarget as SVGSVGElement;

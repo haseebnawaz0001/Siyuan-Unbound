@@ -1,7 +1,7 @@
 import {hasClosestByClassName} from "../util/hasClosest";
 
 export const removeEmbed = (element: Element, type: "outerHTML" | "innerHTML" = "outerHTML") => {
-    // 防止内容块引用嵌入的标签打断 lute 渲染
+    // Prevent a tag embedded via a content-block reference from breaking lute rendering
     // :zap:
     if (!element.querySelector("[data-type='block-render']")) {
         return element[type];

@@ -11,29 +11,29 @@ import { plantumlRender } from "./render/plantumlRender";
 import "../assets/scss/export.scss";
 
 class Protyle {
-    /** 对 graphviz 进行渲染 */
+    /** Render graphviz */
     public static graphvizRender = graphvizRender;
-    /** 为 element 中的代码块进行高亮渲染 */
+    /** Render syntax highlighting for code blocks within an element */
     public static highlightRender = highlightRender;
-    /** 对数学公式进行渲染 */
+    /** Render math formulas */
     public static mathRender = mathRender;
-    /** 流程图/时序图/甘特图渲染 */
+    /** Render flowcharts/sequence diagrams/Gantt charts */
     public static mermaidRender = mermaidRender;
-    /** flowchart.js 渲染 */
+    /** Render flowchart.js */
     public static flowchartRender = flowchartRender;
-    /** 图表渲染 */
+    /** Render charts */
     public static chartRender = chartRender;
-    /** 五线谱渲染 */
+    /** Render staff notation */
     public static abcRender = abcRender;
-    /** 脑图渲染 */
+    /** Render mind maps */
     public static mindmapRender = mindmapRender;
-    /** UML 渲染 */
+    /** Render UML */
     public static plantumlRender = plantumlRender;
-    /** html 块渲染 */
+    /** Render HTML blocks */
     public static htmlRender = htmlRender;
 }
 
-// 由于 https://github.com/siyuan-note/siyuan/issues/7800，先临时解决一下
+// A temporary workaround for https://github.com/siyuan-note/siyuan/issues/7800
 window.Protyle = Protyle;
 
 export default Protyle;

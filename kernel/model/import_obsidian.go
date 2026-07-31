@@ -2401,4 +2401,5 @@ func removeObsidianTemp(taskID string) {
 	}
 }
 
-// Obsidian 导入保持独立实现，避免改变通用 Markdown 导入行为。
+// The Obsidian import keeps its own independent implementation, to avoid changing the behavior of the
+// generic Markdown import.

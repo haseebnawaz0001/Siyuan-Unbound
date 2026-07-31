@@ -16,7 +16,9 @@
 
 package util
 
-var CurrentCloudRegion = 0
+// CurrentCloudRegion selects the cloud endpoints: 0 is mainland China, 1 is North America. This English-first build
+// defaults to North America; InitConf overwrites it with the value persisted in conf.json.
+var CurrentCloudRegion = 1
 
 func IsChinaCloud() bool {
 	return 0 == CurrentCloudRegion
@@ -65,20 +67,20 @@ func GetCloudForumAssetsServer() string {
 }
 
 const (
-	chinaServer            = "https://siyuan-sync.b3logfile.com"    // 中国大陆云端服务地址，阿里云负载均衡，用于接口（数据同步文件上传、下载会走七牛云 OSS ChinaSyncServer）
-	chinaWebSocketServer   = "wss://siyuan-sync.b3logfile.com"      // 中国大陆云端 WebSocket 服务地址，阿里云负载均衡
-	chinaSyncServer        = "https://siyuan-data.b3logfile.com/"   // 中国大陆云端数据同步服务地址，七牛云 OSS，用于数据同步文件上传、下载
-	chinaCloudAssetsServer = "https://assets.b3logfile.com/siyuan/" // 中国大陆云端图床服务地址，用于导出预览模式下订阅会员渲染图床
-	chinaAccountServer     = "https://ld246.com"                    // 中国大陆链滴服务地址，用于账号登录、分享发布帖子
-	chinaForumAssetsServer = "https://b3logfile.com/file/"          // 中国大陆链滴图床服务地址，用于发布文章到社区
+	chinaServer            = "https://siyuan-sync.b3logfile.com"    // Mainland China cloud service address, Alibaba Cloud load balancer, used for the API (data sync file upload/download goes through Qiniu Cloud OSS ChinaSyncServer)
+	chinaWebSocketServer   = "wss://siyuan-sync.b3logfile.com"      // Mainland China cloud WebSocket service address, Alibaba Cloud load balancer
+	chinaSyncServer        = "https://siyuan-data.b3logfile.com/"   // Mainland China cloud data sync service address, Qiniu Cloud OSS, used for data sync file upload/download
+	chinaCloudAssetsServer = "https://assets.b3logfile.com/siyuan/" // Mainland China cloud image hosting service address, used to render subscriber-only images in export preview mode
+	chinaAccountServer     = "https://ld246.com"                    // Mainland China Liandi service address, used for account login and sharing/publishing posts
+	chinaForumAssetsServer = "https://b3logfile.com/file/"          // Mainland China Liandi image hosting service address, used for publishing articles to the community
 
-	northAmericaServer            = "https://siyuan-cloud.liuyun.io"   // 北美云端服务地址，Cloudflare，用于接口（数据同步文件上传、下载会走七牛云 OSS northAmericaSyncServer）
-	northAmericaWebSocketServer   = "wss://siyuan-cloud.liuyun.io"     // 北美云端 WebSocket 服务地址，Cloudflare，
-	northAmericaSyncServer        = "https://siyuan-data.liuyun.io/"   // 北美云端数据同步服务地址，七牛云 OSS，用于数据同步文件上传、下载
-	northAmericaCloudAssetsServer = "https://assets.liuyun.io/siyuan/" // 北美云端图床服务地址，用于导出预览模式下订阅会员渲染图床
-	northAmericaAccountServer     = "https://liuyun.io"                // 流云服务地址，用于账号登录、分享发布帖子
-	northAmericaForumAssetsServer = "https://assets.liuyun.io/file/"   // 北美云端图床服务地址，用于发布文章到社区
+	northAmericaServer            = "https://siyuan-cloud.liuyun.io"   // North America cloud service address, Cloudflare, used for the API (data sync file upload/download goes through Qiniu Cloud OSS northAmericaSyncServer)
+	northAmericaWebSocketServer   = "wss://siyuan-cloud.liuyun.io"     // North America cloud WebSocket service address, Cloudflare
+	northAmericaSyncServer        = "https://siyuan-data.liuyun.io/"   // North America cloud data sync service address, Qiniu Cloud OSS, used for data sync file upload/download
+	northAmericaCloudAssetsServer = "https://assets.liuyun.io/siyuan/" // North America cloud image hosting service address, used to render subscriber-only images in export preview mode
+	northAmericaAccountServer     = "https://liuyun.io"                // Liuyun service address, used for account login and sharing/publishing posts
+	northAmericaForumAssetsServer = "https://assets.liuyun.io/file/"   // North America cloud image hosting service address, used for publishing articles to the community
 
-	BazaarStatServer = "https://bazaar.b3logfile.com" // 集市包统计服务地址，七牛云，全球 CDN
-	BazaarOSSServer  = "https://oss.b3logfile.com"    // 云端对象存储地址，七牛云，仅用于读取集市包，全球 CDN
+	BazaarStatServer = "https://bazaar.b3logfile.com" // Bazaar package stats service address, Qiniu Cloud, global CDN
+	BazaarOSSServer  = "https://oss.b3logfile.com"    // Cloud object storage address, Qiniu Cloud, used only for reading bazaar packages, global CDN
 )

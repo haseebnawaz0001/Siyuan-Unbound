@@ -50,14 +50,14 @@ svg {
 }
 
 @media print {
-  // 尽量避免块内分页
+  // Try to avoid page breaks inside a block
   .protyle-wysiwyg [data-node-id] {
     &[data-type=NodeAudio],
     &.render-node[data-type=NodeCodeBlock],
     &[data-type=NodeHeading],
     &[data-type=NodeIFrame],
     &[data-type=NodeMathBlock],
-    // 移除段落块元素 https://github.com/siyuan-note/siyuan/issues/14702 &[data-type=NodeParagraph],
+    // Removed paragraph block element https://github.com/siyuan-note/siyuan/issues/14702 &[data-type=NodeParagraph],
     &[data-type=NodeThematicBreak],
     &[data-type=NodeVideo],
     &[data-type=NodeWidget],

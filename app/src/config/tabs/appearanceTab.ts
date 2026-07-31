@@ -164,7 +164,7 @@ const mountAppearanceFontFamily = (root: HTMLElement) => {
                         filterFontList();
                     });
                     inputElement.addEventListener("compositionend", filterFontList);
-                    // 列表点击委托，读取 dataset 应用选中逻辑
+                    // Delegated click handler for the list, the selection is applied from the dataset
                     listElement.addEventListener("click", (event) => {
                         const target = event.target as HTMLElement;
                         const itemEl = target.closest(".b3-list-item")?.querySelector(".b3-menu__label") as HTMLElement;
@@ -182,7 +182,7 @@ const mountAppearanceFontFamily = (root: HTMLElement) => {
             });
             const rect = fontFamilyEl.getBoundingClientRect();
             fontMenu.open({x: rect.left, y: rect.bottom, h: rect.height});
-            // 内部列表自行滚动，搜索框保持固定
+            // Let the inner list scroll on its own so that the search box stays in place
             fontMenu.element.querySelector(".b3-menu__items").setAttribute("style", "overflow: initial");
             fontMenu.element.querySelector("input").focus();
         });
@@ -436,7 +436,7 @@ const registerAppearanceControlsGroup = (tab: SettingTabBuilder) => {
             control: desktopModeControl,
             save: (value) => {
                 desktopModeCookie.set(value as boolean);
-                // 切换桌面/移动模式需要重启应用才能加载对应 bundle，走正常退出流程后由用户手动重启
+                // Switching between desktop and mobile mode requires a restart to load the matching bundle, so exit normally and let the user start the app again
                 void exitSiYuan();
             },
         }],
@@ -538,7 +538,7 @@ const NOTIFICATIONS_ITEMS: { field: keyof Config.IAppearanceNotifications; label
 
 const genNotificationsDialogHtml = (): string => {
     const notifications = window.siyuan.config.appearance.notifications;
-    // 默认启用：字段为 undefined（旧配置未迁移）或 true 时开关勾选
+    // Enabled by default: the switch is checked when the field is true or undefined, the latter meaning an unmigrated legacy config
     const listItems = NOTIFICATIONS_ITEMS.map(({field, labelKey}) =>
         genListSwitchItemHtml(field, window.siyuan.languages[labelKey], notifications?.[field] !== false)
     ).join("");

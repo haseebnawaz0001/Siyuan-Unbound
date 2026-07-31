@@ -53,10 +53,10 @@ import (
 
 type File struct {
 	Path         string `json:"path"`
-	Name         string `json:"name"` // 标题，即 ial["title"]
+	Name         string `json:"name"` // Title, i.e. ial["title"]
 	TitleEmpty   bool   `json:"titleEmpty,omitempty"`
 	Icon         string `json:"icon"`
-	Name1        string `json:"name1"` // 命名，即 ial["name"]
+	Name1        string `json:"name1"` // Name, i.e. ial["name"]
 	Alias        string `json:"alias"`
 	Memo         string `json:"memo"`
 	Bookmark     string `json:"bookmark"`
@@ -123,9 +123,11 @@ func (box *Box) docIAL(p string) (ret map[string]string) {
 	filePath := filepath.Join(util.DataDir, box.ID, p)
 	ret = filesys.DocIAL(filePath)
 	if 1 > len(ret) {
-		// 加密笔记本的 .sy 解密失败（DEK 未缓存或 box 未解锁）时不应视为损坏，
-		// 否则文件会被 moveCorruptedData 移走导致数据丢失。
-		// 使用解析后的文件路径反查实际 boxID（可能因 symlink 或路径穿越指向加密 box）
+		// When decrypting a .sy file of an encrypted notebook fails (DEK not cached or box not unlocked), it
+		// should not be treated as corruption; otherwise the file would be moved away by moveCorruptedData,
+		// causing data loss.
+		// Resolve the actual boxID from the resolved file path (it may point to an encrypted box via a
+		// symlink or path traversal)
 		actualBoxID := ExtractBoxIDFromAssetsPath(filePath)
 		if (actualBoxID != "" && IsEncryptedBox(actualBoxID)) || IsEncryptedBox(box.ID) {
 			logging.LogWarnf("properties not found in encrypted file [%s], skip moveCorruptedData", filePath)
@@ -429,7 +431,7 @@ func ListDocTree(boxID, listPath string, sortMode int, flashcard, showHidden boo
 			continue
 		} else {
 			if strings.HasSuffix(file.name, ".sy") && !ast.IsNodeIDPattern(strings.TrimSuffix(file.name, ".sy")) {
-				// 不以块 ID 命名的 .sy 文件不应该被加载到思源中 https://github.com/siyuan-note/siyuan/issues/16089
+				// A .sy file not named after a block ID should not be loaded into SiYuan https://github.com/siyuan-note/siyuan/issues/16089
 				continue
 			}
 		}
@@ -587,8 +589,9 @@ func GetDoc(startID, endID, id string, index int, query string, queryTypes, quer
 	return GetDocInBox(startID, endID, id, index, query, queryTypes, querySubTypes, queryMethod, mode, size, isBacklink, originalRefBlockIDs, highlight, "")
 }
 
-// GetDocInBox 与 GetDoc 一致，但按 boxID 路由到加密 db 或全局 db。
-// 加密笔记本打开文档时传入 boxID，blocktree/content 查询走加密 db；boxID 为空时 fall-through 全局 db。
+// GetDocInBox behaves the same as GetDoc, but routes to the encrypted db or the global db based on boxID.
+// When opening a document in an encrypted notebook, boxID is passed in and blocktree/content queries go
+// through the encrypted db; when boxID is empty it falls through to the global db.
 func GetDocInBox(startID, endID, id string, index int, query string, queryTypes, querySubTypes map[string]bool, queryMethod, mode int, size int, isBacklink bool, originalRefBlockIDs map[string]string, highlight bool, boxID string) (
 	blockCount int, dom, parentID, parent2ID, rootID, typ string, eof, scroll bool, boxIDOut, docPath string, isBacklinkExpand bool, keywords []string, err error) {
 	//os.MkdirAll("pprof", 0755)
@@ -596,14 +599,14 @@ func GetDocInBox(startID, endID, id string, index int, query string, queryTypes,
 	//pprof.StartCPUProfile(cpuProfile)
 	//defer pprof.StopCPUProfile()
 
-	FlushTxQueue() // 写入数据时阻塞，避免获取到的数据不一致
+	FlushTxQueue() // Block while data is being written, to avoid retrieving inconsistent data
 
 	inputIndex := index
 	tree, err := loadTreeByBlockIDInBox(id, boxID)
 	if err != nil {
 		if errors.Is(err, ErrBlockNotFound) {
 			if 0 == mode {
-				err = ErrTreeNotFound // 初始化打开文档时如果找不到则关闭编辑器
+				err = ErrTreeNotFound // Close the editor if the block is not found while initially opening the document
 			}
 		}
 		return
@@ -631,10 +634,10 @@ func GetDocInBox(startID, endID, id string, index int, query string, queryTypes,
 	boxIDOut = node.Box
 	docPath = node.Path
 	if isDoc {
-		if 4 == mode { // 加载文档末尾
+		if 4 == mode { // Load the end of the document
 			node = node.LastChild
 			located = true
-			// 重新计算 index
+			// Recompute index
 			ast.Walk(tree.Root, func(n *ast.Node, entering bool) ast.WalkStatus {
 				if !entering {
 					return ast.WalkContinue
@@ -658,7 +661,7 @@ func GetDocInBox(startID, endID, id string, index int, query string, queryTypes,
 				if index == idx {
 					node = n.DocChild()
 					if "1" == node.IALAttr("heading-fold") {
-						// 加载到折叠标题下方块的话需要回溯到上方标题块
+						// If we landed on a block under a folded heading, walk back up to the heading block above it
 						for h := node.Previous; nil != h; h = h.Previous {
 							if "1" == h.IALAttr("fold") {
 								node = h
@@ -674,7 +677,7 @@ func GetDocInBox(startID, endID, id string, index int, query string, queryTypes,
 		}
 	} else {
 		if 0 == index && 0 != mode {
-			// 非文档且没有指定 index 时需要计算 index
+			// When it's not a document and no index is specified, the index needs to be computed
 			ast.Walk(tree.Root, func(n *ast.Node, entering bool) ast.WalkStatus {
 				if !entering {
 					return ast.WalkContinue
@@ -716,7 +719,7 @@ func GetDocInBox(startID, endID, id string, index int, query string, queryTypes,
 		parent2ID = parentID
 		tmp := node
 		if ast.NodeListItem == node.Type {
-			// 列表项聚焦返回和面包屑保持一致 https://github.com/siyuan-note/siyuan/issues/4914
+			// Keep list item focus return consistent with the breadcrumb https://github.com/siyuan-note/siyuan/issues/4914
 			tmp = node.Parent
 		}
 		if headingParent := treenode.HeadingParent(tmp); nil != headingParent {
@@ -728,7 +731,7 @@ func GetDocInBox(startID, endID, id string, index int, query string, queryTypes,
 		typ = node.Type.String()
 	}
 
-	// 判断是否需要显示动态加载滚动条 https://github.com/siyuan-note/siyuan/issues/7693
+	// Determine whether the dynamic-load scrollbar needs to be shown https://github.com/siyuan-note/siyuan/issues/7693
 	childCount := 0
 	ast.Walk(tree.Root, func(n *ast.Node, entering bool) ast.WalkStatus {
 		if !entering {
@@ -750,17 +753,20 @@ func GetDocInBox(startID, endID, id string, index int, query string, queryTypes,
 
 	var nodes []*ast.Node
 	if isBacklink {
-		// 引用计数浮窗请求，需要按照反链逻辑组装 https://github.com/siyuan-note/siyuan/issues/6853
+		// Reference-count popover request, needs to be assembled following the backlink logic https://github.com/siyuan-note/siyuan/issues/6853
 		nodes, isBacklinkExpand = getBacklinkRenderNodes(node, originalRefBlockIDs)
 	} else {
-		// 如果同时存在 startID 和 endID，并且是动态加载的情况，则只加载 startID 和 endID 之间的块 [startID, endID]
+		// If both startID and endID are present and it's a dynamic-load scenario, only load the blocks between
+		// startID and endID [startID, endID]
 		if "" != startID && "" != endID && scroll {
 			nodes, eof = loadNodesByStartEnd(tree, startID, endID)
 			if 1 > len(nodes) {
-				// 按 mode 加载兜底
+				// Fall back to loading by mode
 				nodes, eof = loadNodesByMode(node, inputIndex, mode, size, isDoc, isHeading)
 			} else {
-				// 文档块没有指定 index 时需要计算 index，否则初次打开文档时 node-index 会为 0，导致首次 Ctrl+Home 无法回到顶部
+				// The index needs to be computed when the document block has no specified index; otherwise
+				// node-index would be 0 when the document is first opened, preventing the first Ctrl+Home from
+				// returning to the top
 				ast.Walk(tree.Root, func(n *ast.Node, entering bool) ast.WalkStatus {
 					if !entering {
 						return ast.WalkContinue
@@ -784,7 +790,7 @@ func GetDocInBox(startID, endID, id string, index int, query string, queryTypes,
 	subTree := &parse.Tree{ID: rootID, Root: &ast.Node{Type: ast.NodeDocument}, Marks: tree.Marks}
 
 	query = filterQueryInvisibleChars(query)
-	if "" != query && (0 == queryMethod || 1 == queryMethod || 3 == queryMethod) { // 只有关键字、查询语法和正则表达式搜索支持高亮
+	if "" != query && (0 == queryMethod || 1 == queryMethod || 3 == queryMethod) { // Only keyword, query-syntax and regexp search support highlighting
 		typeFilter := buildTypeFilter(queryTypes, querySubTypes)
 		switch queryMethod {
 		case 0:
@@ -798,7 +804,8 @@ func GetDocInBox(startID, endID, id string, index int, query string, queryTypes,
 	}
 
 	existKeywords := 0 < len(keywords)
-	// 在 AppendChild 搬移节点前先做完顶层单点查询，避免兄弟链被改写后 IsInFoldedHeading 误判
+	// Finish the top-level single-node lookup before AppendChild moves nodes, to avoid IsInFoldedHeading
+	// giving a wrong result once the sibling chain has been rewritten
 	topInFoldedHeading := map[string]bool{}
 	for _, n := range nodes {
 		if treenode.IsInFoldedHeading(n, nil) {
@@ -808,15 +815,17 @@ func GetDocInBox(startID, endID, id string, index int, query string, queryTypes,
 	for _, n := range nodes {
 		var unlinks []*ast.Node
 
-		// 顶层块整体位于折叠标题下方时用单点查询判断（不依赖子块 heading-fold）：
-		// 非当前 ID 的悬浮或文档加载场景整块剔除；当前 ID 的悬浮保留
+		// When a top-level block as a whole sits under a folded heading, decide via the single-node lookup
+		// (without relying on the child's heading-fold): drop the whole block when it's a hover on a
+		// different ID or a document-load scenario; keep it when it's a hover on the current ID
 		// The referenced block under the folded heading cannot be hovered to view https://github.com/siyuan-note/siyuan/issues/9582
 		nInFoldedHeading := topInFoldedHeading[n.ID]
 		if nInFoldedHeading && ((0 != mode && id != n.ID) || isDoc) {
 			continue
 		}
 
-		// 一次正向扫描收集 n 子树内被折叠标题盖住的后代，避免逐块 O(N²) 回溯 IsInFoldedHeading
+		// A single forward scan collects the descendants within the n subtree that are hidden by a folded
+		// heading, avoiding an O(N^2) per-block backtrack through IsInFoldedHeading
 		foldHidden := map[*ast.Node]bool{}
 		for _, h := range treenode.CollectFoldHiddenNodes(n) {
 			foldHidden[h] = true
@@ -829,19 +838,20 @@ func GetDocInBox(startID, endID, id string, index int, query string, queryTypes,
 
 			if n.IsBlock() {
 				if foldHidden[n] {
-					// 被嵌套折叠标题盖住的整棵子树剔除，无需继续递归其内部
+					// Drop the whole subtree hidden by a nested folded heading; no need to recurse into it further
 					unlinks = append(unlinks, n)
 					return ast.WalkSkipChildren
 				}
 
 				if !nInFoldedHeading && "1" == n.IALAttr("heading-fold") {
-					// 标题已展开但子块仍残留 heading-fold 时清理，避免列表等嵌套块渲染为空
+					// Clean up a leftover heading-fold attribute on a child block after its heading has been
+					// expanded, to avoid nested blocks such as lists rendering as empty
 					n.RemoveIALAttr("heading-fold")
 					n.RemoveIALAttr("fold")
 				}
 
 				if avs := n.IALAttr(av.NodeAttrNameAvs); "" != avs {
-					// 填充属性视图角标 Display the database title on the block superscript https://github.com/siyuan-note/siyuan/issues/10545
+					// Populate the attribute view superscript Display the database title on the block superscript https://github.com/siyuan-note/siyuan/issues/10545
 					avNames := getAvNames(n.IALAttr(av.NodeAttrNameAvs))
 					if "" != avNames {
 						n.SetIALAttr(av.NodeAttrViewNames, avNames)
@@ -849,7 +859,7 @@ func GetDocInBox(startID, endID, id string, index int, query string, queryTypes,
 				}
 
 				if "" != n.ID {
-					// 填充块引计数
+					// Populate the block ref count
 					if cnt := refCount[n.ID]; 0 < cnt {
 						n.SetIALAttr("refcount", strconv.Itoa(cnt))
 					}
@@ -859,7 +869,7 @@ func GetDocInBox(startID, endID, id string, index int, query string, queryTypes,
 					inlines := n.ChildrenByType(ast.NodeTextMark)
 					for _, inline := range inlines {
 						if inline.IsTextMarkType("inline-memo") && util.ContainsSubStr(inline.TextMarkInlineMemoContent, keywords) {
-							// 支持行级备注搜索定位 https://github.com/siyuan-note/siyuan/issues/13465
+							// Support locating inline-memo search results https://github.com/siyuan-note/siyuan/issues/13465
 							keywords = append(keywords, inline.TextMarkTextContent)
 						}
 					}
@@ -875,7 +885,7 @@ func GetDocInBox(startID, endID, id string, index int, query string, queryTypes,
 					}
 					if hitBlock {
 						if ast.NodeCodeBlockCode == n.Type && !treenode.IsChartCodeBlockCode(n) {
-							// 支持代码块搜索定位 https://github.com/siyuan-note/siyuan/issues/5520
+							// Support locating code block search results https://github.com/siyuan-note/siyuan/issues/5520
 							code := string(n.Tokens)
 							markedCode := search.EncloseHighlighting(code, keywords, search.SearchMarkLeft, search.SearchMarkRight, Conf.Search.CaseSensitive, false)
 							if code != markedCode {
@@ -933,7 +943,8 @@ func foldedHiddenSiblings(anchor *ast.Node) (hidden map[string]bool) {
 	return
 }
 
-// foldHeadingStackBefore 通过扫描 node 之前的同级兄弟节点，构造到达 node 之前（不含 node）的折叠层级栈。
+// foldHeadingStackBefore scans the sibling nodes before node to build the fold-level stack up to but not
+// including node.
 func foldHeadingStackBefore(node *ast.Node) (stack treenode.FoldHeadingStack) {
 	if nil == node || nil == node.Parent {
 		return
@@ -951,7 +962,7 @@ func loadNodesByStartEnd(tree *parse.Tree, startID, endID string) (nodes []*ast.
 		return
 	}
 
-	// 用折叠层级栈正向扫描跳过被折叠标题盖住的块
+	// Scan forward with the fold-level stack to skip blocks hidden by a folded heading
 	stack := foldHeadingStackBefore(node)
 	stack.Enter(node)
 	nodes = append(nodes, node)
@@ -972,7 +983,7 @@ func loadNodesByStartEnd(tree *parse.Tree, startID, endID string) (nodes []*ast.
 		}
 
 		if len(nodes) >= Conf.Editor.DynamicLoadBlocks {
-			// 如果加载到指定数量的块则停止加载
+			// Stop loading once the specified number of blocks has been loaded
 			break
 		}
 	}
@@ -980,11 +991,11 @@ func loadNodesByStartEnd(tree *parse.Tree, startID, endID string) (nodes []*ast.
 }
 
 func loadNodesByMode(node *ast.Node, inputIndex, mode, size int, isDoc, isHeading bool) (nodes []*ast.Node, eof bool) {
-	if 2 == mode /* 向下 */ {
+	if 2 == mode /* downward */ {
 		next := node.Next
 		if ast.NodeHeading == node.Type && "1" == node.IALAttr("fold") {
-			// 标题展开时进行动态加载导致重复内容 https://github.com/siyuan-note/siyuan/issues/4671
-			// 这里要考虑折叠标题是最后一个块的情况
+			// Dynamic loading while a heading is expanded caused duplicate content https://github.com/siyuan-note/siyuan/issues/4671
+			// This needs to account for the case where the folded heading is the last block
 			if children := treenode.HeadingChildren(node); 0 < len(children) {
 				next = children[len(children)-1].Next
 			}
@@ -996,15 +1007,17 @@ func loadNodesByMode(node *ast.Node, inputIndex, mode, size int, isDoc, isHeadin
 		}
 	}
 
-	// 一次正向扫描顶层同级子块，标记被折叠标题盖住的隐藏块，向上 / 双向遍历据此判断，避免逐块 O(N²) 回溯
+	// A single forward scan over the top-level sibling blocks marks blocks hidden by a folded heading; upward /
+	// bidirectional traversal uses this to decide, avoiding an O(N^2) per-block backtrack
 	hidden := foldedHiddenSiblings(node)
 
 	count := 0
 	switch mode {
-	case 0: // 仅加载当前 ID
+	case 0: // Load only the current ID
 		nodes = append(nodes, node)
 		if isDoc {
-			// 用折叠层级栈正向扫描顶层同级子块（含 node 自身折叠），避免嵌套折叠漏网
+			// Scan forward over the top-level sibling blocks with the fold-level stack (including node's own
+			// fold state), to avoid missing nested folds
 			stack := foldHeadingStackBefore(node)
 			stack.Enter(node)
 			for n := node.Next; nil != n; n = n.Next {
@@ -1023,8 +1036,9 @@ func loadNodesByMode(node *ast.Node, inputIndex, mode, size int, isDoc, isHeadin
 				}
 			}
 		} else if isHeading {
-			// 聚焦标题：先把当前标题入栈，自身 fold=1 时不摊开下方内容（与旧 IsInFoldedHeading(n, node) 一致）；
-			// 未折叠时仍用栈省略更深嵌套折叠 https://github.com/siyuan-note/siyuan/issues/4997
+			// Focused heading: push the current heading onto the stack first; when it is itself fold=1, do not
+			// expand the content below it (consistent with the old IsInFoldedHeading(n, node)); when not
+			// folded, the stack is still used to skip deeper nested folds https://github.com/siyuan-note/siyuan/issues/4997
 			level := node.HeadingLevel
 			var stack treenode.FoldHeadingStack
 			stack.Enter(node)
@@ -1043,7 +1057,7 @@ func loadNodesByMode(node *ast.Node, inputIndex, mode, size int, isDoc, isHeadin
 				}
 			}
 		}
-	case 4: // Ctrl+End 跳转到末尾后向上加载
+	case 4: // Load upward after Ctrl+End jumps to the end
 		for n := node; nil != n; n = n.Previous {
 			if hidden[n.ID] {
 				continue
@@ -1059,8 +1073,8 @@ func loadNodesByMode(node *ast.Node, inputIndex, mode, size int, isDoc, isHeadin
 			}
 		}
 		eof = true
-	case 1: // 向上加载
-		for n := node.Previous; /* 从上一个节点开始加载 */ nil != n; n = n.Previous {
+	case 1: // Load upward
+		for n := node.Previous; /* start loading from the previous node */ nil != n; n = n.Previous {
 			if hidden[n.ID] {
 				continue
 			}
@@ -1075,12 +1089,12 @@ func loadNodesByMode(node *ast.Node, inputIndex, mode, size int, isDoc, isHeadin
 			}
 		}
 		eof = nil == node.Previous
-	case 2: // 向下加载
-		// 先恢复到 node 处的折叠栈（含 node 自身），与旧 IsInFoldedHeading(n, node) 一致：
-		// 若 node 为折叠标题，则跳过其下方被盖住的块
+	case 2: // Load downward
+		// First restore the fold stack at node (including node itself), consistent with the old
+		// IsInFoldedHeading(n, node): if node is a folded heading, skip the blocks hidden below it
 		stack := foldHeadingStackBefore(node)
 		stack.Enter(node)
-		for n := node.Next; /* 从下一个节点开始加载 */ nil != n; n = n.Next {
+		for n := node.Next; /* start loading from the next node */ nil != n; n = n.Next {
 			stack.Enter(n)
 			if stack.Hidden() {
 				continue
@@ -1095,7 +1109,7 @@ func loadNodesByMode(node *ast.Node, inputIndex, mode, size int, isDoc, isHeadin
 				break
 			}
 		}
-	case 3: // 上下都加载
+	case 3: // Load both upward and downward
 		for n := node; nil != n; n = n.Previous {
 			if hidden[n.ID] {
 				continue
@@ -1108,7 +1122,7 @@ func loadNodesByMode(node *ast.Node, inputIndex, mode, size int, isDoc, isHeadin
 			}
 			if 0 < inputIndex {
 				if 1 < count {
-					break // 滑块指示器加载
+					break // Load for the slider indicator
 				}
 			} else {
 				if size < count {
@@ -1202,12 +1216,12 @@ func DuplicateDoc(tree *parse.Tree) {
 			return ast.WalkContinue
 		}
 
-		// 复制为副本时移除数据库绑定状态 https://github.com/siyuan-note/siyuan/issues/12294
+		// Remove database binding state when duplicating a copy https://github.com/siyuan-note/siyuan/issues/12294
 		n.RemoveIALAttr(av.NodeAttrNameAvs)
 		n.RemoveIALAttr(av.NodeAttrViewNames)
 		n.RemoveIALAttrsByPrefix(av.NodeAttrViewStaticText)
 
-		// 复制为副本时移除闪卡相关属性 https://github.com/siyuan-note/siyuan/issues/13987
+		// Remove flashcard-related attributes when duplicating a copy https://github.com/siyuan-note/siyuan/issues/13987
 		n.RemoveIALAttr(NodeAttrRiffDecks)
 
 		return ast.WalkContinue
@@ -1278,7 +1292,7 @@ func CreateWithMarkdown(tags, boxID, hPath, md, parentID, id string, withMath bo
 	}
 	luteEngine.SetHTMLTag2TextMark(true)
 	if strings.HasPrefix(clippingHref, "https://ld246.com/article/") || strings.HasPrefix(clippingHref, "https://liuyun.io/article/") {
-		// 改进链滴剪藏 https://github.com/siyuan-note/siyuan/issues/13117
+		// Improve Liandi clipping https://github.com/siyuan-note/siyuan/issues/13117
 		enableLuteInlineSyntax(luteEngine)
 	}
 	dom := luteEngine.Md2BlockDOM(md, false)
@@ -1566,7 +1580,7 @@ func MoveDocs(fromPaths []string, toBoxID, toPath string, callback any) (err err
 	}
 
 	if 1 == len(fromPaths) {
-		// 移动到自己的父文档下的情况相当于不移动，直接返回
+		// Moving a document into its own parent document is equivalent to not moving it, so return directly
 		if fromBox := pathsBoxes[fromPaths[0]]; nil != fromBox && fromBox.ID == toBoxID {
 			parentDir := path.Dir(fromPaths[0])
 			if ("/" == toPath && "/" == parentDir) || (parentDir+".sy" == toPath) {
@@ -1575,7 +1589,7 @@ func MoveDocs(fromPaths []string, toBoxID, toPath string, callback any) (err err
 		}
 	}
 
-	// 检查路径深度是否超过限制
+	// Check whether the path depth exceeds the limit
 	for fromPath, fromBox := range pathsBoxes {
 		childDepth := util.GetChildDocDepth(filepath.Join(util.DataDir, fromBox.ID, fromPath))
 		if depth := strings.Count(toPath, "/") + childDepth; 6 < depth && !Conf.FileTree.AllowCreateDeeper {
@@ -1584,8 +1598,10 @@ func MoveDocs(fromPaths []string, toBoxID, toPath string, callback any) (err err
 		}
 	}
 
-	// 禁止跨加密边界移动文档：加密笔记本是孤岛，不同加密笔记本各有独立 DEK，
-	// 跨边界移动（普通↔加密、加密 A↔加密 B）会导致密文用错 DEK 损坏数据
+	// Forbid moving documents across encryption boundaries: an encrypted notebook is an isolated island, and
+	// different encrypted notebooks each have their own independent DEK; moving across the boundary
+	// (regular <-> encrypted, encrypted A <-> encrypted B) would use the wrong DEK on the ciphertext and
+	// corrupt the data
 	for _, fromBox := range pathsBoxes {
 		if fromBox.ID != toBox.ID && !IsSameCryptoBoundary(fromBox.ID, toBox.ID) {
 			err = errors.New(Conf.Language(313))
@@ -1694,7 +1710,7 @@ func moveDoc(fromBox *Box, fromPath string, toBox *Box, toPath string, luteEngin
 
 	needMoveSubDocs := fromBox.Exist(fromFolder)
 	if needMoveSubDocs {
-		// 移动子文档文件夹
+		// Move the sub-document folder
 
 		newFolder := path.Join(toFolder, tree.ID)
 		if isSameBox {
@@ -1749,7 +1765,7 @@ func moveDoc(fromBox *Box, fromPath string, toBox *Box, toPath string, luteEngin
 	}
 
 	if needMoveSubDocs {
-		// 将其所有子文档的移动事件推送到前端 https://github.com/siyuan-note/siyuan/issues/11661
+		// Push move events for all of its sub-documents to the frontend https://github.com/siyuan-note/siyuan/issues/11661
 		subDocsFolder := path.Join(toFolder, tree.ID)
 		syFiles := listSyFiles(path.Join(toBox.ID, subDocsFolder))
 		for _, syFile := range syFiles {
@@ -1880,7 +1896,7 @@ func removeDoc(box *Box, p string, luteEngine *lute.Lute) (ret *parse.Tree, err 
 	}
 
 	generateAvHistoryInTree(ret, historyDir)
-	// 加密笔记本的 assets 不提升到全局
+	// Assets of an encrypted notebook are not promoted to the global assets directory
 	if !IsEncryptedBox(box.ID) {
 		copyDocAssetsToDataAssets(box.ID, p)
 	}
@@ -1946,9 +1962,9 @@ func removeDoc(box *Box, p string, luteEngine *lute.Lute) (ret *parse.Tree, err 
 }
 
 func removeDoc0(tree *parse.Tree, childrenDir string) {
-	// 收集引用的定义块 ID
+	// Collect the IDs of referenced definition blocks
 	refDefIDs := getRefDefIDs(tree.Root)
-	// 推送定义节点引用计数
+	// Push the definition node's ref count
 	for _, defID := range refDefIDs {
 		task.AppendAsyncTaskWithDelay(task.SetDefRefCount, util.SQLFlushInterval, refreshRefCount, defID)
 	}
@@ -1988,7 +2004,7 @@ func renameDoc0(boxID, p, title string) (err error) {
 
 	title = normalizeDocTitle(title)
 	if 512 < utf8.RuneCountInString(title) {
-		// 限制笔记本名和文档名最大长度为 `512` https://github.com/siyuan-note/siyuan/issues/6299
+		// Limit the maximum length of notebook names and document titles to `512` https://github.com/siyuan-note/siyuan/issues/6299
 		return errors.New(Conf.Language(106))
 	}
 
@@ -1997,7 +2013,7 @@ func renameDoc0(boxID, p, title string) (err error) {
 		title = Conf.language(16)
 		isEmpty = true
 	}
-	// 先规范化输入得到实际会存储的标题，再与旧标题比较
+	// First normalize the input to get the title that will actually be stored, then compare it to the old title
 	titleChanged := tree.Root.IALAttr("title") != title
 
 	var emptyAttrUpdated bool
@@ -2006,7 +2022,7 @@ func renameDoc0(boxID, p, title string) (err error) {
 		tree.Root.SetIALAttr("title", title)
 	}
 
-	// 按需同步“无标题”标记（仅更新 IAL，不触发子树重命名等）
+	// Sync the "untitled" flag as needed (only updates the IAL, does not trigger subtree renaming, etc.)
 	isTitleEmpty := tree.Root.IALAttr(NodeAttrTitleEmpty) == "true"
 	if isTitleEmpty != isEmpty {
 		if isEmpty {
@@ -2031,7 +2047,7 @@ func renameDoc0(boxID, p, title string) (err error) {
 				continue
 			}
 
-			subTree, loadErr := filesys.LoadTree(box.ID, subFile.path, luteEngine) // LoadTree 会重新构造 HPath
+			subTree, loadErr := filesys.LoadTree(box.ID, subFile.path, luteEngine) // LoadTree reconstructs HPath
 			if loadErr != nil {
 				continue
 			}
@@ -2065,7 +2081,7 @@ func createDoc(boxID, p, title, dom string, titleEmpty bool) (tree *parse.Tree, 
 	p = normalizeBoxDocPath(boxID, p)
 	title = normalizeDocTitle(title)
 	if 512 < utf8.RuneCountInString(title) {
-		// 限制笔记本名和文档名最大长度为 `512` https://github.com/siyuan-note/siyuan/issues/6299
+		// Limit the maximum length of notebook names and document titles to `512` https://github.com/siyuan-note/siyuan/issues/6299
 		err = errors.New(Conf.Language(106))
 		return
 	}
@@ -2143,7 +2159,7 @@ func createDoc(boxID, p, title, dom string, titleEmpty bool) (tree *parse.Tree, 
 		tree.Root.AppendChild(treenode.NewParagraph(""))
 	}
 
-	// 如果段落块中仅包含一个 mp3/mp4 超链接，则将其转换为音视频块
+	// If a paragraph block contains only a single mp3/mp4 hyperlink, convert it into an audio/video block
 	// Convert mp3 and mp4 hyperlinks to audio and video when moving cloud inbox to docs https://github.com/siyuan-note/siyuan/issues/9778
 	var unlinks []*ast.Node
 	ast.Walk(tree.Root, func(n *ast.Node, entering bool) ast.WalkStatus {
@@ -2183,7 +2199,7 @@ func createDoc(boxID, p, title, dom string, titleEmpty bool) (tree *parse.Tree, 
 
 func normalizeDocTitle(title string) string {
 	title = strings.ReplaceAll(title, "/", "")
-	// 不要踢掉 零宽连字符，否则有的 Emoji 会变形 https://github.com/siyuan-note/siyuan/issues/11480
+	// Do not strip the zero-width joiner, otherwise some emoji will render incorrectly https://github.com/siyuan-note/siyuan/issues/11480
 	title = strings.ReplaceAll(title, string(gulu.ZWJ), "__@ZWJ@__")
 	title = util.RemoveInvalid(title)
 	title = strings.ReplaceAll(title, "__@ZWJ@__", string(gulu.ZWJ))

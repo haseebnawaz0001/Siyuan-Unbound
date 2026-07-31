@@ -208,7 +208,7 @@ func isRelatedSrcAvDocReferenced(destAvID string, docReferencedAvIDs, checkedAvI
 	checkedAvIDs[destAvID] = true
 
 	srcAvIDs := av.GetSrcAvIDs(destAvID)
-	srcAvIDs = gulu.Str.RemoveElem(srcAvIDs, destAvID) // 忽略自身关联
+	srcAvIDs = gulu.Str.RemoveElem(srcAvIDs, destAvID) // ignore self-relation
 	if 1 > len(srcAvIDs) {
 		return false
 	}
@@ -219,7 +219,7 @@ func isRelatedSrcAvDocReferenced(destAvID string, docReferencedAvIDs, checkedAvI
 		}
 	}
 
-	// 递归检查间接关联的 av
+	// recursively check indirectly related avs
 	for _, srcAvID := range srcAvIDs {
 		if isRelatedSrcAvDocReferenced(srcAvID, docReferencedAvIDs, checkedAvIDs) {
 			return true
@@ -255,8 +255,10 @@ func getAvIDs(tree *parse.Tree, allAvIDs []string) (ret []string) {
 func getAllAvIDs() (ret []string, err error) {
 	ret = []string{}
 
-	// 只扫全局 AV 目录。加密笔记本的 AV 存在笔记本级目录（密文），不参与全局枚举——
-	// 未引用清理功能在加密笔记本锁定时无法确认引用关系（loadTree 失败），枚举加密 AV 有误删风险
+	// Only scan the global AV directory. Encrypted notebooks' AVs live in the notebook-level directory
+	// (ciphertext) and are excluded from global enumeration -- the unreferenced-cleanup feature cannot
+	// confirm reference relationships while an encrypted notebook is locked (loadTree fails), so enumerating
+	// encrypted AVs risks accidental deletion
 	entries, err := os.ReadDir(filepath.Join(util.DataDir, "storage", "av"))
 	if nil != err {
 		return
@@ -337,7 +339,7 @@ func GetAttrViewAddingBlockDefaultValues(avID, viewID, groupID, previousBlockID,
 	}
 
 	if 1 > len(view.Filters) && !view.IsGroupView() {
-		// 没有过滤条件也没有分组条件时忽略
+		// ignore when there are neither filter conditions nor group conditions
 		return
 	}
 
@@ -352,7 +354,7 @@ func GetAttrViewAddingBlockDefaultValues(avID, viewID, groupID, previousBlockID,
 
 	ret = getAttrViewAddingBlockDefaultValues(attrView, view, groupView, previousBlockID, addingBlockID, true)
 	for _, value := range ret {
-		// 主键都不返回内容，避免闪烁 https://github.com/siyuan-note/siyuan/issues/15561#issuecomment-3184746195
+		// never return content for the primary key, to avoid flicker https://github.com/siyuan-note/siyuan/issues/15561#issuecomment-3184746195
 		if av.KeyTypeBlock == value.Type {
 			value.Block.Content = ""
 		}
@@ -364,13 +366,13 @@ func getAttrViewAddingBlockDefaultValues(attrView *av.AttributeView, view, group
 	ret = map[string]*av.Value{}
 
 	if 1 > len(view.Filters) && !view.IsGroupView() {
-		// 没有过滤条件也没有分组条件时忽略
+		// ignore when there are neither filter conditions nor group conditions
 		return
 	}
 
 	nearItem := getNearItem(attrView, view, groupView, previousItemID)
 
-	// 使用模板或汇总进行过滤或分组时，需要解析涉及到的其他字段
+	// when filtering or grouping by a template or rollup field, the other fields it involves must be resolved
 	templateRelevantKeys, rollupRelevantKeys := map[string][]*av.Key{}, map[string]*av.Key{}
 	for _, keyValues := range attrView.KeyValues {
 		if av.KeyTypeTemplate == keyValues.Key.Type {
@@ -395,7 +397,7 @@ func getAttrViewAddingBlockDefaultValues(attrView *av.AttributeView, view, group
 
 	filterKeyIDs := map[string]bool{}
 	if applyFilterDefaultValues(view.Filters, attrView, addingItemID, nearItem, templateRelevantKeys, rollupRelevantKeys, ret, filterKeyIDs) {
-		// 遇到 mAsset 过滤即结束全部默认值计算（保留原外层 return 语义）
+		// stop all default-value computation as soon as an mAsset filter is encountered (preserves the original outer return semantics)
 		return
 	}
 
@@ -411,13 +413,14 @@ func getAttrViewAddingBlockDefaultValues(attrView *av.AttributeView, view, group
 
 	newValue := getNewValueByNearItem(nearItem, groupKey, addingItemID)
 	if av.KeyTypeSelect == groupKey.Type || av.KeyTypeMSelect == groupKey.Type {
-		// 因为单选或多选只能按选项分组，并且可能存在空白分组（找不到临近项），所以单选或多选类型的分组字段使用分组值内容对应的选项
+		// select/multi-select fields can only be grouped by option, and a blank group may exist (no nearby item found),
+		// so for select/multi-select group fields, use the option corresponding to the group value's content
 		if opt := groupKey.GetOption(groupView.GetGroupValue()); nil != opt && groupValueDefault != groupView.GetGroupValue() {
 			if nil == newValue {
-				newValue = ret[groupKey.ID] // 如果没有临近项，则尝试从过滤结果中获取
+				newValue = ret[groupKey.ID] // if there is no nearby item, try to get it from the filter results
 			}
 			if nil == newValue {
-				newValue = keyValues.GetValue(addingItemID) // 尝试从已有值中获取
+				newValue = keyValues.GetValue(addingItemID) // try to get it from an existing value
 			}
 
 			if nil != newValue {
@@ -443,7 +446,7 @@ func getAttrViewAddingBlockDefaultValues(attrView *av.AttributeView, view, group
 						}
 					}
 
-					// 添加过滤结果选项的值
+					// add the option values from the filter results
 					if nil != ret[groupKey.ID] {
 						for _, v := range ret[groupKey.ID].MSelect {
 							if !av.MSelectExistOption(vals, v.Content) {
@@ -486,7 +489,7 @@ func getAttrViewAddingBlockDefaultValues(attrView *av.AttributeView, view, group
 	}
 
 	if nil != nearItem && filterKeyIDs[groupKey.ID] {
-		// 临近项不为空并且分组字段和过滤字段相同时，优先使用临近项 https://github.com/siyuan-note/siyuan/issues/15591
+		// when the nearby item is not empty and the group field is the same as the filter field, prefer the nearby item https://github.com/siyuan-note/siyuan/issues/15591
 		newValue = getNewValueByNearItem(nearItem, groupKey, addingItemID)
 		ret[groupKey.ID] = newValue
 
@@ -498,7 +501,7 @@ func getAttrViewAddingBlockDefaultValues(attrView *av.AttributeView, view, group
 	}
 
 	if nil == nearItem && !filterKeyIDs[groupKey.ID] {
-		// 没有临近项并且分组字段和过滤字段不同时，使用分组值
+		// when there is no nearby item and the group field differs from the filter field, use the group value
 		newValue = av.GetAttributeViewDefaultValue(ast.NewNodeID(), groupKey.ID, addingItemID, groupKey.Type, false)
 		if av.KeyTypeText == groupView.GroupVal.Type {
 			content := groupView.GroupVal.Text.Content
@@ -541,9 +544,11 @@ func getAttrViewAddingBlockDefaultValues(attrView *av.AttributeView, view, group
 	return
 }
 
-// applyFilterDefaultValues 递归遍历过滤节点树，对叶子节点计算新增行的默认值。
-// 分组节点只负责向下递归；叶子节点保留原扁平时代的默认值计算逻辑。
-// 返回 true 表示遇到 mAsset 过滤，调用方应立即结束全部默认值计算（保留原外层 return 语义）。
+// applyFilterDefaultValues recursively walks the filter node tree, computing default values for the new row
+// at each leaf node. Group nodes are only responsible for recursing further down; leaf nodes retain the
+// original default-value computation logic from the flat era.
+// Returns true if an mAsset filter is encountered, meaning the caller should immediately stop all default-value
+// computation (preserving the original outer return semantics).
 func applyFilterDefaultValues(filters []*av.ViewFilter, attrView *av.AttributeView, addingItemID string, nearItem av.Item,
 	templateRelevantKeys map[string][]*av.Key, rollupRelevantKeys map[string]*av.Key,
 	ret map[string]*av.Value, filterKeyIDs map[string]bool) (stop bool) {
@@ -590,7 +595,7 @@ func applyFilterDefaultValues(filters []*av.ViewFilter, attrView *av.AttributeVi
 					ret[keyValues.Key.ID] = getNewValueByNearItem(nearItem, keyValues.Key, addingItemID)
 				}
 			}
-			return true // 保留原语义：遇到 mAsset 过滤即结束默认值计算
+			return true // preserve original semantics: stop default-value computation as soon as an mAsset filter is encountered
 		}
 
 		newValue := filter.GetAffectValue(keyValues.Key, addingItemID)
@@ -907,17 +912,17 @@ func setAttributeViewGroup(attrView *av.AttributeView, view *av.View, group *av.
 	setAttrViewGroupStates(view, groupStates)
 
 	if view.Group.HideEmpty != oldHideEmpty {
-		if !oldHideEmpty && view.Group.HideEmpty { // 启用隐藏空分组
+		if !oldHideEmpty && view.Group.HideEmpty { // enabling hide-empty-groups
 			for _, g := range view.Groups {
 				groupViewable := sql.RenderGroupView(attrView, view, g, "")
-				// 必须经过渲染才能得到最终的条目数
+				// rendering is required to get the final item count
 				renderViewableInstance(groupViewable, view, attrView, 1, -1, false, "")
 				if g.GroupHidden == 0 && 1 > groupViewable.(av.Collection).CountItems() {
 					g.GroupHidden = 1
 				}
 			}
 		}
-		if oldHideEmpty && !view.Group.HideEmpty { // 禁用隐藏空分组
+		if oldHideEmpty && !view.Group.HideEmpty { // disabling hide-empty-groups
 			for _, g := range view.Groups {
 				groupViewable := sql.RenderGroupView(attrView, view, g, "")
 				renderViewableInstance(groupViewable, view, attrView, 1, -1, false, "")
@@ -928,14 +933,14 @@ func setAttributeViewGroup(attrView *av.AttributeView, view *av.View, group *av.
 		}
 	}
 
-	if firstInit || changeGroupField { // 首次设置分组时
+	if firstInit || changeGroupField { // when setting the group field for the first time
 		if groupKey := view.GetGroupKey(attrView); nil != groupKey {
 			if av.KeyTypeSelect == groupKey.Type || av.KeyTypeMSelect == groupKey.Type {
-				// 如果分组字段是单选或多选，则将分组排序方式改为按选项排序 https://github.com/siyuan-note/siyuan/issues/15534
+				// if the group field is select or multi-select, change the group sort order to sort by option https://github.com/siyuan-note/siyuan/issues/15534
 				view.Group.Order = av.GroupOrderSelectOption
 				sortGroupsBySelectOption(view, groupKey)
 			} else if av.KeyTypeCheckbox == groupKey.Type {
-				// 如果分组字段是复选框，则将分组排序改为手动排序，并且已勾选在前面
+				// if the group field is a checkbox, change the group sort order to manual sorting, with checked groups first
 				view.Group.Order = av.GroupOrderMan
 				checked := view.GetGroupByGroupValue(av.CheckboxCheckedStr)
 				unchecked := view.GetGroupByGroupValue("")
@@ -1096,14 +1101,14 @@ func ChangeAttrViewLayout(blockID, avID string, newLayout av.LayoutType) (err er
 
 		changed := false
 		attrs := parse.IAL2Map(node.KramdownIAL)
-		if blockID == bID { // 当前操作的镜像库
+		if blockID == bID { // the mirror database currently being operated on
 			attrs[av.NodeAttrView] = view.ID
 			node.AttributeViewType = string(view.LayoutType)
 			attrView.ViewID = view.ID
 			changed = true
 		} else {
 			if view.ID == attrs[av.NodeAttrView] {
-				// 仅更新和当前操作的镜像库指定的视图相同的镜像库
+				// only update mirror databases whose specified view is the same as the one currently being operated on
 				node.AttributeViewType = string(view.LayoutType)
 				changed = true
 			}
@@ -1432,16 +1437,16 @@ func AppendAttributeViewDetachedBlocksWithValues(avID string, blocksValues [][]*
 			keyValues.Values = append(keyValues.Values, v)
 
 			if av.KeyTypeSelect == v.Type || av.KeyTypeMSelect == v.Type {
-				// 保存选项 https://github.com/siyuan-note/siyuan/issues/12475
+				// save the option https://github.com/siyuan-note/siyuan/issues/12475
 				key, _ := attrView.GetKey(v.KeyID)
 				if nil != key && 0 < len(v.MSelect) {
 					for _, valOpt := range v.MSelect {
 						if opt := key.GetOption(valOpt.Content); nil == opt {
-							// 不存在的选项新建保存
+							// create and save a new option if it doesn't exist
 							opt = &av.SelectOption{Name: valOpt.Content, Color: valOpt.Color}
 							key.Options = append(key.Options, opt)
 						} else {
-							// 已经存在的选项颜色需要保持不变
+							// keep the color unchanged for an option that already exists
 							valOpt.Color = opt.Color
 						}
 					}
@@ -1466,9 +1471,10 @@ func AppendAttributeViewDetachedBlocksWithValues(avID string, blocksValues [][]*
 	return
 }
 
-// DuplicateAttributeViewRow 创建源行的纯文本副本，复制除主键、Rollup、Created、Updated 外的所有字段值，
-// 双向关联同步更新目标属性视图的反向关联列。新行 ID 由调用方（前端）生成并通过 newRowID 传入，
-// 副本插入到 previousItemID（通常为最后选中的条目）之后。
+// DuplicateAttributeViewRow creates a plain-text copy of the source row, copying every field value except
+// the primary key, Rollup, Created, and Updated fields. Two-way relations synchronize the reverse relation
+// column in the target attribute view. The new row's ID is generated by the caller (the frontend) and passed
+// in via newRowID; the copy is inserted after previousItemID (usually the last selected item).
 func DuplicateAttributeViewRow(tx *Transaction, avID, previousItemID, srcRowID, newRowID string) (err error) {
 	attrView, err := av.ParseAttributeView(avID)
 	if err != nil {
@@ -1494,7 +1500,7 @@ func DuplicateAttributeViewRow(tx *Transaction, avID, previousItemID, srcRowID, 
 
 	now := util.CurrentTimeMillis()
 
-	// 创建副本的主键值，强制为纯文本（非绑定块）
+	// create the copy's primary key value, forced to plain text (not a bound block)
 	blockContent := ""
 	if nil != srcBlockVal.Block {
 		blockContent = srcBlockVal.Block.Content
@@ -1511,7 +1517,8 @@ func DuplicateAttributeViewRow(tx *Transaction, avID, previousItemID, srcRowID, 
 	}
 	blockKeyValues.Values = append(blockKeyValues.Values, newBlockVal)
 
-	// 收集双向关联字段，循环结束后统一处理，避免跨属性视图重复 parse/save
+	// collect two-way relation fields and handle them together after the loop, to avoid repeated parse/save
+	// across attribute views
 	type pendingTwoWay struct {
 		key *av.Key
 		val *av.Value
@@ -1520,15 +1527,15 @@ func DuplicateAttributeViewRow(tx *Transaction, avID, previousItemID, srcRowID, 
 
 	for _, keyValues := range attrView.KeyValues {
 		if av.KeyTypeBlock == keyValues.Key.Type {
-			continue // 主键已处理
+			continue // primary key already handled
 		}
 		if av.KeyTypeRollup == keyValues.Key.Type || av.KeyTypeCreated == keyValues.Key.Type || av.KeyTypeUpdated == keyValues.Key.Type {
-			continue // 汇总/创建时间/更新时间字段在渲染或自动生成时处理，不复制
+			continue // rollup/created/updated fields are handled during rendering or auto-generation, so don't copy them
 		}
 
 		srcVal := keyValues.GetValue(srcRowID)
 		if nil == srcVal {
-			continue // 源行该字段无值，跳过
+			continue // the source row has no value for this field, skip it
 		}
 
 		newVal := srcVal.Clone()
@@ -1542,10 +1549,10 @@ func DuplicateAttributeViewRow(tx *Transaction, avID, previousItemID, srcRowID, 
 		newVal.UpdatedAt = now
 		newVal.IsRenderAutoFill = false
 		if nil != newVal.Relation {
-			newVal.Relation.Contents = nil // 清除渲染期数据
+			newVal.Relation.Contents = nil // clear render-time data
 		}
 
-		// 单选/多选选项同步，保证目标属性视图存在对应选项 https://github.com/siyuan-note/siyuan/issues/12475
+		// sync select/multi-select options to ensure the corresponding option exists in the attribute view https://github.com/siyuan-note/siyuan/issues/12475
 		if av.KeyTypeSelect == newVal.Type || av.KeyTypeMSelect == newVal.Type {
 			if 0 < len(newVal.MSelect) {
 				for _, valOpt := range newVal.MSelect {
@@ -1561,18 +1568,18 @@ func DuplicateAttributeViewRow(tx *Transaction, avID, previousItemID, srcRowID, 
 
 		keyValues.Values = append(keyValues.Values, newVal)
 
-		// 双向关联值收集，稍后统一更新目标属性视图的反向列
+		// collect two-way relation values, to update the target attribute view's reverse column together later
 		if av.KeyTypeRelation == newVal.Type && nil != keyValues.Key.Relation && keyValues.Key.Relation.IsTwoWay && 0 < len(newVal.Relation.BlockIDs) {
 			pendingTwoWays = append(pendingTwoWays, &pendingTwoWay{key: keyValues.Key, val: newVal})
 		}
 	}
 
-	// 在所有视图上添加新行，插入位置为 previousItemID 之后
+	// add the new row to all views, inserted right after previousItemID
 	for _, v := range attrView.Views {
 		addRowToViewItems(v, newRowID, previousItemID)
 	}
 
-	// 统一处理双向关联：按目标属性视图聚合，每个目标只 parse/save 一次
+	// handle two-way relations together: group by target attribute view, parse/save each target only once
 	twoWayByDestAv := map[string][]*pendingTwoWay{}
 	for _, p := range pendingTwoWays {
 		destAvID := p.key.Relation.AvID
@@ -1580,7 +1587,7 @@ func DuplicateAttributeViewRow(tx *Transaction, avID, previousItemID, srcRowID, 
 	}
 	for destAvID, items := range twoWayByDestAv {
 		if destAvID == attrView.ID {
-			// 自关联，直接在内存对象上更新，随主属性视图一起保存
+			// self-relation, update directly on the in-memory object and save it together with the main attribute view
 			for _, p := range items {
 				updateTwoWayRelationDestAttrView(attrView, p.key, p.val, 1, nil)
 			}
@@ -1593,7 +1600,7 @@ func DuplicateAttributeViewRow(tx *Transaction, avID, previousItemID, srcRowID, 
 			continue
 		}
 		for _, p := range items {
-			// 复用反向更新逻辑，传入 mode=1（增加）、oldBlockIDs 为空
+			// reuse the reverse-update logic, passing mode=1 (add) with oldBlockIDs empty
 			updateTwoWayRelationDestAttrView(destAv, p.key, p.val, 1, nil)
 		}
 		regenAttrViewGroups(destAv)
@@ -1614,8 +1621,8 @@ func DuplicateAttributeViewRow(tx *Transaction, avID, previousItemID, srcRowID, 
 	return
 }
 
-// addRowToViewItems 将 newRowID 插入到视图及其所有分组的项目列表中，位置在 previousItemID 之后；
-// 若 previousItemID 为空或未找到，则追加到末尾。
+// addRowToViewItems inserts newRowID into the view's item list and all of its group item lists, right after
+// previousItemID; if previousItemID is empty or not found, it is appended to the end.
 func addRowToViewItems(view *av.View, newRowID, previousItemID string) {
 	view.ItemIDs = insertItemAfter(view.ItemIDs, newRowID, previousItemID)
 	for _, g := range view.Groups {
@@ -1623,7 +1630,8 @@ func addRowToViewItems(view *av.View, newRowID, previousItemID string) {
 	}
 }
 
-// insertItemAfter 将 item 插入到 items 中 previousItemID 之后；若 previousItemID 为空或未找到，则追加到末尾。
+// insertItemAfter inserts item into items right after previousItemID; if previousItemID is empty or not
+// found, it is appended to the end.
 func insertItemAfter(items []string, item, previousItemID string) []string {
 	if "" != previousItemID {
 		for i, id := range items {
@@ -1637,7 +1645,7 @@ func insertItemAfter(items []string, item, previousItemID string) []string {
 }
 
 func DuplicateDatabaseBlock(avID string) (newAvID, newBlockID string, err error) {
-	// 加密笔记本的 AV 定义在笔记本级目录，通过 fallback 查找实际路径
+	// encrypted notebooks' AV definitions live in the notebook-level directory; use fallback to find the actual path
 	oldAvPath, avBoxID := av.FindAttributeViewPath(avID)
 	if oldAvPath == "" {
 		oldAvPath = av.GetAttributeViewDataPath(avID)
@@ -1655,7 +1663,8 @@ func DuplicateDatabaseBlock(avID string) (newAvID, newBlockID string, err error)
 		return
 	}
 
-	// 加密笔记本的 AV 是密文，需先解密再处理（av.DecryptAVData 内部按 box 加密/已解锁路由）
+	// encrypted notebooks' AVs are ciphertext and must be decrypted before processing (av.DecryptAVData
+	// internally routes by whether the box is encrypted/unlocked)
 	if avBoxID != "" && IsEncryptedBox(avBoxID) {
 		var decErr error
 		data, decErr = av.DecryptAVData(avBoxID, avID, data)
@@ -1681,7 +1690,7 @@ func DuplicateDatabaseBlock(avID string) (newAvID, newBlockID string, err error)
 
 	for _, keyValues := range newAv.KeyValues {
 		if nil != keyValues.Key.Relation && keyValues.Key.Relation.IsTwoWay {
-			// 断开双向关联
+			// disconnect the two-way relation
 			keyValues.Key.Relation.IsTwoWay = false
 			keyValues.Key.Relation.BackKeyID = ""
 		}
@@ -1693,7 +1702,7 @@ func DuplicateDatabaseBlock(avID string) (newAvID, newBlockID string, err error)
 		return
 	}
 
-	// 加密笔记本的新 AV 定义也存笔记本级目录，且需 avKey 加密
+	// the new AV definition for an encrypted notebook is also stored in the notebook-level directory, and needs avKey encryption
 	newAvPath := filepath.Join(util.DataDir, "storage", "av", newAvID+".json")
 	if avBoxID != "" {
 		newAvPath = filepath.Join(util.DataDir, avBoxID, "storage", "av", newAvID+".json")
@@ -2414,7 +2423,7 @@ func GetBlockAttributeViewKeys(nodeID string) (ret []*BlockAttributeViewKeys) {
 		}
 
 		if !attrView.ExistBoundBlock(nodeID) {
-			// 比如剪切后粘贴，块 ID 会变，但是属性还在块上，这里做一次数据订正
+			// e.g. after cutting and pasting, the block ID changes but the attribute stays on the block, so correct the data here
 			// Auto verify the database name when clicking the block superscript icon https://github.com/siyuan-note/siyuan/issues/10861
 			unbindBlockAv(nil, avID, nodeID)
 			return
@@ -2431,13 +2440,13 @@ func GetBlockAttributeViewKeys(nodeID string) (ret []*BlockAttributeViewKeys) {
 			continue
 		}
 
-		// 渲染填充 attrView.KeyValues
+		// render to populate attrView.KeyValues
 		sql.RenderView(attrView, view, "", false)
 
 		var keyValues []*av.KeyValues
 		for _, kv := range attrView.KeyValues {
 			if av.KeyTypeLineNumber == kv.Key.Type {
-				// 属性面板中不显示行号字段
+				// don't show the line number field in the attribute panel
 				// The line number field no longer appears in the database attribute panel https://github.com/siyuan-note/siyuan/issues/11319
 				continue
 			}
@@ -2452,7 +2461,7 @@ func GetBlockAttributeViewKeys(nodeID string) (ret []*BlockAttributeViewKeys) {
 			keyValues = append(keyValues, kValues)
 		}
 
-		// 字段排序
+		// sort fields
 		refreshAttrViewKeyIDs(attrView, true)
 		sorts := map[string]int{}
 		for i, k := range attrView.KeyIDs {
@@ -2464,7 +2473,7 @@ func GetBlockAttributeViewKeys(nodeID string) (ret []*BlockAttributeViewKeys) {
 
 		blockIDs := treenode.GetMirrorAttrViewBlockIDs(avID)
 		if 1 > len(blockIDs) {
-			// 老数据兼容处理
+			// compatibility handling for legacy data
 			avBts := treenode.GetBlockTreesByType("av")
 			for _, avBt := range avBts {
 				if nil == avBt {
@@ -2638,11 +2647,11 @@ func genAttrViewGroups(view *av.View, attrView *av.AttributeView) {
 			case av.GroupMethodDateYear:
 				groupVal = contentTime.Format("2006")
 			case av.GroupMethodDateRelative:
-				// 过去 30 天之前的按月分组
-				// 过去 30 天、过去 7 天、昨天、今天、明天、未来 7 天、未来 30 天
-				// 未来 30 天之后的按月分组
+				// group by month for dates before the last 30 days
+				// last 30 days, last 7 days, yesterday, today, tomorrow, next 7 days, next 30 days
+				// group by month for dates after the next 30 days
 				if contentTime.Before(todayStart.AddDate(0, 0, -30)) {
-					groupVal = contentTime.Format("2006-01") // 开头的数字用于排序
+					groupVal = contentTime.Format("2006-01") // leading numbers are used for sorting
 				} else if contentTime.Before(todayStart.AddDate(0, 0, -7)) {
 					groupVal = groupValueLast30Days
 				} else if contentTime.Before(todayStart.AddDate(0, 0, -1)) {
@@ -2676,11 +2685,11 @@ func genAttrViewGroups(view *av.View, attrView *av.AttributeView) {
 
 	if av.KeyTypeCheckbox != groupKey.Type {
 		if 1 > len(groupItemsMap[groupValueDefault]) {
-			// 始终保留默认分组 https://github.com/siyuan-note/siyuan/issues/15587
+			// always keep the default group https://github.com/siyuan-note/siyuan/issues/15587
 			groupItemsMap[groupValueDefault] = []av.Item{}
 		}
 	} else {
-		// 对于复选框分组，空白分组表示未选中状态，始终保留 https://github.com/siyuan-note/siyuan/issues/15650
+		// for checkbox grouping, the blank group represents the unchecked state and is always kept https://github.com/siyuan-note/siyuan/issues/15650
 		if nil == groupItemsMap[""] {
 			groupItemsMap[""] = []av.Item{}
 		}
@@ -2711,8 +2720,8 @@ func genAttrViewGroups(view *av.View, attrView *av.AttributeView) {
 			v.GroupItemIDs = append(v.GroupItemIDs, item.GetID())
 		}
 
-		v.Name = ""       // 分组视图的名称在渲染时才填充
-		v.GroupHidden = 1 // 默认隐藏空白分组
+		v.Name = ""       // the group view's name is only filled in at render time
+		v.GroupHidden = 1 // hide blank groups by default
 		v.GroupKey = groupKey
 		v.GroupVal = &av.Value{Type: av.KeyTypeText, Text: &av.ValueText{Content: groupValue}}
 		if av.KeyTypeSelect == groupKey.Type || av.KeyTypeMSelect == groupKey.Type {
@@ -2747,7 +2756,8 @@ func genAttrViewGroups(view *av.View, attrView *av.AttributeView) {
 	setAttrViewGroupStates(view, groupStates)
 }
 
-// GroupState 用于临时记录每个分组视图的状态，以便后面重新生成分组后可以恢复这些状态。
+// GroupState temporarily records the state of each group view, so these states can be restored after the
+// groups are later regenerated.
 type GroupState struct {
 	ID      string
 	Folded  bool
@@ -2764,7 +2774,7 @@ func getAttrViewGroupStates(view *av.View) (groupStates map[string]*GroupState) 
 
 	for _, groupView := range view.Groups {
 		if av.LayoutTypeKanban == groupView.LayoutType {
-			// 看板视图的分组不能折叠
+			// groups in a kanban view cannot be folded
 			groupView.GroupFolded = false
 		}
 
@@ -3018,11 +3028,11 @@ func (tx *Transaction) doUpdateAttrViewColRollup(operation *Operation) (ret *TxE
 }
 
 func updateAttributeViewColRollup(operation *Operation) (err error) {
-	// operation.AvID 汇总字段所在 av
-	// operation.ID 汇总字段 ID
-	// operation.ParentID 汇总字段基于的关联字段 ID
-	// operation.KeyID 目标字段 ID
-	// operation.Data 计算方式
+	// operation.AvID the av the rollup field belongs to
+	// operation.ID the rollup field's ID
+	// operation.ParentID the ID of the relation field the rollup field is based on
+	// operation.KeyID the target field ID
+	// operation.Data the calculation method
 
 	attrView, err := av.ParseAttributeView(operation.AvID)
 	if err != nil {
@@ -3056,11 +3066,11 @@ func updateAttributeViewColRollup(operation *Operation) (err error) {
 		}
 	}
 
-	// 如果存在该汇总字段的过滤条件，则移除该过滤条件 https://github.com/siyuan-note/siyuan/issues/15660
+	// if a filter condition exists for this rollup field, remove that filter condition https://github.com/siyuan-note/siyuan/issues/15660
 	for _, view := range attrView.Views {
 		view.Filters = av.RemoveFiltersByColumn(view.Filters, rollUpKey.ID)
 		if 0 == len(view.Filters) {
-			// 保持 spec 5 根组不变量：根组被裁空后补一个空 AND 根组
+			// maintain the spec-5 root-group invariant: once the root group is emptied out, add back an empty AND root group
 			view.Filters = []*av.ViewFilter{{Combination: av.FilterCombinationAnd}}
 		}
 	}
@@ -3078,13 +3088,13 @@ func (tx *Transaction) doUpdateAttrViewColRelation(operation *Operation) (ret *T
 }
 
 func updateAttributeViewColRelation(operation *Operation) (err error) {
-	// operation.AvID 源 avID
-	// operation.ID 目标 avID
-	// operation.KeyID 源 av 关联字段 ID
-	// operation.IsTwoWay 是否双向关联
-	// operation.BackRelationKeyID 双向关联的目标关联字段 ID
-	// operation.Name 双向关联的目标关联字段名称
-	// operation.Format 源 av 关联字段名称
+	// operation.AvID the source avID
+	// operation.ID the target avID
+	// operation.KeyID the source av's relation field ID
+	// operation.IsTwoWay whether it's a two-way relation
+	// operation.BackRelationKeyID the target relation field ID on the two-way relation's target side
+	// operation.Name the target relation field name on the two-way relation's target side
+	// operation.Format the source av's relation field name
 
 	srcAv, err := av.ParseAttributeView(operation.AvID)
 	if err != nil {
@@ -3108,7 +3118,7 @@ func updateAttributeViewColRelation(operation *Operation) (err error) {
 		}
 
 		srcRel := keyValues.Key.Relation
-		// 已经设置过双向关联的话需要先断开双向关联
+		// if a two-way relation was already set, disconnect it first
 		if nil != srcRel {
 			oldDestAvID = srcRel.AvID
 			if srcRel.IsTwoWay {
@@ -3176,7 +3186,7 @@ func updateAttributeViewColRelation(operation *Operation) (err error) {
 	}
 
 	if !destAdded && operation.IsTwoWay {
-		// 新建双向关联目标字段
+		// create the target field for the two-way relation
 		name := strings.TrimSpace(operation.Name)
 		if "" == name {
 			name = srcAv.Name + " " + operation.Format
@@ -3205,7 +3215,7 @@ func updateAttributeViewColRelation(operation *Operation) (err error) {
 		}
 
 		now := time.Now().UnixMilli()
-		// 和现有值进行关联
+		// relate it with existing values
 		for _, keyValues := range srcAv.KeyValues {
 			if keyValues.Key.ID != operation.KeyID {
 				continue
@@ -3344,7 +3354,8 @@ func (tx *Transaction) doRemoveAttrViewView(operation *Operation) (ret *TxErr) {
 		if blockViewID == viewID {
 			attrs[av.NodeAttrView] = attrView.ViewID
 			node.AttributeViewType = string(view.LayoutType)
-			// 镜像块节点未关联 tree，通过 blocktree 解析 boxID 以走加密笔记本守卫与 box-aware 缓存键
+			// mirror block nodes have no associated tree, so resolve boxID via blocktree to go through the
+			// encrypted-notebook guard and the box-aware cache key
 			boxID := ""
 			if bt := treenode.GetBlockTree(node.ID); nil != bt {
 				boxID = bt.BoxID
@@ -3902,7 +3913,7 @@ func (tx *Transaction) doSetAttrViewFilters(operation *Operation) (ret *TxErr) {
 	return
 }
 
-// avParseView 根据 blockID 推导 box 上下文，使用 box-aware 或全局 AV 解析。
+// avParseView derives the box context from blockID and parses the AV using box-aware or global lookup accordingly.
 func avParseView(avID, blockID string) (*av.AttributeView, error) {
 	boxID := deriveAVBoxID(blockID)
 	if boxID != "" {
@@ -3911,7 +3922,7 @@ func avParseView(avID, blockID string) (*av.AttributeView, error) {
 	return av.ParseAttributeView(avID)
 }
 
-// avSaveView 根据 blockID 推导 box 上下文，使用 box-aware 或全局 AV 保存。
+// avSaveView derives the box context from blockID and saves the AV using box-aware or global saving accordingly.
 func avSaveView(attrView *av.AttributeView, blockID string) error {
 	boxID := deriveAVBoxID(blockID)
 	if boxID != "" {
@@ -3923,7 +3934,8 @@ func avSaveView(attrView *av.AttributeView, blockID string) error {
 	return av.SaveAttributeView(attrView)
 }
 
-// deriveAVBoxID 通过 blockID 反查所在 box。blockID 为空或不是加密 box 时返回空串。
+// deriveAVBoxID looks up the box a blockID belongs to. Returns an empty string if blockID is empty or the
+// box is not encrypted.
 func deriveAVBoxID(blockID string) string {
 	if blockID == "" {
 		return ""
@@ -3943,8 +3955,8 @@ func deriveAVBoxID(blockID string) string {
 	return bt.BoxID
 }
 
-// SetAttrViewFilters 用新的过滤规则数组整体替换指定视图的过滤规则，并持久化。
-// data 为 JSON 反序列化前的 []any（通常是前端传来的过滤节点树）。
+// SetAttrViewFilters replaces the specified view's filter rules wholesale with the new filter rule array, and
+// persists it. data is the []any before JSON deserialization (usually the filter node tree sent by the frontend).
 func SetAttrViewFilters(avID, blockID string, data []any) (err error) {
 	attrView, err := avParseView(avID, blockID)
 	if err != nil {
@@ -3967,13 +3979,14 @@ func SetAttrViewFilters(avID, blockID string, data []any) (err error) {
 	}
 	view.Filters = newFilters
 
-	// 归一化为单一根组：spec 5 起顶层应为一个根组。
-	// 兜底旧前端/异常数据发来的扁平叶子数组，在内存里包成 AND 根组后再持久化。
+	// normalize to a single root group: as of spec 5, the top level should be one root group.
+	// as a fallback for flat leaf arrays sent by old frontends/malformed data, wrap it into an AND root group in
+	// memory before persisting.
 	if 1 != len(view.Filters) || nil == view.Filters[0] || !view.Filters[0].IsGroup() {
 		view.Filters = []*av.ViewFilter{{Combination: av.FilterCombinationAnd, Filters: view.Filters}}
 	}
 
-	// 限制筛选嵌套深度，防止异常数据创建过深的嵌套分组。
+	// limit the filter nesting depth, to prevent malformed data from creating overly deep nested groups.
 	if err = av.ValidateFilterDepth(view.Filters); nil != err {
 		return
 	}
@@ -3990,8 +4003,8 @@ func (tx *Transaction) doSetAttrViewSorts(operation *Operation) (ret *TxErr) {
 	return
 }
 
-// SetAttrViewSorts 用新的排序规则数组整体替换指定视图的排序规则，并持久化。
-// data 为 JSON 反序列化前的 []any。
+// SetAttrViewSorts replaces the specified view's sort rules wholesale with the new sort rule array, and
+// persists it. data is the []any before JSON deserialization.
 func SetAttrViewSorts(avID, blockID string, data []any) (err error) {
 	attrView, err := avParseView(avID, blockID)
 	if err != nil {
@@ -4165,12 +4178,12 @@ func addAttributeViewBlock(now int64, avID, dbBlockID, viewID, groupID, previous
 		addingBlockContent = util.UnescapeHTML(addingBlockContent)
 	}
 
-	// 检查是否重复添加相同的块
+	// check whether the same block is being added again
 	blockValues := attrView.GetBlockKeyValues()
 	for _, blockValue := range blockValues.Values {
 		if "" != addingBoundBlockID && blockValue.Block.ID == addingBoundBlockID {
 			if !isDetached {
-				// 重复绑定一下，比如剪切数据库块、取消绑定块后再次添加的场景需要
+				// re-bind it; needed for scenarios like cutting a database block or re-adding a block after unbinding it
 				bindBlockAv0(tx, avID, node, tree)
 				blockValue.IsDetached = isDetached
 				blockValue.Block.Icon = blockIcon
@@ -4224,12 +4237,12 @@ func addAttributeViewBlock(now int64, avID, dbBlockID, viewID, groupID, previous
 		fillDefaultValue(attrView, view, groupView, previousItemID, addingItemID, true)
 	}
 
-	// 处理日期字段默认填充当前创建时间
+	// handle date fields that default-fill the current creation time
 	// The database date field supports filling the current time by default https://github.com/siyuan-note/siyuan/issues/10823
 	for _, keyValues := range attrView.KeyValues {
 		if av.KeyTypeDate == keyValues.Key.Type && nil != keyValues.Key.Date && keyValues.Key.Date.AutoFillNow {
 			val := keyValues.GetValue(addingItemID)
-			if nil == val { // 避免覆盖已有值（可能前面已经通过过滤或者分组条件填充了值）
+			if nil == val { // avoid overwriting an existing value (it may already have been filled in earlier via a filter or group condition)
 				dateVal := &av.Value{
 					ID: ast.NewNodeID(), KeyID: keyValues.Key.ID, BlockID: addingItemID, Type: av.KeyTypeDate, IsDetached: isDetached, CreatedAt: now, UpdatedAt: now + 1000,
 					Date: &av.ValueDate{Content: now, IsNotEmpty: true, IsNotTime: !keyValues.Key.Date.FillSpecificTime},
@@ -4249,7 +4262,7 @@ func addAttributeViewBlock(now int64, avID, dbBlockID, viewID, groupID, previous
 		bindBlockAv0(tx, avID, node, tree)
 	}
 
-	// 在所有视图上添加项目
+	// add the item to all views
 	for _, v := range attrView.Views {
 		if "" != previousItemID {
 			changed := false
@@ -4267,7 +4280,7 @@ func addAttributeViewBlock(now int64, avID, dbBlockID, viewID, groupID, previous
 			v.ItemIDs = append([]string{addingItemID}, v.ItemIDs...)
 		}
 
-		// 在所有分组视图中添加，目的是为了在重新分组的过程中保住排序状态 https://github.com/siyuan-note/siyuan/issues/15560
+		// add it to all group views too, so the sort order is preserved during regrouping https://github.com/siyuan-note/siyuan/issues/15560
 		for _, g := range v.Groups {
 			if "" != previousItemID {
 				changed := false
@@ -4302,19 +4315,19 @@ func fillDefaultValue(attrView *av.AttributeView, view, groupView *av.View, prev
 		}
 
 		if av.KeyTypeRollup == newValue.Type {
-			// 汇总字段的值是渲染时计算的，不需要添加到数据存储中
+			// rollup field values are computed at render time, so there's no need to add them to storage
 			continue
 		}
 
 		if (av.KeyTypeSelect == newValue.Type || av.KeyTypeMSelect == newValue.Type) && 1 > len(newValue.MSelect) && groupValueDefault != groupView.GetGroupValue() {
-			// 单选或多选类型的值可能需要从分组条件中获取默认值
+			// select/multi-select values may need to get their default value from the group condition
 			if opt := keyValues.Key.GetOption(groupView.GetGroupValue()); nil != opt {
 				newValue.MSelect = append(newValue.MSelect, &av.ValueSelect{Content: opt.Name, Color: opt.Color})
 			}
 		}
 
 		if av.KeyTypeRelation == newValue.Type && nil != keyValues.Key.Relation && keyValues.Key.Relation.IsTwoWay {
-			// 双向关联需要同时更新目标字段的值
+			// a two-way relation requires the target field's value to be updated at the same time
 			updateTwoWayRelationDestAttrView(attrView, keyValues.Key, newValue, 1, []string{})
 		}
 
@@ -4325,7 +4338,7 @@ func fillDefaultValue(attrView *av.AttributeView, view, groupView *av.View, prev
 		} else {
 			newValueRaw := newValue.GetValByType(keyValues.Key.Type)
 			if av.KeyTypeBlock != existingVal.Type || (av.KeyTypeBlock == existingVal.Type && existingVal.IsDetached) {
-				// 非主键的值直接覆盖，主键的值只覆盖非绑定块
+				// non-primary-key values are overwritten directly; primary-key values are only overwritten for non-bound blocks
 				existingVal.IsRenderAutoFill = false
 				existingVal.SetValByType(keyValues.Key.Type, newValueRaw)
 			}
@@ -4923,7 +4936,7 @@ func (tx *Transaction) doSortAttrViewRow(operation *Operation) (ret *TxErr) {
 
 func sortAttributeViewRow(operation *Operation) (err error) {
 	if operation.ID == operation.PreviousID {
-		// 拖拽到自己的下方，不做任何操作 https://github.com/siyuan-note/siyuan/issues/11048
+		// dragged below itself, do nothing https://github.com/siyuan-note/siyuan/issues/11048
 		return
 	}
 
@@ -4945,7 +4958,7 @@ func sortAttributeViewRow(operation *Operation) (err error) {
 			groupKey := view.GetGroupKey(attrView)
 			isAcrossGroup := operation.GroupID != operation.TargetGroupID
 			if isAcrossGroup && (av.KeyTypeTemplate == groupKey.Type || av.KeyTypeCreated == groupKey.Type || av.KeyTypeUpdated == groupKey.Type) {
-				// 这些字段类型不支持跨分组移动，因为它们的值是自动计算生成的
+				// these field types don't support moving across groups, because their values are automatically computed
 				return
 			}
 
@@ -4969,7 +4982,7 @@ func sortAttributeViewRow(operation *Operation) (err error) {
 
 					if val := attrView.GetValue(groupKey.ID, itemID); nil != val {
 						if av.MSelectExistOption(val.MSelect, groupView.GetGroupValue()) {
-							// 移除旧分组的值
+							// remove the value from the old group
 							val.MSelect = av.MSelectRemoveOption(val.MSelect, groupView.GetGroupValue())
 						}
 
@@ -4991,7 +5004,7 @@ func sortAttributeViewRow(operation *Operation) (err error) {
 				}
 
 				regenAttrViewGroups(attrView)
-			} else { // 同分组内排序
+			} else { // sorting within the same group
 				for i, r := range groupView.GroupItemIDs {
 					if r == operation.PreviousID {
 						previousIndex = i + 1
@@ -5039,7 +5052,7 @@ func (tx *Transaction) doSortAttrViewColumn(operation *Operation) (ret *TxErr) {
 
 func SortAttributeViewViewKey(avID, blockID, keyID, previousKeyID string) (err error) {
 	if keyID == previousKeyID {
-		// 拖拽到自己的右侧，不做任何操作 https://github.com/siyuan-note/siyuan/issues/11048
+		// dragged to its own right side, do nothing https://github.com/siyuan-note/siyuan/issues/11048
 		return
 	}
 
@@ -5172,7 +5185,7 @@ func SortAttributeViewKey(avID, keyID, previousKeyID string) (err error) {
 }
 
 func refreshAttrViewKeyIDs(attrView *av.AttributeView, needSave bool) {
-	// 订正 keyIDs 数据
+	// correct the keyIDs data
 
 	existKeyIDs := map[string]bool{}
 	for _, keyValues := range attrView.KeyValues {
@@ -5242,7 +5255,7 @@ func AddAttributeViewKey(avID, keyID, keyName, keyType, keyIcon, previousKeyID s
 
 				if "" == previousKeyID {
 					if av.LayoutTypeGallery == currentView.LayoutType || av.LayoutTypeKanban == currentView.LayoutType {
-						// 如果当前视图是卡片或看板视图则添加到最后
+						// if the current view is a gallery or kanban view, add it at the end
 						view.Table.Columns = append(view.Table.Columns, &av.ViewTableColumn{BaseField: newField})
 					} else {
 						view.Table.Columns = append([]*av.ViewTableColumn{{BaseField: newField}}, view.Table.Columns...)
@@ -5438,7 +5451,7 @@ func updateAttributeViewColumn(operation *Operation) (err error) {
 
 			for _, keyValues := range destAv.KeyValues {
 				if av.KeyTypeRollup == keyValues.Key.Type && keyValues.Key.Rollup.KeyID == operation.ID {
-					// 置空关联过来的汇总
+					// clear the rollup values coming from this relation
 					for _, val := range keyValues.Values {
 						val.Rollup.Contents = nil
 					}
@@ -5506,7 +5519,7 @@ func RemoveAttributeViewKey(avID, keyID string, removeRelationDest bool) (err er
 				destAvRelSrcAv := false
 				for i, keyValues := range destAv.KeyValues {
 					if keyValues.Key.ID == removedKey.Relation.BackKeyID {
-						if removeRelationDest { // 删除双向关联的目标字段
+						if removeRelationDest { // delete the two-way relation's target field
 							destAv.KeyValues = append(destAv.KeyValues[:i], destAv.KeyValues[i+1:]...)
 							destAv.RemoveNewItemTemplateFieldValue(removedKey.Relation.BackKeyID)
 						}
@@ -5622,7 +5635,7 @@ func RemoveAttributeViewKey(avID, keyID string, removeRelationDest bool) (err er
 
 		for _, keyValues := range destAv.KeyValues {
 			if av.KeyTypeRollup == keyValues.Key.Type && keyValues.Key.Rollup.KeyID == keyID {
-				// 置空关联过来的汇总
+				// clear the rollup values coming from this relation
 				for _, val := range keyValues.Values {
 					val.Rollup.Contents = nil
 				}
@@ -5671,7 +5684,7 @@ func replaceAttributeViewBlock0(attrView *av.AttributeView, oldBlockID, newNodeI
 	}
 
 	now := util.CurrentTimeMillis()
-	// 检查是否已经存在绑定块，如果存在的话则重新绑定
+	// check whether a bound block already exists, and if so, rebind it
 	for _, blockVal := range attrView.GetBlockKeyValues().Values {
 		if !isDetached && blockVal.Block.ID == newNodeID && nil != node && nil != tree {
 			bindBlockAv0(tx, avID, node, tree)
@@ -5757,7 +5770,7 @@ func BatchUpdateAttributeViewCells(tx *Transaction, avID string, values []any) (
 		if _, ok := v["itemID"]; ok {
 			itemID = v["itemID"].(string)
 		} else if _, ok := v["rowID"]; ok {
-			// TODO 该参数将于 2026 年 12 月 1 日后删除
+			// TODO this parameter will be removed after December 1, 2026
 			itemID = v["rowID"].(string)
 			msg := fmt.Sprintf("[%s] parameter [%s] is deprecated, visit [https://github.com/siyuan-note/siyuan/issues/15727] for details",
 				"/api/av/batchSetAttributeViewBlockAttrs", "rowID")
@@ -5867,7 +5880,7 @@ func updateAttributeViewValue(tx *Transaction, attrView *av.AttributeView, keyID
 	} else if av.KeyTypeSelect == val.Type || av.KeyTypeMSelect == val.Type {
 		if nil != key && 0 < len(val.MSelect) {
 			var tmp []*av.ValueSelect
-			// 移除空选项 https://github.com/siyuan-note/siyuan/issues/15533
+			// remove empty options https://github.com/siyuan-note/siyuan/issues/15533
 			for _, v := range val.MSelect {
 				if "" != v.Content {
 					tmp = append(tmp, v)
@@ -5882,7 +5895,7 @@ func updateAttributeViewValue(tx *Transaction, attrView *av.AttributeView, keyID
 			// The selection options are inconsistent after pasting data into the database https://github.com/siyuan-note/siyuan/issues/11409
 			for _, valOpt := range val.MSelect {
 				if opt := key.GetOption(valOpt.Content); nil == opt {
-					// 不存在的选项新建保存
+					// create and save a new option if it doesn't exist
 					color := valOpt.Color
 					if "" == color {
 						color = fmt.Sprintf("%d", 1+rand.Intn(14))
@@ -5890,20 +5903,20 @@ func updateAttributeViewValue(tx *Transaction, attrView *av.AttributeView, keyID
 					opt = &av.SelectOption{Name: valOpt.Content, Color: color}
 					key.Options = append(key.Options, opt)
 				} else {
-					// 已经存在的选项颜色需要保持不变
+					// keep the color unchanged for an option that already exists
 					valOpt.Color = opt.Color
 				}
 			}
 		}
 	}
 
-	relationChangeMode := 0 // 0：不变（仅排序），1：增加，2：减少
+	relationChangeMode := 0 // 0: unchanged (sort only), 1: increase, 2: decrease
 	if av.KeyTypeRelation == val.Type {
-		// 关联字段得 content 是自动渲染的，所以不需要保存
+		// the relation field's content is auto-rendered, so it doesn't need to be saved
 		val.Relation.Contents = nil
 		val.Relation.BlockIDs = gulu.Str.RemoveDuplicatedElem(val.Relation.BlockIDs)
 
-		// 计算关联变更模式
+		// compute the relation change mode
 		if !slices.Equal(oldRelationBlockIDs, val.Relation.BlockIDs) {
 			if len(oldRelationBlockIDs) > len(val.Relation.BlockIDs) {
 				relationChangeMode = 2
@@ -5913,35 +5926,35 @@ func updateAttributeViewValue(tx *Transaction, attrView *av.AttributeView, keyID
 		}
 	}
 
-	// val.IsDetached 只有更新主键的时候才会传入，所以下面需要结合 isUpdatingBlockKey 来判断
+	// val.IsDetached is only passed in when updating the primary key, so isUpdatingBlockKey must be checked below
 
 	if isUpdatingBlockKey {
 		if oldIsDetached {
-			// 之前是非绑定块
+			// it was previously a non-bound block
 
-			if !val.IsDetached { // 现在绑定了块
+			if !val.IsDetached { // now it's bound to a block
 				bindBlockAv(tx, avID, val.Block.ID)
 			}
 		} else {
-			// 之前绑定了块
+			// it was previously bound to a block
 
-			if val.IsDetached { // 现在是非绑定块
+			if val.IsDetached { // now it's a non-bound block
 				unbindBlockAv(tx, avID, val.Block.ID)
 				val.Block.ID = ""
 			} else {
-				// 现在也绑定了块
+				// it's still bound to a block
 
-				if oldBoundBlockID != val.Block.ID { // 之前绑定的块和现在绑定的块不一样
-					// 换绑块
+				if oldBoundBlockID != val.Block.ID { // the previously bound block differs from the currently bound block
+					// rebind the block
 					unbindBlockAv(tx, avID, oldBoundBlockID)
 					bindBlockAv(tx, avID, val.Block.ID)
 					val.Block.Content = util.UnescapeHTML(val.Block.Content)
-				} else { // 之前绑定的块和现在绑定的块一样
+				} else { // the previously bound block is the same as the currently bound block
 					content := strings.TrimSpace(val.Block.Content)
 					node, tree, _ := getNodeByBlockID(tx, val.Block.ID)
 					_, blockText := getNodeAvBlockText(node, "")
 					if "" == content {
-						// 使用动态锚文本
+						// use dynamic anchor text
 						val.Block.Content = util.UnescapeHTML(blockText)
 						updateBlockValueStaticText(tx, node, tree, avID, "")
 					} else {
@@ -5963,7 +5976,7 @@ func updateAttributeViewValue(tx *Transaction, attrView *av.AttributeView, keyID
 	val.SetUpdatedAt(now)
 
 	if nil != key && av.KeyTypeRelation == key.Type && nil != key.Relation && key.Relation.IsTwoWay {
-		// 双向关联需要同时更新目标字段的值
+		// a two-way relation requires the target field's value to be updated at the same time
 		updateTwoWayRelationDestAttrView(attrView, key, val, relationChangeMode, oldRelationBlockIDs)
 	}
 
@@ -5985,7 +5998,7 @@ func refreshRelatedSrcAvs(destAvID string, tx *Transaction) {
 	var tmp []string
 	for _, relatedAvID := range relatedAvIDs {
 		if relatedAvID == destAvID {
-			// 目标和源相同则跳过
+			// skip if the target is the same as the source
 			continue
 		}
 
@@ -6010,9 +6023,9 @@ func refreshRelatedSrcAvs(destAvID string, tx *Transaction) {
 }
 
 // relationChangeMode
-// 0：关联字段值不变（仅排序），不影响目标值
-// 1：关联字段值增加，增加目标值
-// 2：关联字段值减少，减少目标值
+// 0: the relation field's value is unchanged (sort only), no effect on the target value
+// 1: the relation field's value increased, so add to the target value
+// 2: the relation field's value decreased, so remove from the target value
 func updateTwoWayRelationDestAttrView(attrView *av.AttributeView, relKey *av.Key, val *av.Value, relationChangeMode int, oldRelationBlockIDs []string) {
 	var destAv *av.AttributeView
 	if attrView.ID == relKey.Relation.AvID {
@@ -6078,7 +6091,7 @@ func updateTwoWayRelationDestAttrView(attrView *av.AttributeView, relKey *av.Key
 	}
 }
 
-// regenAttrViewGroups 重新生成分组视图。
+// regenAttrViewGroups regenerates the group views.
 func regenAttrViewGroups(attrView *av.AttributeView) {
 	for _, view := range attrView.Views {
 		groupKey := view.GetGroupKey(attrView)
@@ -6166,7 +6179,7 @@ func bindBlockAv0(tx *Transaction, avID string, node *ast.Node, tree *parse.Tree
 }
 
 func updateBlockValueStaticText(tx *Transaction, node *ast.Node, tree *parse.Tree, avID, text string) {
-	// 设置静态锚文本 Database-bound block primary key supports setting static anchor text https://github.com/siyuan-note/siyuan/issues/10049
+	// set static anchor text; Database-bound block primary key supports setting static anchor text https://github.com/siyuan-note/siyuan/issues/10049
 
 	if nil == node {
 		return
@@ -6227,7 +6240,7 @@ func updateAttributeViewColumnOptions(operation *Operation) (err error) {
 		return
 	}
 
-	// 移除空选项 https://github.com/siyuan-note/siyuan/issues/15533
+	// remove empty options https://github.com/siyuan-note/siyuan/issues/15533
 	var tmp []*av.SelectOption
 	for _, opt := range options {
 		if "" != opt.Name {
@@ -6255,11 +6268,11 @@ func updateAttributeViewColumnOptions(operation *Operation) (err error) {
 	}
 	for _, opt := range options {
 		if existingOpt, exists := existingOptions[opt.Name]; exists {
-			// 如果选项已经存在则更新颜色和描述
+			// if the option already exists, update its color and description
 			existingOpt.Color = opt.Color
 			existingOpt.Desc = opt.Desc
 		} else {
-			// 如果选项不存在则添加新选项
+			// if the option doesn't exist, add it as a new option
 			selectKey.Options = append(selectKey.Options, &av.SelectOption{
 				Name:  opt.Name,
 				Color: opt.Color,
@@ -6329,11 +6342,11 @@ func removeAttributeViewColumnOption(operation *Operation) (err error) {
 		break
 	}
 
-	// 如果存在选项对应的过滤条件，则删除过滤条件中设置的选项值 https://github.com/siyuan-note/siyuan/issues/15536
+	// if a filter condition exists for this option, delete the option value set in that filter condition https://github.com/siyuan-note/siyuan/issues/15536
 	for _, view := range attrView.Views {
 		view.Filters = av.RemoveSelectOptionFromFilters(view.Filters, operation.ID, optName)
 		if 0 == len(view.Filters) {
-			// 保持 spec 5 根组不变量
+			// maintain the spec-5 root-group invariant
 			view.Filters = []*av.ViewFilter{{Combination: av.FilterCombinationAnd}}
 		}
 	}
@@ -6375,7 +6388,7 @@ func updateAttributeViewColumnOption(operation *Operation) (err error) {
 		rename = true
 
 		for _, opt := range key.Options {
-			if newName == opt.Name { // 如果选项已经存在则直接使用
+			if newName == opt.Name { // if the option already exists, just use it directly
 				found = true
 				newColor = opt.Color
 				newDesc = opt.Desc
@@ -6398,7 +6411,7 @@ func updateAttributeViewColumnOption(operation *Operation) (err error) {
 		}
 	}
 
-	// 如果存在选项对应的值，需要更新值中的选项
+	// if values reference this option, the option in those values needs to be updated
 	for _, keyValues := range attrView.KeyValues {
 		if keyValues.Key.ID != operation.ID {
 			continue
@@ -6440,7 +6453,7 @@ func updateAttributeViewColumnOption(operation *Operation) (err error) {
 		break
 	}
 
-	// 如果存在选项对应的过滤条件，需要更新过滤条件中设置的选项值
+	// if a filter condition exists for this option, the option value set in that filter condition needs to be updated
 	// Database select field filters follow option editing changes https://github.com/siyuan-note/siyuan/issues/10881
 	for _, view := range attrView.Views {
 		av.RenameSelectOptionInFilters(view.Filters, key.ID, oldName, newName, newColor)
@@ -6506,7 +6519,7 @@ func getAttrViewName(attrView *av.AttributeView) string {
 }
 
 func updateBoundBlockAvsAttribute(avIDs []string) {
-	// 更新指定 avIDs 中绑定块的 avs 属性
+	// update the avs attribute of bound blocks in the given avIDs
 
 	cachedTrees, saveTrees := map[string]*parse.Tree{}, map[string]*parse.Tree{}
 	luteEngine := util.NewLute()

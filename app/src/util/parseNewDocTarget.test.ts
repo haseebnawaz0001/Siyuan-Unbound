@@ -33,10 +33,10 @@ const assertHPath = (target: NewDocTarget, expected: {
 };
 
 describe("getNewDocTargetFromSavePath", () => {
-    // 聚焦嵌套文档：内核路径与人类路径成对出现
+    // Focused nested document: kernel path and human path come as a pair
     const nestedDocPath = "/20260628041644-ndcuikw/20260628040939-kkaajwr.sy";
     const nestedHPath = "/parent1/parent2/docName";
-    // 聚焦根级文档
+    // Focused root-level document
     const rootDocPath = "/20260628041702-kqfrg7p.sy";
     const rootHPath = "/docName";
     const notebookId = "nb";
@@ -49,18 +49,18 @@ describe("getNewDocTargetFromSavePath", () => {
         currentPath: nestedDocPath,
     };
 
-    describe("空模板", () => {
-        it("有页签/选中 + 无 name → 当前文档下子文档", () => {
+    describe("empty template", () => {
+        it("has tab/selection + no name -> subdoc under the current document", () => {
             const target = getNewDocTargetFromSavePath({...nestedContext, templatePath: ""});
             assertSubDoc(target, {targetNotebookId: notebookId, parentPath: nestedDocPath, title: ""});
         });
 
-        it("有页签/选中 + 显式标题 → 当前 hPath 下按名称新建", () => {
+        it("has tab/selection + explicit title -> create by name under the current hPath", () => {
             const target = getNewDocTargetFromSavePath({...nestedContext, templatePath: "", name: "docName2"});
             assertHPath(target, {hPath: "/parent1/parent2/docName/docName2", title: "docName2"});
         });
 
-        it("聚焦根级文档 + 无 name → 子文档", () => {
+        it("focused on a root-level document + no name -> subdoc", () => {
             const target = getNewDocTargetFromSavePath({
                 ...nestedContext,
                 templatePath: "",
@@ -70,7 +70,7 @@ describe("getNewDocTargetFromSavePath", () => {
             assertSubDoc(target, {parentPath: rootDocPath, title: ""});
         });
 
-        it("聚焦根级文档 + 显式标题 → 当前 hPath 下按名称新建", () => {
+        it("focused on a root-level document + explicit title -> create by name under the current hPath", () => {
             const target = getNewDocTargetFromSavePath({
                 ...nestedContext,
                 templatePath: "",
@@ -81,7 +81,7 @@ describe("getNewDocTargetFromSavePath", () => {
             assertHPath(target, {hPath: "/docName/docName2", title: "docName2"});
         });
 
-        it("选中笔记本根（currentPath=/）+ 无 name → 子文档", () => {
+        it("notebook root selected (currentPath=/) + no name -> subdoc", () => {
             const target = getNewDocTargetFromSavePath({
                 ...nestedContext,
                 templatePath: "",
@@ -91,7 +91,7 @@ describe("getNewDocTargetFromSavePath", () => {
             assertSubDoc(target, {parentPath: "/", title: ""});
         });
 
-        it("无页签无选中 → 笔记本根", () => {
+        it("no tab and no selection -> notebook root", () => {
             const target = getNewDocTargetFromSavePath({
                 ...nestedContext,
                 templatePath: "",
@@ -102,7 +102,7 @@ describe("getNewDocTargetFromSavePath", () => {
             assertHPath(target, {hPath: "/", title: ""});
         });
 
-        it("无页签无选中 + 显式标题 → 笔记本根下按名称新建", () => {
+        it("no tab and no selection + explicit title -> create by name under the notebook root", () => {
             const target = getNewDocTargetFromSavePath({
                 ...nestedContext,
                 templatePath: "",
@@ -114,131 +114,131 @@ describe("getNewDocTargetFromSavePath", () => {
         });
     });
 
-    describe("容器路径（尾 /）", () => {
-        it("绝对 /parent3/", () => {
+    describe("container path (trailing /)", () => {
+        it("absolute /parent3/", () => {
             const target = getNewDocTargetFromSavePath({...nestedContext, templatePath: "/parent3/"});
             assertHPath(target, {hPath: "/parent3/", title: ""});
         });
 
-        it("绝对 /parent3/ + 显式标题", () => {
+        it("absolute /parent3/ + explicit title", () => {
             const target = getNewDocTargetFromSavePath({...nestedContext, templatePath: "/parent3/", name: "docName2"});
             assertHPath(target, {hPath: "/parent3/docName2", title: "docName2"});
         });
 
-        it("绝对 /", () => {
+        it("absolute /", () => {
             const target = getNewDocTargetFromSavePath({...nestedContext, templatePath: "/", hPath: "/"});
             assertHPath(target, {hPath: "/", title: ""});
         });
 
-        it("绝对 /parent1/parent2/", () => {
+        it("absolute /parent1/parent2/", () => {
             const target = getNewDocTargetFromSavePath({...nestedContext, templatePath: "/parent1/parent2/"});
             assertHPath(target, {hPath: "/parent1/parent2/", title: ""});
         });
 
-        it("相对 parent3/", () => {
+        it("relative parent3/", () => {
             const target = getNewDocTargetFromSavePath({...nestedContext, templatePath: "parent3/"});
             assertHPath(target, {hPath: "/parent1/parent2/docName/parent3/", title: ""});
         });
 
-        it("相对 parent3/parent4/", () => {
+        it("relative parent3/parent4/", () => {
             const target = getNewDocTargetFromSavePath({...nestedContext, templatePath: "parent3/parent4/"});
             assertHPath(target, {hPath: "/parent1/parent2/docName/parent3/parent4/", title: ""});
         });
 
-        it("相对 ../", () => {
+        it("relative ../", () => {
             const target = getNewDocTargetFromSavePath({...nestedContext, templatePath: "../"});
             assertHPath(target, {hPath: "/parent1/parent2/", title: ""});
         });
 
-        it("相对 ../ + 显式标题", () => {
+        it("relative ../ + explicit title", () => {
             const target = getNewDocTargetFromSavePath({...nestedContext, templatePath: "../", name: "docName2"});
             assertHPath(target, {hPath: "/parent1/parent2/docName2", title: "docName2"});
         });
 
-        it("相对 ../../", () => {
+        it("relative ../../", () => {
             const target = getNewDocTargetFromSavePath({...nestedContext, templatePath: "../../"});
             assertHPath(target, {hPath: "/parent1/", title: ""});
         });
 
-        it("相对 ../parent3/", () => {
+        it("relative ../parent3/", () => {
             const target = getNewDocTargetFromSavePath({...nestedContext, templatePath: "../parent3/"});
             assertHPath(target, {hPath: "/parent1/parent2/parent3/", title: ""});
         });
 
-        it("相对 ../../parent3/parent4/", () => {
+        it("relative ../../parent3/parent4/", () => {
             const target = getNewDocTargetFromSavePath({...nestedContext, templatePath: "../../parent3/parent4/"});
             assertHPath(target, {hPath: "/parent1/parent3/parent4/", title: ""});
         });
 
-        it("已在根时 ../", () => {
+        it("already at root, ../", () => {
             const target = getNewDocTargetFromSavePath({...nestedContext, templatePath: "../", hPath: "/"});
             assertHPath(target, {hPath: "/", title: ""});
         });
 
-        it("模板首尾空白 trim", () => {
+        it("trims leading/trailing whitespace in the template", () => {
             const target = getNewDocTargetFromSavePath({...nestedContext, templatePath: "  parent3/  "});
             assertHPath(target, {hPath: "/parent1/parent2/docName/parent3/", title: ""});
         });
     });
 
-    describe("文档名路径", () => {
-        it("相对 docName2", () => {
+    describe("document name path", () => {
+        it("relative docName2", () => {
             const target = getNewDocTargetFromSavePath({...nestedContext, templatePath: "docName2"});
             assertHPath(target, {hPath: "/parent1/parent2/docName/docName2", title: "docName2"});
         });
 
-        it("相对 docName2 + 显式标题替换末段", () => {
+        it("relative docName2 + explicit title replaces the last segment", () => {
             const target = getNewDocTargetFromSavePath({...nestedContext, templatePath: "docName2", name: "docName3"});
             assertHPath(target, {hPath: "/parent1/parent2/docName/docName3", title: "docName3"});
         });
 
-        it("模板首尾空白 trim", () => {
+        it("trims leading/trailing whitespace in the template", () => {
             const target = getNewDocTargetFromSavePath({...nestedContext, templatePath: "  docName2  "});
             assertHPath(target, {hPath: "/parent1/parent2/docName/docName2", title: "docName2"});
         });
 
-        it("绝对 /docName2", () => {
+        it("absolute /docName2", () => {
             const target = getNewDocTargetFromSavePath({...nestedContext, templatePath: "/docName2"});
             assertHPath(target, {hPath: "/docName2", title: "docName2"});
         });
 
-        it("绝对 /docName2 + 显式标题替换末段", () => {
+        it("absolute /docName2 + explicit title replaces the last segment", () => {
             const target = getNewDocTargetFromSavePath({...nestedContext, templatePath: "/docName2", name: "docName3"});
             assertHPath(target, {hPath: "/docName3", title: "docName3"});
         });
 
-        it("相对 parent3/docName2", () => {
+        it("relative parent3/docName2", () => {
             const target = getNewDocTargetFromSavePath({...nestedContext, templatePath: "parent3/docName2"});
             assertHPath(target, {hPath: "/parent1/parent2/docName/parent3/docName2", title: "docName2"});
         });
 
-        it("绝对 /parent3/docName2", () => {
+        it("absolute /parent3/docName2", () => {
             const target = getNewDocTargetFromSavePath({...nestedContext, templatePath: "/parent3/docName2"});
             assertHPath(target, {hPath: "/parent3/docName2", title: "docName2"});
         });
 
-        it("相对 ../docName2", () => {
+        it("relative ../docName2", () => {
             const target = getNewDocTargetFromSavePath({...nestedContext, templatePath: "../docName2"});
             assertHPath(target, {hPath: "/parent1/parent2/docName2", title: "docName2"});
         });
 
-        it("相对 ../../docName2", () => {
+        it("relative ../../docName2", () => {
             const target = getNewDocTargetFromSavePath({...nestedContext, templatePath: "../../docName2"});
             assertHPath(target, {hPath: "/parent1/docName2", title: "docName2"});
         });
 
-        it("相对 ../parent3/docName2", () => {
+        it("relative ../parent3/docName2", () => {
             const target = getNewDocTargetFromSavePath({...nestedContext, templatePath: "../parent3/docName2"});
             assertHPath(target, {hPath: "/parent1/parent2/parent3/docName2", title: "docName2"});
         });
 
-        it("已在根时 ../docName2（.. 在根无效）", () => {
+        it("already at root, ../docName2 (.. has no effect at the root)", () => {
             const target = getNewDocTargetFromSavePath({...nestedContext, templatePath: "../docName2", hPath: "/"});
             assertHPath(target, {hPath: "/docName2", title: "docName2"});
         });
     });
 
-    describe("跨笔记本", () => {
+    describe("cross-notebook", () => {
         const crossNotebook = {
             ...nestedContext,
             targetNotebookId: "box-b",
@@ -247,27 +247,27 @@ describe("getNewDocTargetFromSavePath", () => {
             currentPath: nestedDocPath,
         };
 
-        it("相对 docName2 → 补 / 后按目标笔记本根解析", () => {
+        it("relative docName2 -> pad with / then resolve against the target notebook root", () => {
             const target = getNewDocTargetFromSavePath({...crossNotebook, templatePath: "docName2"});
             assertHPath(target, {targetNotebookId: "box-b", hPath: "/docName2", title: "docName2"});
         });
 
-        it("相对 parent3/parent4/ → 补 / 后按目标笔记本根解析", () => {
+        it("relative parent3/parent4/ -> pad with / then resolve against the target notebook root", () => {
             const target = getNewDocTargetFromSavePath({...crossNotebook, templatePath: "parent3/parent4/"});
             assertHPath(target, {targetNotebookId: "box-b", hPath: "/parent3/parent4/", title: ""});
         });
 
-        it("相对 ../docName2 → 补 / 后 .. 在根无效", () => {
+        it("relative ../docName2 -> pad with /, .. has no effect at the root", () => {
             const target = getNewDocTargetFromSavePath({...crossNotebook, templatePath: "../docName2"});
             assertHPath(target, {targetNotebookId: "box-b", hPath: "/docName2", title: "docName2"});
         });
 
-        it("绝对 /parent3/docName2 不受影响", () => {
+        it("absolute /parent3/docName2 is unaffected", () => {
             const target = getNewDocTargetFromSavePath({...crossNotebook, templatePath: "/parent3/docName2"});
             assertHPath(target, {targetNotebookId: "box-b", hPath: "/parent3/docName2", title: "docName2"});
         });
 
-        it("空模板 + 无页签无选中 + 显式标题 → 目标笔记本根下按名称新建", () => {
+        it("empty template + no tab and no selection + explicit title -> create by name under the target notebook root", () => {
             const target = getNewDocTargetFromSavePath({
                 ...crossNotebook,
                 templatePath: "",
@@ -277,12 +277,12 @@ describe("getNewDocTargetFromSavePath", () => {
             assertHPath(target, {targetNotebookId: "box-b", hPath: "/docName2", title: "docName2"});
         });
 
-        it("空模板 + 有聚焦 + 无 name → 回退到目标笔记本根空标题文档", () => {
+        it("empty template + focused + no name -> falls back to an empty-title document at the target notebook root", () => {
             const target = getNewDocTargetFromSavePath({...crossNotebook, templatePath: ""});
             assertHPath(target, {targetNotebookId: "box-b", hPath: "/", title: ""});
         });
 
-        it("空模板 + 有聚焦 + 显式标题 → 目标笔记本根下按名称新建（跨笔记本 hPath 基点为 /）", () => {
+        it("empty template + focused + explicit title -> create by name under the target notebook root (cross-notebook hPath base is /)", () => {
             const target = getNewDocTargetFromSavePath({...crossNotebook, templatePath: "", name: "docName2"});
             assertHPath(target, {targetNotebookId: "box-b", hPath: "/docName2", title: "docName2"});
         });
@@ -291,62 +291,62 @@ describe("getNewDocTargetFromSavePath", () => {
 
 describe("getNewDocTargetFromTree", () => {
     const notebookId = "nb";
-    // 文档树 data-path：带 .sy 的内核路径
+    // Doc tree data-path: kernel path with .sy
     const parentDocPath = "/20260628041644-ndcuikw.sy";
     const nestedDocPath = "/20260628041644-ndcuikw/20260628040939-kkaajwr.sy";
-    // pathPosix().dirname()：同级插入时传入的父目录（无 .sy、无尾斜杠）
+    // pathPosix().dirname(): the parent directory passed in for a sibling insert (no .sy, no trailing slash)
     const parentDirPath = "/20260628041644-ndcuikw";
     const rootPath = "/";
 
-    describe("文档树 + 新建子文档（currentPath 为 data-path）", () => {
+    describe("doc tree + new subdocument (currentPath is a data-path)", () => {
         const treeContext = {currentNotebookId: notebookId, currentPath: parentDocPath};
 
-        it("空模板", () => {
+        it("empty template", () => {
             const target = getNewDocTargetFromTree({...treeContext, templatePath: ""});
             assertSubDoc(target, {targetNotebookId: notebookId, parentPath: parentDocPath, title: ""});
         });
 
-        it("空模板 + 显式标题", () => {
+        it("empty template + explicit title", () => {
             const target = getNewDocTargetFromTree({...treeContext, templatePath: "", name: "docName2"});
             assertSubDoc(target, {parentPath: parentDocPath, title: "docName2"});
         });
 
-        it("单段模板 docName2", () => {
+        it("single-segment template docName2", () => {
             const target = getNewDocTargetFromTree({...treeContext, templatePath: "docName2"});
             assertSubDoc(target, {parentPath: parentDocPath, title: "docName2"});
         });
 
-        it("单段模板 docName2 + 显式标题", () => {
+        it("single-segment template docName2 + explicit title", () => {
             const target = getNewDocTargetFromTree({...treeContext, templatePath: "docName2", name: "docName3"});
             assertSubDoc(target, {parentPath: parentDocPath, title: "docName3"});
         });
 
-        it("多段模板 parent3/docName2（仅取末段为标题，父路径不变）", () => {
+        it("multi-segment template parent3/docName2 (only the last segment becomes the title, parent path unchanged)", () => {
             const target = getNewDocTargetFromTree({...treeContext, templatePath: "parent3/docName2"});
             assertSubDoc(target, {parentPath: parentDocPath, title: "docName2"});
         });
 
-        it("绝对模板 /docName2（落点仍为 currentPath，仅影响标题）", () => {
+        it("absolute template /docName2 (the target is still currentPath, only the title is affected)", () => {
             const target = getNewDocTargetFromTree({...treeContext, templatePath: "/docName2"});
             assertSubDoc(target, {parentPath: parentDocPath, title: "docName2"});
         });
 
-        it("容器模板 docName2/（树入口不解析容器链，无 name 时空标题）", () => {
+        it("container template docName2/ (the tree entry point does not resolve container chains; empty title when there is no name)", () => {
             const target = getNewDocTargetFromTree({...treeContext, templatePath: "docName2/"});
             assertSubDoc(target, {parentPath: parentDocPath, title: ""});
         });
 
-        it("容器模板 docName2/ + 显式标题", () => {
+        it("container template docName2/ + explicit title", () => {
             const target = getNewDocTargetFromTree({...treeContext, templatePath: "docName2/", name: "docName2"});
             assertSubDoc(target, {parentPath: parentDocPath, title: "docName2"});
         });
 
-        it("模板首尾空白 trim", () => {
+        it("trims leading/trailing whitespace in the template", () => {
             const target = getNewDocTargetFromTree({...treeContext, templatePath: "  docName2  "});
             assertSubDoc(target, {parentPath: parentDocPath, title: "docName2"});
         });
 
-        it("嵌套文档下新建子文档", () => {
+        it("create a new subdocument under a nested document", () => {
             const target = getNewDocTargetFromTree({
                 currentNotebookId: notebookId,
                 currentPath: nestedDocPath,
@@ -356,8 +356,8 @@ describe("getNewDocTargetFromTree", () => {
         });
     });
 
-    describe("同级插入（currentPath 为 dirname，无 .sy）", () => {
-        it("嵌套文档的同级插入", () => {
+    describe("sibling insert (currentPath is a dirname, no .sy)", () => {
+        it("sibling insert for a nested document", () => {
             const target = getNewDocTargetFromTree({
                 currentNotebookId: notebookId,
                 currentPath: parentDirPath,
@@ -366,7 +366,7 @@ describe("getNewDocTargetFromTree", () => {
             assertSubDoc(target, {parentPath: parentDirPath, title: "docName2"});
         });
 
-        it("根级文档的同级插入（dirname 为 /）", () => {
+        it("sibling insert for a root-level document (dirname is /)", () => {
             const target = getNewDocTargetFromTree({
                 currentNotebookId: notebookId,
                 currentPath: rootPath,
@@ -376,8 +376,8 @@ describe("getNewDocTargetFromTree", () => {
         });
     });
 
-    describe("笔记本根（currentPath 为 /）", () => {
-        it("空模板", () => {
+    describe("notebook root (currentPath is /)", () => {
+        it("empty template", () => {
             const target = getNewDocTargetFromTree({
                 currentNotebookId: notebookId,
                 currentPath: rootPath,
@@ -386,7 +386,7 @@ describe("getNewDocTargetFromTree", () => {
             assertSubDoc(target, {parentPath: rootPath, title: ""});
         });
 
-        it("单段模板 + 显式标题", () => {
+        it("single-segment template + explicit title", () => {
             const target = getNewDocTargetFromTree({
                 currentNotebookId: notebookId,
                 currentPath: rootPath,

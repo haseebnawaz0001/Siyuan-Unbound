@@ -45,16 +45,17 @@ func PushReloadSnippet(snippet *conf.Snpt) {
 }
 
 func PushReloadPlugin(uninstallPluginNameSet, unloadPluginNameSet, reloadPluginSet, dataChangePluginSet *hashset.Set, excludeApp string) {
-	// 按优先级从高到低排列，同一插件只保留在优先级最高的集合中
+	// Ordered from highest to lowest priority; a plugin is only kept in the highest-priority set it
+	// appears in
 	orderedSets := []*hashset.Set{uninstallPluginNameSet, unloadPluginNameSet, reloadPluginSet, dataChangePluginSet}
 	slices := make([][]string, len(orderedSets))
-	// 按顺序遍历所有集合
+	// Walk all sets in order
 	for i, set := range orderedSets {
 		if nil != set {
-			// 遍历当前集合的所有插件名称
+			// Walk all plugin names in the current set
 			for _, n := range set.Values() {
 				name := n.(string)
-				// 将该插件从所有后续集合中移除
+				// Remove this plugin from all subsequent sets
 				for _, lowerSet := range orderedSets[i+1:] {
 					if nil != lowerSet {
 						lowerSet.Remove(name)
@@ -63,7 +64,7 @@ func PushReloadPlugin(uninstallPluginNameSet, unloadPluginNameSet, reloadPluginS
 			}
 		}
 
-		// 将当前集合转换为字符串切片
+		// Convert the current set to a string slice
 		if nil == set {
 			slices[i] = []string{}
 		} else {
@@ -77,10 +78,10 @@ func PushReloadPlugin(uninstallPluginNameSet, unloadPluginNameSet, reloadPluginS
 
 	logging.LogInfof("reload plugins, uninstalls=%v, unloads=%v, reloads=%v, dataChanges=%v", slices[0], slices[1], slices[2], slices[3])
 	payload := map[string]any{
-		"uninstallPlugins":  slices[0], // 插件卸载
-		"unloadPlugins":     slices[1], // 插件禁用
-		"reloadPlugins":     slices[2], // 插件启用，或插件代码变更
-		"dataChangePlugins": slices[3], // 插件存储数据变更
+		"uninstallPlugins":  slices[0], // plugin uninstalled
+		"unloadPlugins":     slices[1], // plugin disabled
+		"reloadPlugins":     slices[2], // plugin enabled, or its code changed
+		"dataChangePlugins": slices[3], // plugin's stored data changed
 	}
 
 	if "" == excludeApp {
@@ -203,7 +204,7 @@ func ReloadTag() {
 }
 
 func ReloadProtyle(rootID string) {
-	// 刷新关联的引用
+	// Refresh the associated refs
 	defTree, _ := LoadTreeByBlockID(rootID)
 	if nil != defTree {
 		defIDs := sql.QueryChildDefIDsByRootDefID(rootID)
@@ -225,7 +226,7 @@ func ReloadProtyle(rootID string) {
 		}
 	}
 
-	// 刷新关联的嵌入块
+	// Refresh the associated embed blocks
 	refIDs := sql.QueryRefIDsByDefID(rootID, true)
 	var rootIDs []string
 	bts := treenode.GetBlockTrees(refIDs)
@@ -240,7 +241,7 @@ func ReloadProtyle(rootID string) {
 	task.AppendAsyncTaskWithDelay(task.ReloadProtyle, 200*time.Millisecond, util.PushReloadProtyle, rootID)
 }
 
-// refreshRefCount 用于刷新定义块处的引用计数。
+// refreshRefCount refreshes the ref count on a def block.
 func refreshRefCount(blockID string) {
 	sql.FlushQueue()
 
@@ -270,16 +271,18 @@ func refreshRefCount(blockID string) {
 	util.PushSetDefRefCount(bt.RootID, blockID, defIDs, refCount, rootRefCount)
 }
 
-// refreshDynamicRefText 用于刷新块引用的动态锚文本。
-// 该实现依赖了数据库缓存，导致外部调用时可能需要阻塞等待数据库写入后才能获取到 refs
+// refreshDynamicRefText refreshes the dynamic anchor text of a block ref.
+// This implementation relies on the database cache, so callers may need to block until the
+// database write completes before the refs can be retrieved.
 func refreshDynamicRefText(updatedDefNode *ast.Node, updatedTree *parse.Tree) {
 	changedDefs := map[string]*ast.Node{updatedDefNode.ID: updatedDefNode}
 	changedTrees := map[string]*parse.Tree{updatedTree.ID: updatedTree}
 	refreshDynamicRefTexts(changedDefs, changedTrees)
 }
 
-// refreshDynamicRefTexts 用于批量刷新块引用的动态锚文本。
-// 该实现依赖了数据库缓存，导致外部调用时可能需要阻塞等待数据库写入后才能获取到 refs
+// refreshDynamicRefTexts refreshes the dynamic anchor text of block refs in batch.
+// This implementation relies on the database cache, so callers may need to block until the
+// database write completes before the refs can be retrieved.
 func refreshDynamicRefTexts(updatedDefNodes map[string]*ast.Node, updatedTrees map[string]*parse.Tree) (changedRootIDs []string) {
 	for t := range updatedTrees {
 		changedRootIDs = append(changedRootIDs, t)
@@ -305,7 +308,7 @@ func refreshDynamicRefTexts0(updatedDefNodes map[string]*ast.Node, updatedTrees 
 	updatedRefNodes = map[string]*ast.Node{}
 	updatedRefTrees = map[string]*parse.Tree{}
 
-	// 1. 更新引用的动态锚文本
+	// 1. Update the dynamic anchor text of the refs
 	treeRefNodeIDs := map[string]*hashset.Set{}
 	var changedNodes []*ast.Node
 	var refs []*sql.Ref
@@ -351,7 +354,7 @@ func refreshDynamicRefTexts0(updatedDefNodes map[string]*ast.Node, updatedTrees 
 					updatedRefTrees[refTreeID] = refTree
 				}
 
-				// 推送动态锚文本节点刷新
+				// Push a refresh for the dynamic anchor text node
 				for _, defNode := range changedDefNodes {
 					switch defNode.refType {
 					case "ref-d":
@@ -369,10 +372,10 @@ func refreshDynamicRefTexts0(updatedDefNodes map[string]*ast.Node, updatedTrees 
 		}
 	}
 
-	// 2. 更新属性视图主键内容
+	// 2. Update the attribute view primary key content
 	updateAttributeViewBlockText(updatedDefNodes)
 
-	// 3. 保存变更
+	// 3. Save the changes
 	for _, tree := range changedRefTree {
 		indexWriteTreeUpsertQueue(tree)
 	}
@@ -433,7 +436,7 @@ func updateAttributeViewBlockText(updatedDefNodes map[string]*ast.Node) {
 	}
 }
 
-// ReloadAttrView 用于重新加载属性视图。
+// ReloadAttrView reloads the attribute view.
 func ReloadAttrView(avID string) {
 	task.AppendAsyncTaskWithDelay(task.ReloadAttributeView, 200*time.Millisecond, pushReloadAttrView, avID)
 }

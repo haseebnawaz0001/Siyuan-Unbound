@@ -21,10 +21,10 @@ let yDiff: number;
 let time: number;
 let firstDirection: "toLeft" | "toRight";
 let firstXY: "x" | "y";
-let lastClientX: number;    // 和起始方向不一致时，记录最后一次的 clientX
+let lastClientX: number;    // records the last clientX when it doesn't match the initial direction
 let scrollBlock: boolean;
 let isFirstMove = true;
-// 长按进入多选的定时器
+// Timer for entering multi-select via long press
 let longPressTimer: number;
 
 const popSide = (render = true) => {
@@ -36,7 +36,7 @@ const popSide = (render = true) => {
     }
 };
 
-// 清除长按进入多选的定时器
+// Clear the timer for entering multi-select via long press
 const clearLongPress = () => {
     if (longPressTimer) {
         clearTimeout(longPressTimer);
@@ -65,12 +65,13 @@ export const handleTouchEnd = (event: TouchEvent) => {
                 event.preventDefault();
                 return;
             }
-            // 多选模式
+            // Multi-select mode
             window.getSelection()?.removeAllRanges();
             activeBlur();
             const blockElement = hasClosestBlock(target);
             if (blockElement) {
-                // 本次按压已在按住期间触发多选，松手时不切换选中态，仅消费该手势
+                // This press already triggered multi-select while held down, so on release don't toggle the
+                // selection state, just consume this gesture
                 blockElement.querySelectorAll(".protyle-wysiwyg--select").forEach(item => {
                     item.classList.remove("protyle-wysiwyg--select");
                 });
@@ -85,7 +86,8 @@ export const handleTouchEnd = (event: TouchEvent) => {
                 event.preventDefault();
             }
         } else if (currentTime - time > Constants.TIMEOUT_LONGPRESS) {
-            // 长按：多选已在按住满阈值时触发，此处取消定时器避免重复触发
+            // Long press: multi-select was already triggered once the hold threshold was reached; cancel the timer
+            // here to avoid triggering it again
             if (isIPhone() && !isChromeBrowser() && !window.siyuan.touchDragActive) {
                 target.dispatchEvent(new MouseEvent("contextmenu", {
                     bubbles: true,
@@ -103,7 +105,8 @@ export const handleTouchEnd = (event: TouchEvent) => {
         const nodeElement = hasClosestBlock(target);
         if (nodeElement && nodeElement.closest(".protyle-wysiwyg")) {
             if (nodeElement.classList.contains("list") || nodeElement.classList.contains("li")) {
-                // 光标在列表下部应显示右侧的元素，而不是列表本身。放在 windowEvent 中的 mousemove 下处理
+                // When the cursor is in the lower part of a list, the element to the right should be shown instead
+                // of the list itself; this is handled under mousemove in windowEvent
                 return;
             }
             const embedElement = isInEmbedBlock(nodeElement);
@@ -130,9 +133,9 @@ export const handleTouchEnd = (event: TouchEvent) => {
         window.siyuan.mobile.editor.protyle.contentElement.style.overflow = "";
     }
 
-    // 有些事件不经过 touchstart 和 touchmove，因此需设置为 null 不再继续执行
+    // Some events don't go through touchstart and touchmove, so set this to null to stop further processing
     clientX = null;
-    // 有些事件不经过 touchmove
+    // Some events don't go through touchmove
 
     if (scrollBlock) {
         closePanel();
@@ -150,7 +153,7 @@ export const handleTouchEnd = (event: TouchEvent) => {
     const modelElement = hasClosestByAttribute(target, "id", "model", true);
     if (modelElement) {
         if (isXScroll && firstDirection === "toRight" && !lastClientX && !hasClosestByClassName(target, "protyle-wysiwyg", true) &&
-            // 划选文字时不触发关闭面板
+            // Don't trigger closing the panel while selecting text
             (getSelection().rangeCount === 0 || getSelection().toString() === "")) {
             closeModel();
         }
@@ -226,7 +229,7 @@ export const handleTouchStart = (event: TouchEvent) => {
         activeBlur();
         return;
     }
-    // 存在其他拖拽元素时
+    // When another draggable element is present
     const otherTouchElement = hasClosestByClassName(target, "b3-chip");
     if ((otherTouchElement && otherTouchElement.parentElement.classList.contains("b3-chips__doctag")) ||
         target.closest(".protyle-gutters") ||
@@ -260,7 +263,8 @@ export const handleTouchStart = (event: TouchEvent) => {
     }
     isFirstMove = true;
     scrollBlock = false;
-    // 长按编辑器内块达到阈值时直接进入多选模式，无需抬手
+    // When a long press on a block inside the editor reaches the threshold, enter multi-select mode directly
+    // without needing to release
     clearLongPress();
     if (clientX && clientY && editor && !editor.protyle.toolbar.isMultiSelectMode()) {
         const blockElement = hasClosestBlock(target);
@@ -280,7 +284,8 @@ let previousClientX: number;
 const sideMaskElement = document.querySelector(".side-mask") as HTMLElement;
 export const handleTouchMove = (event: TouchEvent) => {
     const target = event.target as HTMLElement;
-    // 位移超过阈值说明是滑动而非长按，取消进入多选的定时器
+    // Movement exceeding the threshold means this is a swipe rather than a long press, so cancel the timer for
+    // entering multi-select
     if (clientX && clientY &&
         (Math.abs(clientX - event.touches[0].clientX) >= 5 || Math.abs(clientY - event.touches[0].clientY) >= 5)) {
         clearLongPress();
@@ -297,13 +302,13 @@ export const handleTouchMove = (event: TouchEvent) => {
         return;
     }
 
-    // 正在编辑时禁止滑动
+    // Disable swiping while editing
     if (!document.querySelector("#keyboardToolbar").classList.contains("fn__none")) {
         return;
     }
-    // 只读状态下选中内容时时禁止滑动
+    // Disable swiping when content is selected in read-only state
     if (getSelection().rangeCount > 0) {
-        // 选中后扩选的情况
+        // Case where the selection was extended after selecting
         const range = getSelection().getRangeAt(0);
         const currentEditor = getCurrentEditor();
         if (range.toString() !== "" && currentEditor?.protyle.wysiwyg.element.contains(range.startContainer)) {
@@ -316,7 +321,7 @@ export const handleTouchMove = (event: TouchEvent) => {
     if (!firstDirection) {
         firstDirection = xDiff > 0 ? "toLeft" : "toRight";
     }
-    // 上下滚动防止左右滑动
+    // Vertical scrolling prevents horizontal swiping
     if (!firstXY) {
         if (Math.abs(xDiff) > Math.abs(yDiff)) {
             firstXY = "x";

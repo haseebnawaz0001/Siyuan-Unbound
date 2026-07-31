@@ -41,7 +41,7 @@ func MarkText(text string, keyword string, beforeLen int, caseSensitive bool) (p
 
 	var before []rune
 	var count int
-	for i := pos; 0 < i; { // 关键字前面太长的话缩短一些
+	for i := pos; 0 < i; { // shorten it if the text before the keyword is too long
 		r, size := utf8.DecodeLastRuneInString(marked[:i])
 		i -= size
 		before = append([]rune{r}, before...)
@@ -98,7 +98,8 @@ func EncloseHighlighting(text string, keywords []string, openMark, closeMark str
 			wordBoundary = lex.IsASCIILetterNums(gulu.Str.ToBytes(k)) // Improve virtual reference split words https://github.com/siyuan-note/siyuan/issues/7833
 		}
 		if !util.SearchHanSensitive {
-			// 不区分繁简：将关键字逐字符展开为繁简等价字符类，如 "诗经" -> "[诗詩][经經]"
+			// Traditional/simplified insensitive: expand the keyword character by character into
+			// traditional/simplified equivalence character classes, e.g. "诗经" -> "[诗詩][经經]"
 			k = hanInsensitiveRegexp(util.EscapeHTML(k))
 		} else {
 			k = regexp.QuoteMeta(util.EscapeHTML(k))
@@ -132,7 +133,7 @@ func EncloseHighlighting(text string, keywords []string, openMark, closeMark str
 	ret = strings.ReplaceAll(ret, "\ue002", "&gt;")
 	ret = strings.ReplaceAll(ret, "\ue003", "&#39;")
 
-	// 搜索结果预览包含转义符问题 Search results preview contains escape character issue https://github.com/siyuan-note/siyuan/issues/9790
+	// Search results preview contains escape character issue https://github.com/siyuan-note/siyuan/issues/9790
 	ret = strings.ReplaceAll(ret, "\\<span", "\\\\<span")
 	return
 }

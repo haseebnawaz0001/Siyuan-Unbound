@@ -12,7 +12,7 @@ export class Scroll {
     private parentElement: HTMLElement;
     private inputElement: HTMLInputElement;
     public lastScrollTop: number;
-    public keepLazyLoad: boolean;   // 保持加载内容
+    public keepLazyLoad: boolean;   // Keep the loaded content
 
     constructor(protyle: IProtyle) {
         this.parentElement = document.createElement("div");
@@ -86,7 +86,7 @@ export class Scroll {
                 afterCB: () => {
                     setTimeout(() => {
                         protyle.contentElement.style.overflow = "";
-                    }, Constants.TIMEOUT_INPUT);    // 需和 onGet 中的 preventScroll 保持一致
+                    }, Constants.TIMEOUT_INPUT);    // Must stay consistent with preventScroll in onGet
                     showTooltip(this.element.getAttribute("aria-label"), this.element);
                 }
             });

@@ -22,9 +22,9 @@ import (
 	"github.com/88250/gulu"
 )
 
-// UnzipTool 提供工作区内 zip 文件解压能力。
-// zipPath 和 destPath 均为工作区相对路径，通过 resolvePath 校验防逃逸。
-// 解压是写操作，自动触发 UI 确认和仓库快照（不在 safeActions 中）。
+// UnzipTool provides the ability to extract a zip file within the workspace.
+// Both zipPath and destPath are workspace-relative paths, validated via resolvePath to prevent escaping.
+// Extraction is a write operation, so it automatically triggers UI confirmation and a repository snapshot (it's not in safeActions).
 var UnzipTool = &Tool{
 	Name:        "unzip",
 	Description: "Extract a zip archive within the workspace. Provide the workspace-relative path to the zip file and the destination directory (also workspace-relative). The destination will be created if it does not exist.",
@@ -59,7 +59,7 @@ func unzipHandler(args map[string]any) (CallToolResult, error) {
 		return CallToolResult{Content: []ContentItem{{Type: "text", Text: "destPath is required"}}, IsError: true}, nil
 	}
 
-	// 解析并校验路径在工作区内（防逃逸），复用 file 工具的 resolvePath。
+	// Resolve and validate that the paths are within the workspace (to prevent escaping), reusing the file tool's resolvePath.
 	zipAbs, err := resolvePath(zipPath)
 	if err != nil {
 		return CallToolResult{Content: []ContentItem{{Type: "text", Text: "invalid zipPath: " + err.Error()}}, IsError: true}, nil
@@ -69,12 +69,12 @@ func unzipHandler(args map[string]any) (CallToolResult, error) {
 		return CallToolResult{Content: []ContentItem{{Type: "text", Text: "invalid destPath: " + err.Error()}}, IsError: true}, nil
 	}
 
-	// 检查 zip 文件存在。
+	// Check that the zip file exists.
 	if !gulu.File.IsExist(zipAbs) {
 		return CallToolResult{Content: []ContentItem{{Type: "text", Text: "zip file not found: " + zipPath}}, IsError: true}, nil
 	}
 
-	// 解压（gulu.Zip.Unzip 是内核统一使用的解压 API，与 /api/archive/unzip 一致）。
+	// Extract (gulu.Zip.Unzip is the extraction API used uniformly across the kernel, consistent with /api/archive/unzip).
 	if err := gulu.Zip.Unzip(zipAbs, destAbs); err != nil {
 		return CallToolResult{Content: []ContentItem{{Type: "text", Text: "unzip failed: " + err.Error()}}, IsError: true}, nil
 	}

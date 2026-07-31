@@ -50,8 +50,10 @@ func newManagedEncryptedExportID() (string, error) {
 	return hex.EncodeToString(random), nil
 }
 
-// registerManagedEncryptedExport 登记一个加密笔记本的导出产物，返回相对路径作为下载令牌。
-// kind 标识产物来源（resources/sy/markdown/repo），仅影响注册 key 的分段，解析与撤销均按 boxID 前缀匹配。
+// registerManagedEncryptedExport registers an export artifact from an encrypted notebook, returning a
+// relative path to use as the download token.
+// kind identifies the artifact's source (resources/sy/markdown/repo); it only affects the segment of the
+// registration key, and both resolution and revocation match on the boxID prefix.
 func registerManagedEncryptedExport(boxID, kind, artifact string) string {
 	relativePath := path.Join(boxID, kind, filepath.Base(artifact))
 	managedEncryptedExports.Lock()
@@ -64,12 +66,13 @@ func registerManagedEncryptedExport(boxID, kind, artifact string) string {
 	return relativePath
 }
 
-// RegisterManagedEncryptedExport 是 registerManagedEncryptedExport 的导出包装，供 api 层调用。
+// RegisterManagedEncryptedExport is the exported wrapper around registerManagedEncryptedExport, for the api layer to call.
 func RegisterManagedEncryptedExport(boxID, kind, artifact string) string {
 	return registerManagedEncryptedExport(boxID, kind, artifact)
 }
 
-// ResolveManagedEncryptedExport 返回仍有效的加密导出产物，未登记、已撤销或过期的路径均不可下载。
+// ResolveManagedEncryptedExport returns an encrypted export artifact that is still valid; paths that
+// are unregistered, revoked, or expired cannot be downloaded.
 func ResolveManagedEncryptedExport(relativePath string) (boxID, artifact string, ok bool) {
 	relativePath = path.Clean("/" + relativePath)
 	relativePath = relativePath[1:]
@@ -90,7 +93,7 @@ func ResolveManagedEncryptedExport(relativePath string) (boxID, artifact string,
 	return job.boxID, job.artifact, true
 }
 
-// RevokeManagedEncryptedExportsForBox 使指定笔记本的所有导出下载链接立即失效。
+// RevokeManagedEncryptedExportsForBox immediately invalidates all export download links for the given notebook.
 func RevokeManagedEncryptedExportsForBox(boxID string) {
 	managedEncryptedExports.Lock()
 	defer managedEncryptedExports.Unlock()
@@ -101,8 +104,10 @@ func RevokeManagedEncryptedExportsForBox(boxID string) {
 	}
 }
 
-// clearEncryptedExportTempOnBoot 清理异常退出后残留的加密笔记本明文导出目录。
-// 加密导出的第一层目录固定为 boxID，普通导出和插件临时目录不使用该命名形式。
+// clearEncryptedExportTempOnBoot cleans up leftover plaintext export directories for encrypted notebooks
+// that remain after an abnormal exit.
+// The top-level directory for an encrypted export is always the boxID; regular exports and plugin temp
+// directories don't use this naming form.
 func clearEncryptedExportTempOnBoot() {
 	if strings.TrimSpace(util.TempDir) == "" {
 		logging.LogWarnf("skip clearing stale encrypted export temp: temp dir is not initialized")
@@ -128,17 +133,21 @@ func clearEncryptedExportTempOnBoot() {
 	}
 }
 
-// IsManagedEncryptedExportPath 判断相对路径是否属于加密导出受控范围（<boxID>/<kind>/<file> 结构）。
-// 只要路径首段是合法 boxID 格式即视为受控，不依赖 box 是否仍存在（笔记本删除后仍需按注册表拒绝，
-// 避免因 IsEncryptedBox 返回 false 而 fail-open 暴露明文产物）。
+// IsManagedEncryptedExportPath reports whether a relative path falls within the managed scope of
+// encrypted exports (the <boxID>/<kind>/<file> structure).
+// A path is considered managed as long as its first segment is a valid boxID format, regardless of
+// whether the box still exists (a deleted notebook must still be rejected per the registry, to avoid
+// fail-open exposure of plaintext artifacts just because IsEncryptedBox returns false).
 func IsManagedEncryptedExportPath(relativePath string) bool {
 	relativePath = path.Clean("/" + relativePath)
 	parts := strings.SplitN(strings.TrimPrefix(relativePath, "/"), "/", 3)
 	return len(parts) >= 1 && ast.IsNodeIDPattern(parts[0])
 }
 
-// ResolveManagedExportForMobile 供移动端 GetExportFilePath 调用，校验托管 token 有效且 box 已解锁。
-// 任一条件不满足返回 ("", false)（fail-closed），防止移动端绕过注册表直接读取明文导出产物。
+// ResolveManagedExportForMobile is called by the mobile GetExportFilePath to verify that the managed
+// token is valid and the box is unlocked.
+// If either condition fails it returns ("", false) (fail-closed), preventing mobile from bypassing the
+// registry to read plaintext export artifacts directly.
 func ResolveManagedExportForMobile(relativePath string) (absPath string, ok bool) {
 	boxID, artifact, resolved := ResolveManagedEncryptedExport(relativePath)
 	if !resolved {

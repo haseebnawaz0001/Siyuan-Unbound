@@ -26,7 +26,7 @@ import (
 	"github.com/siyuan-note/filelock"
 )
 
-// 以下是七牛云 Hash 算法实现 https://github.com/qiniu/qetag/blob/master/qetag.go
+// The following is the Qiniu Cloud hash algorithm implementation https://github.com/qiniu/qetag/blob/master/qetag.go
 
 func GetEtagByHandle(f io.Reader, size int64) (etag string, err error) {
 	blockCnt := BlockCount(size)

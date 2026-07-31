@@ -154,7 +154,7 @@ export const assetMenu = (protyle: IProtyle, position: IPosition, callback?: (ur
                         window.siyuan.menus.menu.remove();
                         focusByRange(protyle.toolbar.range);
                     }
-                    // 空行处插入 mp3 会多一个空的 mp3 块
+                    // Inserting an mp3 on an empty line adds an extra empty mp3 block
                     event.preventDefault();
                     event.stopPropagation();
                 } else if (event.key === "Escape") {
@@ -360,7 +360,7 @@ export const refMenu = (protyle: IProtyle, element: HTMLElement) => {
                 inputElement.value = element.getAttribute("data-subtype") === "d" ? "" : element.textContent;
                 inputElement.addEventListener("input", () => {
                     if (inputElement.value) {
-                        // 不能使用 textContent，否则 < 会变为 &lt;
+                        // Cannot use textContent, otherwise < would become &lt;
                         element.innerHTML = Lute.EscapeHTMLStr(inputElement.value).trim() || refBlockId;
                     } else {
                         fetchPost("/api/block/getRefText", {id: refBlockId}, (response) => {
@@ -711,7 +711,7 @@ export const contentMenu = (protyle: IProtyle, nodeElement: Element) => {
             accelerator: "⌘C",
             label: window.siyuan.languages.copy,
             click() {
-                // range 需要重新计算 https://ld246.com/article/1644979219025
+                // The range needs to be recalculated https://ld246.com/article/1644979219025
                 focusByRange(getEditorRange(nodeElement));
                 document.execCommand("copy");
             }
@@ -1010,13 +1010,13 @@ export const zoomOut = (options: {
                 focusElement = options.protyle.wysiwyg.element.querySelector(`[data-node-id="${unfoldResponse.data.parentID}"]`);
             }
             if (focusElement) {
-                // 退出聚焦后块在折叠中 https://github.com/siyuan-note/siyuan/issues/10746
+                // After exiting zoom-in, the block is inside a collapsed section https://github.com/siyuan-note/siyuan/issues/10746
                 let showElement = focusElement;
                 while (showElement.getBoundingClientRect().height === 0) {
                     showElement = showElement.parentElement;
                 }
                 if (showElement.classList.contains("protyle-wysiwyg")) {
-                    // 闪卡退出聚焦元素被隐藏 https://github.com/siyuan-note/siyuan/issues/10058#issuecomment-2029524211
+                    // Flashcards: the element is hidden after exiting zoom-in https://github.com/siyuan-note/siyuan/issues/10058#issuecomment-2029524211
                     showElement = focusElement.previousElementSibling || focusElement.nextElementSibling;
                 } else {
                     showElement = getFirstBlock(showElement);
@@ -1038,7 +1038,7 @@ export const zoomOut = (options: {
                     });
                 });
                 return;
-            } else if (options.id === options.protyle.block.rootID) { // 聚焦返回后，该块是动态加载的，但是没加载出来
+            } else if (options.id === options.protyle.block.rootID) { // After returning from zoom-in, this block is dynamically loaded but hasn't loaded yet
                 const getDocParam: IObject = {
                     id: options.focusId,
                     mode: 3,

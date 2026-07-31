@@ -24,7 +24,7 @@ export const hideElements = (panels: string[], protyle?: IProtyle, focusHide = f
             item.classList.remove("protyle-wysiwyg--hl");
         });
     }
-    //  不能 remove("protyle-wysiwyg--hl") 否则打开页签的时候 "cb-get-hl" 高亮会被移除
+    // Do not remove "protyle-wysiwyg--hl", otherwise the "cb-get-hl" highlight will be removed when opening the tab
     if (protyle.gutter && panels.includes("gutterOnly")) {
         if (!isIPhone()) {
             protyle.gutter.element.classList.add("fn__none");

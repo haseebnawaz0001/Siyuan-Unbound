@@ -56,8 +56,8 @@ type dbQueueOperation struct {
 	removeAssetHashes             []string    // delete_assets
 }
 
-// boxID 从 op 提取目标 boxID，供 beginTxForBox 路由到加密 db 或全局 db。
-// delete_ids/delete_assets 无 box 上下文，返回空串 → 走全局 db。
+// boxID extracts the target boxID from op, for beginTxForBox to route to the encrypted db or the global db.
+// delete_ids/delete_assets have no box context, so they return an empty string -> routed to the global db.
 func (op *dbQueueOperation) boxID() string {
 	switch op.action {
 	case "index", "rename", "move":
@@ -93,10 +93,10 @@ func WaitFlushTx() {
 
 	for len(operationQueue) > 0 || flushingTx.Load() {
 		if i == 0 {
-			// 第一次等待时使用较短的超时
+			// Use a shorter timeout for the first wait
 			dbQueueCond.Wait()
 		} else {
-			// 后续等待添加超时检测，用于打印警告日志
+			// Add timeout detection for subsequent waits, used to print a warning log
 			timer := time.AfterFunc(50*time.Millisecond, func() {
 				dbQueueCond.Broadcast()
 			})
@@ -105,11 +105,11 @@ func WaitFlushTx() {
 		}
 
 		i++
-		if 200 < i && !printLog { // 10s 后打日志
+		if 200 < i && !printLog { // Log after 10s
 			logging.LogWarnf("database is writing: \n%s", logging.ShortStack())
 			printLog = true
 		}
-		if 1200 < i && !lastPrintLog { // 60s 后打日志
+		if 1200 < i && !lastPrintLog { // Log after 60s
 			logging.LogWarnf("database is still writing")
 			lastPrintLog = true
 		}
@@ -139,7 +139,7 @@ func FlushQueue() {
 	flushingTx.Store(true)
 	defer func() {
 		flushingTx.Store(false)
-		// 通知等待的协程队列已刷新完成
+		// Notify waiting goroutines that the queue has finished flushing
 		dbQueueCond.Broadcast()
 	}()
 
@@ -147,7 +147,8 @@ func FlushQueue() {
 
 	// logging.LogInfof("flushing database queue, total operations [%d]", total)
 
-	// 如果有重命名树的操作，则统计各路径前缀的块树数量，数量较大的话阻塞整个队列，以便尽可能合并重命名树的操作 RenameTreeQueue(tree)
+	// If there's a rename-tree operation, count the block trees under each path prefix; if the count is large,
+	// block the whole queue so that rename-tree operations can be merged as much as possible: RenameTreeQueue(tree)
 	var renameTreeOp *dbQueueOperation
 	for _, op := range ops {
 		if "rename" == op.action {
@@ -281,10 +282,12 @@ func execOp(op *dbQueueOperation, tx *sql.Tx, context map[string]any) (err error
 			tx.Exec("UPDATE block_embeddings SET box = ?, path = ? WHERE root_id = ?", op.indexTree.Box, op.indexTree.Path, op.indexTree.ID)
 		}
 	case "delete_box":
-		// 清理 box 的内容索引。事务由 beginTxForBox(op.boxID()) 按所属库路由：
-		// 普通 box 落到全局 siyuan.db，加密笔记本落到其独立 content db，删除均生效。
-		// 注意加密笔记本关闭时必须清空 content db 数据，否则下次 Mount 的全量 Index
-		// 会用纯 INSERT 在无主键的 blocks 表上叠加重复行，导致搜索结果翻倍。
+		// Clean up the box's content index. The transaction is routed by beginTxForBox(op.boxID()) according to
+		// which db owns it: a regular box lands on the global siyuan.db, an encrypted notebook lands on its own
+		// content db, and the delete takes effect either way.
+		// Note that an encrypted notebook's content db data must be cleared when it's closed, otherwise the next
+		// full Index on Mount would use plain INSERTs on the primary-key-less blocks table, piling up duplicate
+		// rows and doubling search results.
 		err = deleteByBoxTx(tx, op.box)
 		if nil == err {
 			tx.Exec("DELETE FROM block_embeddings WHERE box = ?", op.box)
@@ -415,7 +418,7 @@ func IndexTreeQueue(tree *parse.Tree) {
 
 	newOp := &dbQueueOperation{indexTree: tree, inQueueTime: time.Now(), action: "index"}
 	for i, op := range operationQueue {
-		if "index" == op.action && op.indexTree.ID == tree.ID { // 相同树则覆盖
+		if "index" == op.action && op.indexTree.ID == tree.ID { // Overwrite if it's the same tree
 			operationQueue[i] = newOp
 			return
 		}
@@ -429,7 +432,7 @@ func UpsertTreeQueue(tree *parse.Tree) {
 
 	newOp := &dbQueueOperation{upsertTree: tree, inQueueTime: time.Now(), action: "upsert"}
 	for i, op := range operationQueue {
-		if "upsert" == op.action && op.upsertTree.ID == tree.ID { // 相同树则覆盖
+		if "upsert" == op.action && op.upsertTree.ID == tree.ID { // Overwrite if it's the same tree
 			operationQueue[i] = newOp
 			return
 		}
@@ -447,7 +450,7 @@ func RenameTreeQueue(tree *parse.Tree) {
 		action:      "rename",
 	}
 	for i, op := range operationQueue {
-		if "rename" == op.action && op.indexTree.ID == tree.ID { // 相同树则覆盖
+		if "rename" == op.action && op.indexTree.ID == tree.ID { // Overwrite if it's the same tree
 			operationQueue[i] = newOp
 			return
 		}
@@ -465,7 +468,7 @@ func MoveTreeQueue(tree *parse.Tree) {
 		action:      "move",
 	}
 	for i, op := range operationQueue {
-		if "move" == op.action && op.indexTree.ID == tree.ID { // 相同树则覆盖
+		if "move" == op.action && op.indexTree.ID == tree.ID { // Overwrite if it's the same tree
 			operationQueue[i] = newOp
 			return
 		}

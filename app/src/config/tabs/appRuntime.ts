@@ -8,7 +8,7 @@ import {exportLayout} from "../../layout/util";
 /// #endif
 import {exitSiYuan} from "../../dialog/processSystem";
 
-/** 应用 / 关于 / 访问授权等 Tab 中的 system.* 设置项 save */
+/** Save handler of the system.* setting items of the app, about and access authorization tabs */
 export const sendAppSetting = (controlId: string, value: unknown) => {
     switch (controlId) {
         case "system.autoLaunch2": {

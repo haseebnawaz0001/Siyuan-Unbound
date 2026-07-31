@@ -556,13 +556,13 @@ func importZipMd(c *gin.Context) {
 	notebook := form.Value["notebook"][0]
 	toPath := form.Value["toPath"][0]
 
-	// 准备解压路径
+	// Prepare the unzip path
 	filenameMain := strings.TrimSuffix(file.Filename, filepath.Ext(file.Filename))
 	unzipPath := filepath.Join(util.TempDir, "import", filenameMain)
 
 	defer os.RemoveAll(unzipPath)
 
-	// 解压 writePath 的 zip 到 unzipPath
+	// Unzip writePath's zip into unzipPath
 	err = gulu.Zip.Unzip(writePath, unzipPath)
 	if err != nil {
 		logging.LogErrorf("unzip import .zip failed: %s", err)
@@ -571,7 +571,7 @@ func importZipMd(c *gin.Context) {
 		return
 	}
 
-	// 调用本地导入逻辑
+	// Call the local import logic
 	err = model.ImportFromLocalPath(notebook, unzipPath, toPath)
 
 	if err != nil {

@@ -100,7 +100,8 @@ export const parseUriInfo = (): ISiYuanUriBlockInfo => {
         }
     }
 
-    // 支持通过 URL 查询字符串参数 `id` 和 `focus` 跳转到 Web 端指定块 https://github.com/siyuan-note/siyuan/pull/7086
+    // Support jumping to a specific block on the web end via the URL query string parameters `id`
+    // and `focus` https://github.com/siyuan-note/siyuan/pull/7086
     const fullscreen = searchParams.get("fullscreen") === "1";
     window.siyuan.editorIsFullscreen = fullscreen;
     return {
@@ -169,13 +170,13 @@ export const isLocalPath = (link: string) => {
     }
 
     link = link.toLowerCase();
-    if (link.startsWith("assets/") || link.startsWith("file://") || link.startsWith("\\\\") /* Windows 网络共享路径 */) {
+    if (link.startsWith("assets/") || link.startsWith("file://") || link.startsWith("\\\\") /* Windows network share path */) {
         return true;
     }
 
     if (isWindows()) {
         const colonIdx = link.indexOf(":");
-        return 1 === colonIdx; // 冒号前面只有一个字符认为是 Windows 盘符而不是网络协议
+        return 1 === colonIdx; // A single character before the colon is treated as a Windows drive letter, not a network protocol
     }
     return link.startsWith("/");
 };
@@ -640,7 +641,7 @@ export const movePathTo = (options: {
                 }
                 if (options.title === window.siyuan.languages.specifyPath && isOnlyMeta(event)) {
                     if (currentItemElements.length === 1 && currentItemElements[0] === target) {
-                        // 至少需选中一个
+                        // At least one must remain selected
                     } else {
                         target.classList.toggle("b3-list-item--focus");
                     }
@@ -777,9 +778,10 @@ export const setNoteBook = (cb?: (notebook: INotebook[]) => void, flashcard = fa
 };
 
 /**
- * 返回指定 boxID 是否为加密笔记本。
- * 用于前端在加密 box 上下文里给 getDoc / 反链 / 搜索请求带上 notebook 参数，
- * 让内核走 InBox 版（查加密 blocktree + content db）。
+ * Returns whether the given boxID is an encrypted notebook.
+ * Used by the frontend to attach the notebook parameter to getDoc / backlink / search requests in
+ * an encrypted box context, so the kernel takes the InBox path (querying the encrypted blocktree +
+ * content db).
  */
 export const isEncryptedBox = (boxId: string): boolean => {
     if (!boxId) {
@@ -789,9 +791,11 @@ export const isEncryptedBox = (boxId: string): boolean => {
 };
 
 /**
- * 规范化并校验相对路径：允许子目录，但禁止通过 ".." 穿越到根外。
- * 用于插件存储，确保路径不逃出指定根目录。
- * @returns 规范化后的相对路径（使用 /），若路径非法则返回替换后的合法路径
+ * Normalizes and validates a relative path: subdirectories are allowed, but escaping outside the
+ * root via ".." is forbidden.
+ * Used for plugin storage, to ensure the path never escapes the designated root directory.
+ * @returns the normalized relative path (using /); if the path is invalid, returns a sanitized
+ * valid path instead
  */
 export const normalizeStoragePath = (storageName: string): string | null => {
     const segments = storageName.replace(/\\/g, "/").split("/");

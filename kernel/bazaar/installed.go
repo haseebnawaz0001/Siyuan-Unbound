@@ -31,7 +31,7 @@ import (
 	"golang.org/x/sync/singleflight"
 )
 
-// ReadInstalledPackageDirs 读取本地集市包的目录列表
+// ReadInstalledPackageDirs reads the directory list of locally installed bazaar packages
 func ReadInstalledPackageDirs(basePath string) ([]os.DirEntry, error) {
 	if !util.IsPathRegularDirOrSymlinkDir(basePath) {
 		return []os.DirEntry{}, nil
@@ -51,9 +51,9 @@ func ReadInstalledPackageDirs(basePath string) ([]os.DirEntry, error) {
 	return dirs, nil
 }
 
-// SetInstalledPackageMetadata 设置本地集市包的通用元数据
+// SetInstalledPackageMetadata sets the common metadata of a locally installed bazaar package
 func SetInstalledPackageMetadata(pkg *Package, installPath, baseURLPath, pkgType, frontend string, bazaarPackagesMap map[string]*Package) bool {
-	// 展示信息
+	// display info
 	pkg.IconURL = baseURLPath + "icon.png"
 	pkg.PreviewURL = baseURLPath + "preview.png"
 	pkg.PreferredName = GetPreferredLocaleString(pkg.DisplayName, pkg.Name)
@@ -61,11 +61,11 @@ func SetInstalledPackageMetadata(pkg *Package, installPath, baseURLPath, pkgType
 	pkg.PreferredReadme = getInstalledPackageREADME(installPath, baseURLPath, pkg.Readme)
 	pkg.PreferredFunding = getPreferredFunding(pkg.Funding)
 
-	// 更新信息
+	// update info
 	pkg.Installed = true
 	pkg.DisallowInstall = isBelowRequiredAppVersion(pkg)
 	if bazaarPkg := bazaarPackagesMap[pkg.Name]; nil != bazaarPkg {
-		pkg.RepoURL = bazaarPkg.RepoURL // 更新链接使用在线数据，避免本地元数据的链接错误
+		pkg.RepoURL = bazaarPkg.RepoURL // use the online data for the updated link, to avoid an incorrect link from the local metadata
 		pkg.UpdateRequiredMinAppVer = bazaarPkg.MinAppVersion
 
 		if 0 > semver.Compare("v"+pkg.Version, "v"+bazaarPkg.Version) {
@@ -88,11 +88,15 @@ func SetInstalledPackageMetadata(pkg *Package, installPath, baseURLPath, pkgType
 		pkg.RepoURL = pkg.URL
 	}
 
-	// 安装信息
+	// install info
 	pkg.HInstallDate = getPackageHInstallDate(pkgType, pkg.Name, installPath)
-	// TODO 本地安装大小的缓存改成 1 分钟有效，打开集市包 README 的时候才遍历集市包文件夹进行统计，异步返回结果到前端显示 https://github.com/siyuan-note/siyuan/issues/16983
-	// 目前优先使用在线 stage 数据：不耗时，但可能不准确，比如本地旧版本与云端最新版本的安装大小可能不一致；其次使用本地目录大小：耗时，但准确
-	// 需要分离本地安装大小和在线 stage 数据的安装大小
+	// TODO change the local install size cache to a 1-minute TTL; only walk the package folder to compute the
+	// size when the bazaar package README is opened, and return the result to the frontend asynchronously
+	// https://github.com/siyuan-note/siyuan/issues/16983
+	// Currently the online stage data is preferred: not time-consuming, but may be inaccurate, e.g. an old
+	// local version and the latest cloud version may have a different install size; falling back to the local
+	// directory size: time-consuming, but accurate.
+	// Need to separate the local install size from the online stage data's install size.
 	bazaarMemMu.RLock()
 	cachedSize, hit := installSizeCache[pkg.RepoURL]
 	bazaarMemMu.RUnlock()
@@ -112,26 +116,26 @@ func SetInstalledPackageMetadata(pkg *Package, installPath, baseURLPath, pkgType
 
 // Add marketplace package config item `minAppVersion` https://github.com/siyuan-note/siyuan/issues/8330
 func isBelowRequiredAppVersion(pkg *Package) bool {
-	// 如果包没有指定 minAppVersion，则允许安装
+	// If the package doesn't specify minAppVersion, allow install
 	if "" == pkg.MinAppVersion {
 		return false
 	}
 
-	// 如果包要求的 minAppVersion 大于当前版本，则不允许安装
+	// If the package's required minAppVersion is greater than the current version, disallow install
 	if 0 < semver.Compare("v"+pkg.MinAppVersion, "v"+util.Ver) {
 		return true
 	}
 	return false
 }
 
-// BazaarInfo 集市的持久化信息
+// BazaarInfo is the persisted info of the bazaar
 type BazaarInfo struct {
 	Packages map[string]map[string]*PackageInfo `json:"packages"`
 }
 
-// PackageInfo 集市包的持久化信息
+// PackageInfo is the persisted info of a bazaar package
 type PackageInfo struct {
-	InstallTime int64 `json:"installTime"` // 安装时间戳（毫秒）
+	InstallTime int64 `json:"installTime"` // install timestamp (milliseconds)
 }
 
 var (
@@ -141,7 +145,7 @@ var (
 	bazaarInfoSingleFlight singleflight.Group
 )
 
-// getBazaarInfo 确保集市持久化信息已加载到 bazaarInfoCache
+// getBazaarInfo ensures the bazaar's persisted info has been loaded into bazaarInfoCache
 func getBazaarInfo() {
 	infoPath := filepath.Join(util.DataDir, "storage", "bazaar.json")
 	info, err := os.Stat(infoPath)
@@ -150,15 +154,15 @@ func getBazaarInfo() {
 	cache := bazaarInfoCache
 	modTime := bazaarInfoModTime
 	bazaarInfoCacheLock.RUnlock()
-	// 文件修改时间没变则认为缓存有效
+	// If the file's modification time hasn't changed, consider the cache valid
 	if cache != nil && err == nil && info.ModTime().Equal(modTime) {
 		return
 	}
 
 	_, _, _ = bazaarInfoSingleFlight.Do("loadBazaarInfo", func() (any, error) {
-		// 缓存失效时从磁盘加载
+		// Load from disk when the cache is invalid
 		newRet := loadBazaarInfo()
-		// 更新缓存和修改时间
+		// Update the cache and the modification time
 		bazaarInfoCacheLock.Lock()
 		bazaarInfoCache = newRet
 		if err == nil {
@@ -169,9 +173,9 @@ func getBazaarInfo() {
 	})
 }
 
-// loadBazaarInfo 从磁盘加载集市持久化信息
+// loadBazaarInfo loads the bazaar's persisted info from disk
 func loadBazaarInfo() (ret *BazaarInfo) {
-	// 初始化一个空的 BazaarInfo，后续使用时无需判断 nil
+	// Initialize an empty BazaarInfo, so later usage doesn't need to check for nil
 	ret = &BazaarInfo{
 		Packages: make(map[string]map[string]*PackageInfo),
 	}
@@ -203,7 +207,7 @@ func loadBazaarInfo() (ret *BazaarInfo) {
 	return
 }
 
-// saveBazaarInfo 保存集市持久化信息（调用者需持有 bazaarInfoCacheLock 写锁）
+// saveBazaarInfo saves the bazaar's persisted info (the caller must hold the bazaarInfoCacheLock write lock)
 func saveBazaarInfo() {
 	infoPath := filepath.Join(util.DataDir, "storage", "bazaar.json")
 
@@ -222,7 +226,7 @@ func saveBazaarInfo() {
 	}
 }
 
-// setPackageInstallTime 设置集市包的安装时间
+// setPackageInstallTime sets the install time of a bazaar package
 func setPackageInstallTime(pkgType, pkgName string, installTime time.Time) {
 	getBazaarInfo()
 
@@ -244,7 +248,7 @@ func setPackageInstallTime(pkgType, pkgName string, installTime time.Time) {
 	saveBazaarInfo()
 }
 
-// getPackageHInstallDate 获取集市包的安装日期
+// getPackageHInstallDate gets the install date of a bazaar package
 func getPackageHInstallDate(pkgType, pkgName, installPath string) string {
 	getBazaarInfo()
 	bazaarInfoCacheLock.RLock()
@@ -260,7 +264,7 @@ func getPackageHInstallDate(pkgType, pkgName, installPath string) string {
 		return time.UnixMilli(installTime).Format("2006-01-02")
 	}
 
-	// 如果 bazaar.json 中没有记录，使用文件夹修改时间并记录到 bazaar.json 中
+	// If there's no record in bazaar.json, use the folder's modification time and record it into bazaar.json
 	fi, err := os.Stat(installPath)
 	if err != nil {
 		logging.LogWarnf("stat install package folder [%s] failed: %s", installPath, err)
@@ -271,7 +275,7 @@ func getPackageHInstallDate(pkgType, pkgName, installPath string) string {
 	return fi.ModTime().Format("2006-01-02")
 }
 
-// RemovePackageInfo 删除集市包的持久化信息
+// RemovePackageInfo removes the persisted info of a bazaar package
 func RemovePackageInfo(pkgType, pkgName string) {
 	getBazaarInfo()
 

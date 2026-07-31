@@ -69,7 +69,7 @@ export class MobileOutline extends Model {
         const inputElement = this.element.querySelector("input.b3-text-field.search__label") as HTMLInputElement;
         inputElement.addEventListener("blur", () => {
             inputElement.classList.add("fn__none");
-            const filterIconElement = inputElement.nextElementSibling as HTMLElement; // search 图标
+            const filterIconElement = inputElement.nextElementSibling as HTMLElement; // search icon
             const value = inputElement.value;
             if (value) {
                 filterIconElement.classList.add("toolbar__icon--active");
@@ -136,19 +136,19 @@ export class MobileOutline extends Model {
             blockExtHTML: window.siyuan.config.readonly ? undefined : '<span class="b3-list-item__action"><svg><use xlink:href="#iconMore"></use></svg></span>',
             topExtHTML: window.siyuan.config.readonly ? undefined : '<span class="b3-list-item__action"><svg><use xlink:href="#iconMore"></use></svg></span>',
         });
-        // 为了快捷键的 dispatch
+        // For dispatching the keyboard shortcut
         this.element.querySelector('[data-type="collapse"]').addEventListener("click", () => {
             this.tree.collapseAll();
             this.saveExpendIds();
         });
 
-        // 普通的全部展开按钮
+        // Regular "expand all" button
         this.element.querySelector('[data-type="expand"]').addEventListener("click", () => {
             this.tree.expandAll();
             this.saveExpendIds();
         });
 
-        // 保持当前标题展开功能
+        // "Keep current heading expanded" feature
         this.element.querySelector('[data-type="keepCurrentExpand"]').addEventListener("click", (event: MouseEvent & {
             target: Element
         }) => {
@@ -171,7 +171,7 @@ export class MobileOutline extends Model {
                     this.setCurrent(focusElement);
                 }
             }
-            // 保存keepCurrentExpand状态到localStorage
+            // Save the keepCurrentExpand state to localStorage
             setStorageVal(Constants.LOCAL_OUTLINE, window.siyuan.storage[Constants.LOCAL_OUTLINE]);
         });
         this.element.addEventListener("click", (event: MouseEvent & { target: HTMLElement }) => {
@@ -206,16 +206,19 @@ export class MobileOutline extends Model {
         this.reload();
     }
 
-    // 大纲拖拽排序：原生触摸事件实现，长按门槛避免与列表滚动冲突，排序逻辑对齐桌面端 Outline.bindSort
+    // Outline drag-to-sort: implemented with native touch events; a long-press threshold avoids conflicting with
+    // list scrolling; the sorting logic mirrors the desktop's Outline.bindSort
     private bindSort() {
-        // 滚动容器为列表本体（不含顶部工具栏），否则边缘滚动判定会把工具栏算进可视区导致拖到列表顶/底部不滚动
+        // The scroll container is the list body itself (excluding the top toolbar); otherwise the edge-scroll
+        // check would count the toolbar as part of the visible area, causing dragging to the top/bottom of the
+        // list to not scroll
         const scrollElement = this.tree.element;
         const contentRect = () => scrollElement.getBoundingClientRect();
         this.element.addEventListener("touchstart", (event: TouchEvent) => {
             if (window.siyuan.config.readonly) return;
             if (this.element.getAttribute("data-loading") === "true") return;
             if (event.touches.length !== 1) return;
-            // 仅当触摸到当前文档对应的编辑器时才允许拖拽排序
+            // Only allow drag-to-sort when touching the editor for the current document
             const editor = window.siyuan.mobile.editor?.protyle;
             if (!editor || editor.disabled || editor.block.rootID !== this.blockId) return;
 
@@ -239,7 +242,8 @@ export class MobileOutline extends Model {
             if (!state) return;
             const touch = event.touches[0];
 
-            // 长按门槛：未达到长按时间就移动则视为滚动，放弃拖拽
+            // Long-press threshold: if movement happens before the long-press duration is reached, treat it as
+            // scrolling and abandon the drag
             if (!state.isDragging) {
                 if (Date.now() - state.startTime < Constants.TIMEOUT_LONGPRESS &&
                     (Math.abs(touch.clientX - state.startX) > Constants.SIZE_DRAG_THRESHOLD ||
@@ -251,7 +255,7 @@ export class MobileOutline extends Model {
                     Math.abs(touch.clientY - state.startY) < Constants.SIZE_DRAG_THRESHOLD) return;
                 state.isDragging = true;
 
-                // 创建 ghost 元素，跟随手指移动
+                // Create a ghost element that follows the finger's movement
                 state.selectedElement.style.opacity = "0.38";
                 const ghostElement = state.selectedElement.cloneNode(true) as HTMLElement;
                 ghostElement.setAttribute("id", "dragGhost");
@@ -261,14 +265,14 @@ export class MobileOutline extends Model {
                 state.ghostElement = ghostElement;
             }
 
-            // 进入拖拽后阻止原生滚动，避免列表伴随手指滚动
+            // Once dragging starts, prevent native scrolling so the list doesn't scroll along with the finger
             event.preventDefault();
             event.stopPropagation();
             state.ghostElement.style.top = touch.clientY + "px";
             state.ghostElement.style.left = touch.clientX + "px";
             dragOverScroll({clientY: touch.clientY} as MouseEvent, contentRect(), scrollElement);
 
-            // 通过 elementFromPoint 定位手指下的目标项
+            // Locate the target item under the finger via elementFromPoint
             const target = document.elementFromPoint(touch.clientX, touch.clientY);
             const selectItem = target?.closest(".b3-list-item") as HTMLElement;
             if (!selectItem || selectItem.tagName !== "LI" || !scrollElement.contains(selectItem)) {
@@ -382,7 +386,7 @@ export class MobileOutline extends Model {
         });
     }
 
-    // 清理拖拽指示线
+    // Clear drag indicator lines
     private clearDragIndicators = () => {
         this.element.querySelectorAll(".dragover__top, .dragover__bottom, .dragover, .dragover__current").forEach(item => {
             item.classList.remove("dragover__top", "dragover__bottom", "dragover", "dragover__current");
@@ -600,10 +604,10 @@ export class MobileOutline extends Model {
     }
 
     /**
-     * 应用大纲筛选
+     * Apply outline filtering
      */
     private setFilter() {
-        // 还原 display
+        // Restore display
         this.element.querySelectorAll('li.b3-list-item[style$="display: none;"]').forEach((item: HTMLElement) => {
             item.style.display = "";
         });
@@ -612,7 +616,7 @@ export class MobileOutline extends Model {
         });
         const keyword = (this.element.querySelector("input.b3-text-field.search__label") as HTMLInputElement).value.toLowerCase();
         if (keyword) {
-            // 首次筛选时记录折叠状态
+            // Record the collapsed state the first time filtering happens
             if (!this.preFilterExpandIds) {
                 this.preFilterExpandIds = this.tree.getExpandIds();
             }
@@ -631,25 +635,25 @@ export class MobileOutline extends Model {
 
                     const arrowElement = liItem.querySelector(".b3-list-item__arrow");
                     if ((liItem.querySelector(".b3-list-item__text")?.textContent || "").trim().toLowerCase().includes(keyword)) {
-                        // 当前标题命中
+                        // Current heading matches
                         liItem.style.display = "";
                         hasMatch = true;
 
                         if (nextUlElement) {
                             nextUlElement.classList.remove("fn__none");
                             if (childResult.hasMatch || childResult.hasChildMatch) {
-                                // 子项也有命中
+                                // Children also have matches
                                 arrowElement.classList.add("b3-list-item__arrow--open");
                                 nextUlElement.classList.remove("fn__none");
                             } else {
-                                // 子项无命中，折叠所有子项
+                                // No matches among children, collapse all children
                                 arrowElement.classList.remove("b3-list-item__arrow--open");
                                 arrowElement.parentElement.classList.add("fn__hidden");
                                 nextUlElement.classList.add("fn__none");
                             }
                         }
                     } else if (childResult.hasMatch || childResult.hasChildMatch) {
-                        // 当前标题未命中，但子级有命中
+                        // Current heading doesn't match, but a descendant does
                         liItem.style.display = "";
                         hasChildMatch = true;
 
@@ -658,7 +662,7 @@ export class MobileOutline extends Model {
                             arrowElement.classList.add("b3-list-item__arrow--open");
                         }
                     } else {
-                        // 当前标题和子级都未命中，隐藏
+                        // Neither the current heading nor its descendants match, hide it
                         liItem.style.display = "none";
                         if (nextUlElement) {
                             nextUlElement.classList.add("fn__none");
@@ -671,40 +675,40 @@ export class MobileOutline extends Model {
             processUL(this.element.lastElementChild.firstElementChild);
             return;
         }
-        // 恢复折叠状态
+        // Restore the collapsed state
         this.tree.setExpandIds(this.preFilterExpandIds);
         this.preFilterExpandIds = null;
     }
 
     /**
-     * 获取标题元素的实际标题级别（H1=1, H2=2, 等等）
-     * @param element li元素
-     * @returns 标题级别（1-6）
+     * Get the actual heading level of a heading element (H1=1, H2=2, etc.)
+     * @param element the li element
+     * @returns heading level (1-6)
      */
     private getHeadingLevel(element: HTMLElement) {
         return parseInt(element.getAttribute("data-subtype")?.replace("h", "") || "0");
     }
 
     /**
-     * 展开到指定标题级别
-     * @param targetLevel 目标标题级别，1-6级（H1-H6），6级表示全部展开
+     * Expand to the specified heading level
+     * @param targetLevel target heading level, 1-6 (H1-H6); 6 means expand all
      */
     private expandToLevel(targetLevel: number) {
         if (targetLevel >= 6) {
-            // 全部展开
+            // Expand all
             this.tree.expandAll();
         } else {
-            // 展开到指定标题级别
+            // Expand to the specified heading level
             this.element.querySelectorAll("li.b3-list-item").forEach(item => {
                 const headingLevel = this.getHeadingLevel(item as HTMLElement);
                 const arrowElement = item.querySelector(".b3-list-item__arrow");
                 if (item.nextElementSibling && item.nextElementSibling.tagName === "UL" && arrowElement) {
                     if (headingLevel > 0 && headingLevel < targetLevel) {
-                        // 当前标题级别小于目标级别，展开
+                        // Current heading level is below the target level, expand it
                         arrowElement.classList.add("b3-list-item__arrow--open");
                         item.nextElementSibling.classList.remove("fn__none");
                     } else if (headingLevel >= targetLevel) {
-                        // 当前标题级别大于等于目标级别，折叠
+                        // Current heading level is at or above the target level, collapse it
                         arrowElement.classList.remove("b3-list-item__arrow--open");
                         item.nextElementSibling.classList.add("fn__none");
                     }
@@ -715,7 +719,7 @@ export class MobileOutline extends Model {
     }
 
     /**
-     * 显示展开层级菜单
+     * Show the expand-level menu
      */
     private showExpandLevelMenu() {
         window.siyuan.menus.menu.remove();
@@ -733,10 +737,10 @@ export class MobileOutline extends Model {
     }
 
     /**
-     * 切换同层级的所有标题的展开/折叠状态（基于标题级别而不是DOM层级）
+     * Toggle the expand/collapse state of all headings at the same level (based on heading level, not DOM depth)
      */
     private collapseSameLevel(element: HTMLElement, expand?: boolean) {
-        // 获取所有相同标题级别的元素
+        // Get all elements at the same heading level
         this.element.querySelectorAll(`li.b3-list-item[data-subtype="${element.getAttribute("data-subtype")}"]`).forEach(item => {
             const arrowElement = item.querySelector(".b3-list-item__arrow");
             if (typeof expand === "undefined") {
@@ -827,18 +831,18 @@ export class MobileOutline extends Model {
     }
 
     /**
-     * 显示右键菜单
+     * Show the context menu
      */
     private showContextMenu(element: HTMLElement) {
         if (this.isPreview) {
-            return; // 预览模式下不显示右键菜单
+            return; // Don't show the context menu in preview mode
         }
         const currentLevel = this.getHeadingLevel(element);
         window.siyuan.menus.menu.remove();
         window.siyuan.menus.menu.element.setAttribute("data-name", Constants.MENU_OUTLINE_CONTEXT);
         const id = element.getAttribute("data-node-id");
         if (!window.siyuan.config.readonly) {
-            // 升级
+            // Upgrade
             if (currentLevel > 1) {
                 window.siyuan.menus.menu.append(new MenuItem({
                     id: "upgrade",
@@ -860,7 +864,7 @@ export class MobileOutline extends Model {
                 }).element);
             }
 
-            // 降级
+            // Downgrade
             if (currentLevel < 6) {
                 window.siyuan.menus.menu.append(new MenuItem({
                     id: "downgrade",
@@ -914,7 +918,7 @@ export class MobileOutline extends Model {
 
             window.siyuan.menus.menu.append(new MenuItem({id: "separator_1", type: "separator"}).element);
 
-            // 在前面插入同级标题
+            // Insert a same-level heading before
             window.siyuan.menus.menu.append(new MenuItem({
                 id: "insertSameLevelHeadingBefore",
                 icon: "iconBefore",
@@ -943,7 +947,7 @@ export class MobileOutline extends Model {
                 }
             }).element);
 
-            // 在后面插入同级标题
+            // Insert a same-level heading after
             window.siyuan.menus.menu.append(new MenuItem({
                 id: "insertSameLevelHeadingAfter",
                 icon: "iconAfter",
@@ -985,8 +989,8 @@ export class MobileOutline extends Model {
                 }
             }).element);
 
-            // 添加子标题
-            if (currentLevel < 6) { // 只有当前级别小于6时才能添加子标题
+            // Add a child heading
+            if (currentLevel < 6) { // A child heading can only be added when the current level is below 6
                 window.siyuan.menus.menu.append(new MenuItem({
                     id: "addChildHeading",
                     icon: "iconAdd",
@@ -1038,7 +1042,7 @@ export class MobileOutline extends Model {
             window.siyuan.menus.menu.append(new MenuItem({id: "separator_2", type: "separator"}).element);
         }
 
-        // 复制带子标题
+        // Copy including child headings
         window.siyuan.menus.menu.append(new MenuItem({
             id: "copyHeadings1",
             icon: "iconCopy",
@@ -1061,7 +1065,7 @@ export class MobileOutline extends Model {
         }).element);
 
         if (!window.siyuan.config.readonly) {
-            // 剪切带子标题
+            // Cut including child headings
             window.siyuan.menus.menu.append(new MenuItem({
                 id: "cutHeadings1",
                 icon: "iconCut",
@@ -1109,7 +1113,7 @@ export class MobileOutline extends Model {
                 }
             }).element);
 
-            // 删除
+            // Delete
             window.siyuan.menus.menu.append(new MenuItem({
                 id: "deleteHeadings1",
                 icon: "iconTrashcan",
@@ -1147,7 +1151,7 @@ export class MobileOutline extends Model {
         }
         window.siyuan.menus.menu.append(new MenuItem({id: "separator_3", type: "separator"}).element);
 
-        // 展开子标题
+        // Expand child headings
         window.siyuan.menus.menu.append(new MenuItem({
             id: "expandChildHeading",
             icon: "iconExpand",
@@ -1156,7 +1160,7 @@ export class MobileOutline extends Model {
             click: () => this.collapseChildren(element, true)
         }).element);
 
-        // 折叠子标题
+        // Fold child headings
         window.siyuan.menus.menu.append(new MenuItem({
             id: "foldChildHeading",
             icon: "iconContract",
@@ -1165,7 +1169,7 @@ export class MobileOutline extends Model {
             click: () => this.collapseChildren(element, false)
         }).element);
 
-        // 展开同级标题
+        // Expand same-level headings
         window.siyuan.menus.menu.append(new MenuItem({
             id: "expandSameLevelHeading",
             icon: "iconExpand",
@@ -1174,7 +1178,7 @@ export class MobileOutline extends Model {
             click: () => this.collapseSameLevel(element, true)
         }).element);
 
-        // 折叠同级标题
+        // Fold same-level headings
         window.siyuan.menus.menu.append(new MenuItem({
             id: "foldSameLevelHeading",
             icon: "iconContract",
@@ -1183,7 +1187,7 @@ export class MobileOutline extends Model {
             click: () => this.collapseSameLevel(element, false)
         }).element);
 
-        // 全部展开
+        // Expand all
         window.siyuan.menus.menu.append(new MenuItem({
             id: "expandAll",
             icon: "iconExpand",
@@ -1194,7 +1198,7 @@ export class MobileOutline extends Model {
             }
         }).element);
 
-        // 全部折叠
+        // Fold all
         window.siyuan.menus.menu.append(new MenuItem({
             id: "foldAll",
             icon: "iconContract",
@@ -1230,7 +1234,7 @@ export class MobileOutline extends Model {
     }
 
     /**
-     * 生成标题级别转换菜单项
+     * Generate a heading-level-transform menu item
      */
     private genHeadingTransform(id: string, level: number) {
         return {
@@ -1257,7 +1261,7 @@ export class MobileOutline extends Model {
                         protyle.wysiwyg.element.querySelectorAll(`[data-node-id="${operation.id}"]`).forEach((itemElement: HTMLElement) => {
                             itemElement.outerHTML = operation.data;
                         });
-                        // 使用 outer 后元素需要重新查询
+                        // After using outerHTML, the element needs to be queried again
                         protyle.wysiwyg.element.querySelectorAll(`[data-node-id="${operation.id}"]`).forEach((itemElement: HTMLElement) => {
                             mathRender(itemElement);
                         });

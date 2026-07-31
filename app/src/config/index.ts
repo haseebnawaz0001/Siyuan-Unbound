@@ -67,7 +67,7 @@ const openSettingDialog = (app: App, initialTab: TSettingTab = "editor") => {
     initSettingSearch(dialog.element, app);
     (dialog.element.querySelector(".b3-dialog__container") as HTMLElement).style.maxWidth = "1280px";
     dialog.element.querySelectorAll(".config__side .b3-list-item").forEach(item => {
-        // 兼容社区 JS 代码片段模拟点击，不做事件委托
+        // Bound directly instead of through event delegation, so that community JS snippets simulating a click keep working
         item.addEventListener("click", () => {
             const tabId = item.getAttribute("data-name") as TSettingTab;
             switchSettingTab(dialog.element, app, tabId);
@@ -122,7 +122,7 @@ export const openBazaarReadme = async (app: App, bazaarType: TBazaarType, itemNa
 
     const response = await fetchSyncPost(getResourcesUrl, {
         frontend: getFrontend(),
-        // 完整包名作 keyword 可缩小请求响应列表；最终仍按 name 精确匹配
+        // Using the full package name as the keyword narrows down the response list, the exact match on name still happens below
         keyword: itemName,
     });
     if (response.code !== 0) return;

@@ -25,8 +25,9 @@ import (
 	"github.com/siyuan-note/logging"
 )
 
-// flushDNS 刷新 Windows 系统 DNS 解析缓存，用于在同步遇到 DNS 类错误（域名解析失败、过期缓存）后
-// 清掉本地可能过期的解析记录，以便后续重试时能重新向上游 DNS 查询。
+// flushDNS flushes the Windows system DNS resolution cache. Used after sync encounters DNS-related
+// errors (hostname resolution failure, stale cache) to clear any potentially stale local resolution
+// records, so subsequent retries can query the upstream DNS again.
 func flushDNS() {
 	cmd := exec.Command("ipconfig", "/flushdns")
 	gulu.CmdAttr(cmd)

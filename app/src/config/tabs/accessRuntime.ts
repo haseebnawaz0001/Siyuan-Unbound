@@ -1,15 +1,15 @@
 import {fetchPost} from "../../util/fetch";
 import {isMobile} from "../../util/functions";
 
-/** 访问授权 Tab 根节点，供 send 回调更新局部 UI */
+/** Root node of the access authorization tab, used by the send callbacks to update parts of the UI */
 let accessTabElement: HTMLElement | undefined;
 
-/** 设置对话框关闭后释放 Tab 根节点引用，避免持有已脱离文档的 DOM */
+/** Releases the reference to the tab root once the setting dialog is closed, so that no detached DOM is kept alive */
 export const clearAccessTabElement = () => {
     accessTabElement = undefined;
 };
 
-/** 访问授权 Tab 挂载后记录根节点（供 setting/tabs.ts afterMount 调用） */
+/** Stores the root node once the access authorization tab is mounted, called from the afterMount hook in setting/tabs.ts */
 export const mountAccessTab = (root: HTMLElement) => {
     accessTabElement = root;
 };
@@ -86,7 +86,7 @@ export const renderPublishAuthAccounts = () => {
     publishAuthAccounts.innerHTML = `<ul class="fn__flex-1" style="overflow: visible;">${listItemHtml}</ul>`;
 };
 
-/** 访问授权 Tab：按控件 id 路由到各 API */
+/** Access authorization tab: routes each control id to the matching API */
 export const sendAccessSetting = (controlId: string, value: unknown) => {
     switch (controlId) {
         case "api.token": {

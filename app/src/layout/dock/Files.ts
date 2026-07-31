@@ -118,7 +118,7 @@ export class Files extends Model {
                 } else if (type === "open") {
                     const notebookId = target.getAttribute("data-url");
                     const liElement = target.closest("li");
-                    // 加密笔记本关闭（锁定）时点"打开"先弹解锁框，解锁成功后再挂载
+                    // When an encrypted notebook is closed (locked), clicking "Open" first pops the unlock dialog, and mounts it after unlocking succeeds
                     if (liElement && liElement.getAttribute("data-encrypted") === "true") {
                         openEncryptedNotebook(this.app, notebookId, liElement.querySelector(".b3-list-item__text").textContent);
                     } else {
@@ -134,7 +134,7 @@ export class Files extends Model {
                 target = target.parentElement;
             }
         });
-        // 为了快捷键的 dispatch
+        // For dispatching the keyboard shortcut
         this.actionsElement.querySelector('[data-type="collapse"]').addEventListener("click", () => {
             Array.from(this.element.children).forEach(item => {
                 const liElement = item.firstElementChild;
@@ -176,7 +176,7 @@ export class Files extends Model {
             }
         });
         this.element.addEventListener("mousedown", (event) => {
-            // 点击鼠标滚轮关闭
+            // Click the mouse wheel to close
             if (event.button !== 1 || !window.siyuan.config.fileTree.openFilesUseCurrentTab) {
                 return;
             }
@@ -320,7 +320,7 @@ export class Files extends Model {
                             target.classList.toggle("b3-list-item--focus");
                             this.lastSelectedElement = target;
                         } else if (event.shiftKey && !event.altKey && isNotCtrl(event)) {
-                            // Shift+click 多选文档
+                            // Shift+click to multi-select documents
                             if (!document.contains(this.lastSelectedElement)) {
                                 this.lastSelectedElement = null;
                             }
@@ -334,18 +334,18 @@ export class Files extends Model {
                                 item.classList.remove("b3-list-item--focus");
                             });
 
-                            // 获取所有文档项
+                            // Get all document items
                             const allFiles = Array.from(this.element.querySelectorAll("li.b3-list-item"));
 
-                            // 获取起始和结束索引
+                            // Get the start and end indices
                             const startIndex = allFiles.indexOf(this.lastSelectedElement);
                             const endIndex = allFiles.indexOf(target);
 
-                            // 确定选择范围
+                            // Determine the selection range
                             const start = Math.min(startIndex, endIndex);
                             const end = Math.max(startIndex, endIndex);
 
-                            // 添加新选择
+                            // Add the new selection
                             for (let i = start; i <= end; i++) {
                                 (allFiles[i] as HTMLElement).classList.add("b3-list-item--focus");
                             }
@@ -354,7 +354,7 @@ export class Files extends Model {
                             this.setCurrent(target, false);
                             if (target.getAttribute("data-type") === "navigation-file" ||
                                 (target.getAttribute("data-type") === "navigation-root" && target.getAttribute("data-node-id"))) {
-                                // 更新最后点击的文档项
+                                // Update the last-clicked document item
                                 needFocus = false;
                                 if (target.getAttribute("data-opening")) {
                                     return;
@@ -440,7 +440,7 @@ export class Files extends Model {
                     ghostElement.append(item.cloneNode(true));
                     item.style.opacity = "0.38";
                     const itemNodeId = item.dataset.nodeId ||
-                        item.dataset.path; // 拖拽笔记本时值不能为空，否则 drop 就不会继续排序
+                        item.dataset.path; // When dragging a notebook, the value must not be empty, otherwise drop will not proceed with reordering
                     if (itemNodeId) {
                         ids += itemNodeId;
                         if (index < selectElements.length - 1) {
@@ -452,11 +452,11 @@ export class Files extends Model {
                 ghostElement.setAttribute("class", "b3-list b3-list--background");
                 document.body.append(ghostElement);
                 if (window.siyuan.touchDragActive) {
-                    // 触屏保留 DOM ghost 供 touchDragBridge 跟随手指
+                    // On touchscreens, keep the DOM ghost so touchDragBridge can follow the finger
                     event.dataTransfer.setDragImage(ghostElement, 16, 16);
                     window.siyuan.touchDragGhost = ghostElement;
                 } else {
-                    // 桌面端隐藏原生 ghost，改用自定义双区跟随框
+                    // On desktop, hide the native ghost and use a custom two-zone follow box instead
                     const transparentImg = new Image();
                     transparentImg.src = transparentImgSrc;
                     event.dataTransfer.setDragImage(transparentImg, 0, 0);
@@ -530,15 +530,17 @@ export class Files extends Model {
                     gutterType = item.type;
                 }
             }
-            // 标题/列表项等块标源拖到文档树的提示在下方 rAF 回调中根据高亮类判定
-            // 其余无法转换的块标源（如段落）不显示提示
+            // The hint for dragging a gutter source (heading/list item, etc.) onto the doc tree is
+            // decided below in the rAF callback based on the highlight class
+            // Other gutter sources that cannot be converted (e.g. paragraphs) show no hint
             if (gutterType) {
                 const gutterTypes = gutterType.replace(Constants.SIYUAN_DROP_GUTTER, "").split(Constants.ZWSP);
                 if (!["nodelistitem", "nodeheading"].includes(gutterTypes[0])) {
                     hideDragTip();
                 }
             }
-            // 文档→文档拖拽的提示在下方 rAF 回调中根据高亮类判定（需等高亮类确定后再显示）
+            // The hint for document -> document dragging is decided below in the rAF callback based on
+            // the highlight class (it must wait until the highlight class is determined before showing)
             dragOverLastObj.rafId = requestAnimationFrame(() => {
                 dragOverLastObj.rafId = null;
                 let liElement = event.target.closest("li");
@@ -555,14 +557,14 @@ export class Files extends Model {
                 if (dragOverLastObj.element !== liElement) {
                     dragOverLastObj.element?.classList.remove("dragover", "dragover__bottom", "dragover__top");
                     if (gutterType) {
-                        // 块标拖拽
+                        // Gutter drag
                         const gutterTypes = gutterType.replace(Constants.SIYUAN_DROP_GUTTER, "").split(Constants.ZWSP);
                         if (!["nodelistitem", "nodeheading"].includes(gutterTypes[0])) {
                             event.preventDefault();
                             return;
                         }
                     } else if (liElement.classList.contains("b3-list-item--focus")) {
-                        // 选中的文档不能拖拽到自己上，但允许标题拖拽到文档树的选中文档上 https://github.com/siyuan-note/siyuan/issues/6552
+                        // A selected document cannot be dragged onto itself, but a heading is allowed to be dragged onto the doc tree's selected document https://github.com/siyuan-note/siyuan/issues/6552
                         hideDragTip();
                         event.preventDefault();
                         return;
@@ -622,7 +624,7 @@ export class Files extends Model {
                     dragOverLastObj.element = liElement;
                 }
                 dragOverLastObj.positionY = event.clientY;
-                // 文档→文档拖拽：依据当前高亮类显示对应操作提示（带目标文档名）
+                // Document -> document dragging: show the corresponding operation hint based on the current highlight class (including the target document name)
                 if (!gutterType) {
                     const name = liElement.querySelector(".b3-list-item__text")?.textContent || "";
                     const title = window.siyuan.dragTitle || "";
@@ -636,7 +638,7 @@ export class Files extends Model {
                         hideDragTip();
                     }
                 } else {
-                    // 块标（标题/列表项）→文档树：结合“转换为文档”和位置（带目标文档名）
+                    // Gutter (heading/list item) -> doc tree: combine "convert to document" with the position (including the target document name)
                     const gutterTypes = gutterType.replace(Constants.SIYUAN_DROP_GUTTER, "").split(Constants.ZWSP);
                     if (["nodelistitem", "nodeheading"].includes(gutterTypes[0])) {
                         const name = liElement.querySelector(".b3-list-item__text")?.textContent || "";
@@ -691,7 +693,7 @@ export class Files extends Model {
                     gutterType = item.type;
                 }
             }
-            // 块标拖拽
+            // Gutter drag
             if (gutterType) {
                 const gutterTypes = gutterType.replace(Constants.SIYUAN_DROP_GUTTER, "").split(Constants.ZWSP);
                 if (["nodelistitem", "nodeheading"].includes(gutterTypes[0])) {
@@ -715,7 +717,7 @@ export class Files extends Model {
                         if (newElement.previousElementSibling) {
                             toDocOptions.previousPath = newElement.previousElementSibling.getAttribute("data-path");
                         } else {
-                            // 拖到第一个子文档上方，作为父文档的第一个子文档
+                            // Dropped above the first child document, becoming the first child document of the parent
                             const parentLi = newElement.parentElement.previousElementSibling as HTMLElement;
                             toDocOptions.targetPath = parentLi.getAttribute("data-path");
                             toDocOptions.toTop = true;
@@ -752,7 +754,7 @@ export class Files extends Model {
                         }
                     });
                     if (!isChild) {
-                        // 禁止父节点移动到子节点 https://github.com/siyuan-note/siyuan/issues/12539
+                        // Prevent moving a parent node into a child node https://github.com/siyuan-note/siyuan/issues/12539
                         if (newElement.getAttribute("data-path").startsWith(item.dataset.path.replace(".sy", ""))) {
                             return;
                         }
@@ -1039,10 +1041,10 @@ export class Files extends Model {
             } else {
                 const hiddenElement = liElement.querySelector(".fn__hidden");
                 if (hiddenElement) {
-                    // 原先无子文档：显示展开箭头
+                    // Previously had no child documents: show the expand arrow
                     hiddenElement.classList.remove("fn__hidden");
                 } else if (liElement.querySelector(".b3-list-item__arrow--open")) {
-                    // 父文档已展开：刷新子列表
+                    // The parent document is already expanded: refresh the child list
                     this.getLeaf(liElement, notebookId, true);
                 }
                 break;
@@ -1052,7 +1054,7 @@ export class Files extends Model {
 
     private genNotebook(item: INotebook) {
         const editingPublishAccess = this.element.classList.contains("file-tree__publish-access--active");
-        // 加密笔记本关闭（锁定）时用 🔒 提示需解锁；打开（解锁）后恢复正常 emoji
+        // When an encrypted notebook is closed (locked), use 🔒 to indicate it needs unlocking; once opened (unlocked), restore the normal emoji
         const iconContent = (item.encrypted && item.closed)
             ? "🔒️"
             : unicode2Emoji(item.icon || window.siyuan.storage[Constants.LOCAL_IMAGES].note);
@@ -1145,7 +1147,7 @@ data-type="navigation-root" data-path="/" data-count="${item.subFileCount || 0}"
     }
 
     private onRemove(data: IWebSocketData) {
-        // "doc2heading" 后删除文件或挂载帮助文档前的 unmount
+        // Unmount before deleting a file after "doc2heading", or before mounting the help document
         if (data.cmd === "closeBox" || data.cmd === "removeBox") {
             setNoteBook((notebooks) => {
                 const targetElement = this.element.querySelector(`ul[data-url="${data.data.box}"] li[data-path="${"/"}"]`);
@@ -1181,11 +1183,11 @@ data-type="navigation-root" data-path="/" data-count="${item.subFileCount || 0}"
         data.data.ids.forEach((item: string) => {
             const targetElement = this.element.querySelector(`li.b3-list-item[data-node-id="${item}"]`);
             if (targetElement) {
-                // 子节点展开则删除
+                // Remove it if the child nodes are expanded
                 if (targetElement.nextElementSibling?.tagName === "UL") {
                     targetElement.nextElementSibling.remove();
                 }
-                // 移除当前节点
+                // Remove the current node
                 const parentElement = targetElement.parentElement.previousElementSibling as HTMLElement;
                 if (targetElement.parentElement.childElementCount === 1) {
                     if (parentElement) {
@@ -1292,7 +1294,7 @@ data-type="navigation-root" data-path="/" data-count="${item.subFileCount || 0}"
             }
         }
         const newElement = this.element.querySelector(`[data-url="${response.data.toNotebook}"] li[data-path="${response.data.toPath}"]`) as HTMLElement;
-        // 更新移动到的新文件夹
+        // Update the new folder it was moved to
         if (newElement) {
             newElement.querySelector(".b3-list-item__toggle").classList.remove("fn__hidden");
             if (newElement.getAttribute("data-type") === "navigation-root") {
@@ -1324,10 +1326,10 @@ data-type="navigation-root" data-path="/" data-count="${item.subFileCount || 0}"
         });
         let nextElement = liElement.nextElementSibling;
         if (nextElement && nextElement.tagName === "UL") {
-            // 文件展开时，刷新
+            // Refresh while the file is expanded
             const tempElement = document.createElement("template");
             tempElement.innerHTML = fileHTML;
-            // 保持文件夹展开状态
+            // Keep the folder's expanded state
             nextElement.querySelectorAll(":scope > .b3-list-item > .b3-list-item__toggle> .b3-list-item__arrow--open").forEach(item => {
                 const openLiElement = hasClosestByClassName(item, "b3-list-item");
                 if (openLiElement) {
@@ -1373,7 +1375,7 @@ data-type="navigation-root" data-path="/" data-count="${item.subFileCount || 0}"
             return;
         }
         if (liElement.nextElementSibling && liElement.nextElementSibling.tagName === "UL") {
-            // 文件展开时，刷新
+            // Refresh while the file is expanded
             liElement.nextElementSibling.remove();
         }
         const arrowElement = liElement.querySelector(".b3-list-item__arrow");
@@ -1434,7 +1436,7 @@ data-type="navigation-root" data-path="/" data-count="${item.subFileCount || 0}"
                 leafElement.remove();
                 this.getOpenPaths();
             } else {
-                // 没有UL，直接更新路径
+                // No UL, update the path directly
                 this.getOpenPaths();
             }
             return;
@@ -1461,7 +1463,7 @@ data-type="navigation-root" data-path="/" data-count="${item.subFileCount || 0}"
         filePath = filePath.replace(/\/\/+/g, "/");
         const treeElement = this.element.querySelector(`[data-url="${notebookId}"]`);
         if (!treeElement) {
-            // 有文件树和编辑器的布局初始化时，文件树还未挂载
+            // The file tree is not yet mounted while a layout with both a file tree and an editor is being initialized
             return;
         }
         const boxDocID = window.siyuan.config.fileTree.boxDocEnabled ? notebookId : "";

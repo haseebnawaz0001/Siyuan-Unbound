@@ -350,8 +350,9 @@ func SaveSessionState(data []byte) (int64, map[string]any, error) {
 			currentRevision = numberToInt64(existingData["revision"])
 			currentCommittedTurnID, _ = existingData["lastCommittedTurnID"].(string)
 			if commitTurnID != "" && currentCommittedTurnID == commitTurnID {
-				// 提交响应丢失后，客户端可能原样重试同一个 commitTurnID。此判断要先于修订号校验，
-				// 并且不能再用客户端快照覆盖已经由 runtime 生成的权威内容。
+				// If the commit response was lost, the client may retry with the same commitTurnID unchanged.
+				// This check must come before the revision check, and the client snapshot must not be allowed
+				// to overwrite authoritative content the runtime already produced.
 				if err := markRuntimeCommittedLocked(meta.ID, commitTurnID); err != nil {
 					logging.LogWarnf("clean committed agent runtime failed: %s", err)
 				}
@@ -362,8 +363,9 @@ func SaveSessionState(data []byte) (int64, map[string]any, error) {
 			}
 			for k, v := range existingData {
 				if _, ok := newData[k]; !ok {
-					// messages 是已废弃的旧会话字段，不再带入新格式；其他未知字段原样保留，
-					// 避免前后端版本不一致时擦除较新版本写入的数据。
+					// messages is a deprecated legacy session field and is no longer carried into the new format;
+					// other unknown fields are kept as-is, to avoid erasing data written by a newer version when
+					// the frontend/backend versions are out of sync.
 					if k != "messages" && k != "expectedRevision" && k != "commitTurnID" &&
 						k != "recoveryTurnID" && k != "recoveryState" && k != "recoveryRevision" && k != "agentRunning" {
 						newData[k] = v
@@ -474,7 +476,7 @@ func numberToInt64(value any) int64 {
 	return 0
 }
 
-// jsonNumber 保持与 encoding/json.Number 相同的最小接口，避免会话存储依赖具体解码器实现。
+// jsonNumber keeps the same minimal interface as encoding/json.Number, so session storage doesn't depend on a specific decoder implementation.
 type jsonNumber interface {
 	Int64() (int64, error)
 }

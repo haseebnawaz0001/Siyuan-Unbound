@@ -570,7 +570,7 @@ export const bindCardEvent = async (options: {
                             }
                         }];
                         ipcRenderer.send(Constants.SIYUAN_OPEN_WINDOW, {
-                            // 需要 encode， 否则 https://github.com/siyuan-note/siyuan/issues/9343
+                            // Must be encoded, otherwise https://github.com/siyuan-note/siyuan/issues/9343
                             url: `${window.location.protocol}//${window.location.host}/stage/build/app/window.html?v=${Constants.SIYUAN_VERSION}&json=${encodeURIComponent(JSON.stringify(json))}`
                         });
                         options.dialog.destroy();
@@ -682,7 +682,7 @@ export const bindCardEvent = async (options: {
         event.preventDefault();
         event.stopPropagation();
         hideElements(["toolbar", "hint", "util", "gutter"], editor.protyle);
-        if (type === "-1") {    // 显示答案
+        if (type === "-1") {    // Show answer
             if (actionElements[0].classList.contains("fn__none")) {
                 type = "3";
             } else {
@@ -698,7 +698,7 @@ export const bindCardEvent = async (options: {
                 emitEvent(options.app, currentCard, type);
                 return;
             }
-        } else if (type === "-2") {    // 上一步
+        } else if (type === "-2") {    // Previous step
             if (index > 0) {
                 index--;
                 nextCard({

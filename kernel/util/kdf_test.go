@@ -24,7 +24,7 @@ import (
 	"testing"
 )
 
-// TestArgon2KDFConsistency 验证同一 password+salt+params 多次派生结果一致。
+// TestArgon2KDFConsistency verifies that the same password+salt+params always produce the same derived result.
 func TestArgon2KDFConsistency(t *testing.T) {
 	params := Argon2Params{Memory: 64 * 1024, Iterations: 3, Parallelism: 1, KeyLength: 32}
 	salt := []byte("0123456789abcdef")
@@ -38,7 +38,7 @@ func TestArgon2KDFConsistency(t *testing.T) {
 	}
 }
 
-// TestArgon2KDFDifferentPasswords 验证不同密码派生出不同密钥。
+// TestArgon2KDFDifferentPasswords verifies that different passwords derive different keys.
 func TestArgon2KDFDifferentPasswords(t *testing.T) {
 	params := Argon2Params{Memory: 64 * 1024, Iterations: 3, Parallelism: 1, KeyLength: 32}
 	salt := []byte("0123456789abcdef")
@@ -49,7 +49,7 @@ func TestArgon2KDFDifferentPasswords(t *testing.T) {
 	}
 }
 
-// TestAESGCMRoundTrip 验证加密→解密还原原文。
+// TestAESGCMRoundTrip verifies that encrypt -> decrypt restores the original text.
 func TestAESGCMRoundTrip(t *testing.T) {
 	key, err := GenerateDEK()
 	if err != nil {
@@ -79,7 +79,7 @@ func TestAESGCMRoundTrip(t *testing.T) {
 	}
 }
 
-// TestAESGCMSamePlaintextDifferentCiphertext 验证同一明文多次加密结果不同（随机 nonce）。
+// TestAESGCMSamePlaintextDifferentCiphertext verifies that encrypting the same plaintext multiple times produces different results (random nonce).
 func TestAESGCMSamePlaintextDifferentCiphertext(t *testing.T) {
 	key, _ := GenerateDEK()
 	plaintext := []byte("same content")
@@ -88,7 +88,7 @@ func TestAESGCMSamePlaintextDifferentCiphertext(t *testing.T) {
 	if bytes.Equal(ct1, ct2) {
 		t.Fatalf("same plaintext produced identical ciphertext (nonce not random?)")
 	}
-	// 但两者都应能正确解密
+	// But both should still decrypt correctly
 	if pt, err := Decrypt(key, ct1); err != nil || !bytes.Equal(pt, plaintext) {
 		t.Fatalf("ct1 decrypt failed")
 	}
@@ -97,7 +97,7 @@ func TestAESGCMSamePlaintextDifferentCiphertext(t *testing.T) {
 	}
 }
 
-// TestAESGCMWrongKey 验证错误密钥解密失败。
+// TestAESGCMWrongKey verifies that decryption fails with the wrong key.
 func TestAESGCMWrongKey(t *testing.T) {
 	key1, _ := GenerateDEK()
 	key2, _ := GenerateDEK()
@@ -108,19 +108,19 @@ func TestAESGCMWrongKey(t *testing.T) {
 	}
 }
 
-// TestAESGCMTamperedCiphertext 验证篡改密文后解密失败（GCM 完整性校验）。
+// TestAESGCMTamperedCiphertext verifies that decryption fails after the ciphertext has been tampered with (GCM integrity check).
 func TestAESGCMTamperedCiphertext(t *testing.T) {
 	key, _ := GenerateDEK()
 	plaintext := []byte("integrity check")
 	ct, _ := Encrypt(key, plaintext)
-	// 翻转最后一个字节（落在 GCM tag 区域）
+	// Flip the last byte (falls within the GCM tag region)
 	ct[len(ct)-1] ^= 0xff
 	if _, err := Decrypt(key, ct); err == nil {
 		t.Fatalf("Decrypt of tampered ciphertext should fail")
 	}
 }
 
-// TestAESGCMEnvelopeHeaderTampering 验证信封头参与认证，篡改后不能被当作有效密文读取。
+// TestAESGCMEnvelopeHeaderTampering verifies that the envelope header participates in authentication, and once tampered with, the data can no longer be read as valid ciphertext.
 func TestAESGCMEnvelopeHeaderTampering(t *testing.T) {
 	key, _ := GenerateDEK()
 	ct, _ := Encrypt(key, []byte("header integrity"))
@@ -130,7 +130,7 @@ func TestAESGCMEnvelopeHeaderTampering(t *testing.T) {
 	}
 }
 
-// TestAESGCMInvalidKeyLength 验证非 32 字节密钥被拒绝。
+// TestAESGCMInvalidKeyLength verifies that a key that isn't 32 bytes is rejected.
 func TestAESGCMInvalidKeyLength(t *testing.T) {
 	shortKey := []byte("too-short")
 	if _, err := Encrypt(shortKey, []byte("x")); err == nil {
@@ -138,7 +138,7 @@ func TestAESGCMInvalidKeyLength(t *testing.T) {
 	}
 }
 
-// TestAESGCMLegacyCiphertextCompatibility 验证旧 nonce||ciphertext||tag 格式仍可解密，保证升级后已有数据可读。
+// TestAESGCMLegacyCiphertextCompatibility verifies that the legacy nonce||ciphertext||tag format can still be decrypted, ensuring existing data remains readable after upgrading.
 func TestAESGCMLegacyCiphertextCompatibility(t *testing.T) {
 	key, _ := GenerateDEK()
 	plaintext := []byte("legacy encrypted notebook data")
@@ -155,7 +155,7 @@ func TestAESGCMLegacyCiphertextCompatibility(t *testing.T) {
 	}
 }
 
-// TestAESGCMLegacyCiphertextWithAADCompatibility 验证旧版带 AAD 的文件/资源密文仍可读取。
+// TestAESGCMLegacyCiphertextWithAADCompatibility verifies that legacy file/asset ciphertext with AAD can still be read.
 func TestAESGCMLegacyCiphertextWithAADCompatibility(t *testing.T) {
 	key, _ := GenerateDEK()
 	plaintext := []byte("legacy encrypted asset")
@@ -189,7 +189,7 @@ func encryptLegacyForTest(key, plaintext, aad []byte) ([]byte, error) {
 	return gcm.Seal(nonce, nonce, plaintext, aad), nil
 }
 
-// TestGenerateSaltUnique 验证生成的 salt 足够随机（两次调用结果不同）。
+// TestGenerateSaltUnique verifies that the generated salt is sufficiently random (two calls produce different results).
 func TestGenerateSaltUnique(t *testing.T) {
 	s1, err := GenerateSalt()
 	if err != nil {

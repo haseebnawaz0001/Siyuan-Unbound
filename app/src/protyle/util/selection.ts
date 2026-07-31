@@ -25,7 +25,7 @@ const selectIsEditor = (editor: Element, range?: Range) => {
     return editor.isEqualNode(container) || editor.contains(container);
 };
 
-// table 选中处理
+// Table selection handling
 export const fixTableRange = (range: Range) => {
     const tableElement = hasClosestByAttribute(range.startContainer, "data-type", "NodeTable");
     if (range.toString() !== "" && tableElement && range.commonAncestorContainer.nodeType !== 3) {
@@ -38,7 +38,8 @@ export const fixTableRange = (range: Range) => {
                 range.setStart(cellElement.firstChild, 0);
                 range.setEnd(cellElement.lastChild, cellElement.lastChild.textContent.length);
             } else if (startCellElement &&
-                // 不能包含自身元素，否则对 cell 中的部分文字两次高亮后就会选中整个 cell。 https://github.com/siyuan-note/siyuan/issues/3649 第二点
+                // Must not contain the element itself, otherwise highlighting part of a cell's text twice would
+                // select the whole cell. See point 2 of https://github.com/siyuan-note/siyuan/issues/3649
                 !startCellElement.contains(range.endContainer)) {
                 setLastNodeRange(startCellElement, range, false);
             }
@@ -65,7 +66,7 @@ export const selectAll = (protyle: IProtyle, nodeElement: Element, range: Range)
         } else {
             position = getSelectionOffset(editElement, nodeElement, range);
             if (position.start !== 0 || position.end !== editElement.textContent.length) {
-                // 全选后 rang 不对 https://ld246.com/article/1654848722251
+                // The range is wrong after select-all https://ld246.com/article/1654848722251
                 let firstChild = editElement.firstChild;
                 while (firstChild) {
                     if (firstChild.nodeType === 3) {
@@ -101,7 +102,7 @@ export const selectAll = (protyle: IProtyle, nodeElement: Element, range: Range)
                         lastChild = lastChild.lastChild as HTMLElement;
                     }
                 }
-                // 列表回车后，左键全选无法选中
+                // After pressing Enter in a list, select-all via the left mouse button doesn't select anything
                 focusByRange(range);
                 protyle.toolbar.render(protyle, range);
                 countSelectWord(range, protyle.block.rootID);
@@ -143,14 +144,14 @@ export const getEditorRange = (element: Element): Range => {
         range = getSelection().getRangeAt(0);
         if (element === range.startContainer || element.contains(range.startContainer)) {
             if (range.toString() === "" && range.startContainer.nodeType === 1) {
-                // 有时候点击编辑器头部需要矫正到第一个块中
+                // Clicking the top of the editor sometimes needs to be corrected to land in the first block
                 if (range.startOffset === 0 && (range.startContainer as HTMLElement).classList.contains("protyle-wysiwyg")) {
                     const focusRange = focusBlock(range.startContainer.firstChild as Element);
                     if (focusRange) {
                         return focusRange;
                     }
                 }
-                // 移动端获取有偏差 https://github.com/siyuan-note/siyuan/issues/15998
+                // The value obtained on mobile is off https://github.com/siyuan-note/siyuan/issues/15998
                 if ((range.startContainer as Element).getAttribute("contenteditable") !== "true" &&
                     getContenteditableElement(range.startContainer as Element)) {
                     const blockElement = hasClosestBlock(range.startContainer);
@@ -173,7 +174,8 @@ export const getEditorRange = (element: Element): Range => {
         }
     }
 
-    // 代码块过长，在代码块的下一个块前删除，代码块会滚动到顶部，因粗需要 preventScroll
+    // When a code block is too long, deleting right before the block after it scrolls the code block back to
+    // the top, so preventScroll is needed
     (element as HTMLElement).focus({preventScroll: true});
     if (!range) {
         range = document.createRange();
@@ -181,7 +183,7 @@ export const getEditorRange = (element: Element): Range => {
 
     let targetElement;
     if (element.classList.contains("table")) {
-        // 当光标不在表格区域中时表格无法被复制 https://ld246.com/article/1650510736504
+        // A table can't be copied when the caret isn't inside the table area https://ld246.com/article/1650510736504
         targetElement = element.querySelector("th") || element.querySelector("td");
     } else {
         targetElement = getContenteditableElement(element);
@@ -199,7 +201,7 @@ export const getEditorRange = (element: Element): Range => {
                 targetElement = element.firstElementChild.lastChild;
             }
         } else if (targetElement.tagName === "TABLE") {
-            // 文档中开头为表格，获取错误 https://ld246.com/article/1663408335459?r=88250
+            // Getting this wrong when a document starts with a table https://ld246.com/article/1663408335459?r=88250
             targetElement = targetElement.querySelector("th") || element.querySelector("td");
         }
     }
@@ -221,9 +223,9 @@ export const getSelectionPosition = (nodeElement: Element, range?: Range, useDir
     let cursorRect;
     if (range.getClientRects().length === 0) {
         if (range.startContainer.nodeType === 3) {
-            // 空行时，会出现没有 br 的情况，需要根据父元素 <p> 获取位置信息
+            // On an empty line there can be no <br>, so positioning info must come from the parent <p> element
             const parentRects = range.startContainer.parentElement?.getClientRects();
-            // 连续粘贴图片时
+            // When pasting images consecutively
             const previousRects = (range.startContainer as Element).previousElementSibling?.getClientRects();
             if (parentRects.length > 0 || previousRects.length > 0) {
                 if (parentRects.length === 0 || (previousRects &&
@@ -245,7 +247,7 @@ export const getSelectionPosition = (nodeElement: Element, range?: Range, useDir
             const children = (range.startContainer as Element).children;
             if (children[range.startOffset] &&
                 children[range.startOffset].getClientRects().length > 0) {
-                // markdown 模式回车
+                // Enter in markdown mode
                 cursorRect = children[range.startOffset].getClientRects()[0];
             } else if (range.startContainer.childNodes.length > 0) {
                 // in table or code block
@@ -301,32 +303,33 @@ export const getSelectionPosition = (nodeElement: Element, range?: Range, useDir
             }
         }
     } else {
-        const rects = range.getClientRects(); // 由于长度过长折行，光标在行首时有多个 rects https://github.com/siyuan-note/siyuan/issues/6156
+        const rects = range.getClientRects(); // There can be multiple rects when the caret is at the start of a wrapped line https://github.com/siyuan-note/siyuan/issues/6156
         if (range.toString()) {
             if (useDirect) {
                 const selection = window.getSelection() as Selection & {
                     direction: "forward" | "backward" | "none"
                 };
-                // 判断选择方向
+                // Determine the selection direction
                 const isBackward = (selection && "direction" in selection && selection.direction !== "none") ?
                     selection.direction === "backward"
                     : range.startContainer === selection?.focusNode && range.startOffset === selection?.focusOffset;
                 const isBottom = !isBackward && rects[0].top !== rects[rects.length - 1].top;
                 return {
-                    // 向左选择：使用第一个矩形的左边界；向右选择：使用最后一个矩形的右边界
+                    // Selecting leftward: use the first rect's left edge; selecting rightward: use the last rect's right edge
                     left: isBackward ? rects[0].left : rects[rects.length - 1].right,
-                    // 如果向右选择时有多个垂直位置不同的矩形：使用最后一个矩形的下边界；否则使用第一个矩形的上边界
+                    // When selecting rightward across rects with different vertical positions: use the last
+                    // rect's bottom edge; otherwise use the first rect's top edge
                     top: isBottom ? rects[rects.length - 1].bottom : rects[0].top,
                     isBottom
                 };
             } else {
-                return {    // 选中多行不应遮挡第一行 https://github.com/siyuan-note/siyuan/issues/7541
+                return {    // Selecting multiple lines should not obscure the first line https://github.com/siyuan-note/siyuan/issues/7541
                     left: rects[rects.length - 1].left,
                     top: rects[0].top
                 };
             }
         } else {
-            return {    // 代码块首 https://github.com/siyuan-note/siyuan/issues/13113
+            return {    // At the start of a code block https://github.com/siyuan-note/siyuan/issues/13113
                 left: rects[rects.length - 1].left,
                 top: rects[rects.length - 1].top
             };
@@ -362,13 +365,13 @@ export const getSelectionOffset = (selectElement: Node, editorElement?: Element,
         preSelectionRange.selectNodeContents(selectElement);
     }
     preSelectionRange.setEnd(range.startContainer, range.startOffset);
-    // 需加上表格内软换行 br 的长度
+    // The length of soft-line-break br elements inside a table must be added
     position.start = preSelectionRange.toString().length + preSelectionRange.cloneContents().querySelectorAll("br, .emoji").length;
     position.end = position.start + range.toString().length + range.cloneContents().querySelectorAll("br, .emoji").length;
     return position;
 };
 
-// 记录插入块前的焦点位置，供撤销回放完成后恢复。
+// Record the focus position before a block is inserted, to restore it once undo replay completes.
 export const getUndoFocusContext = (editorElement: Element, range?: Range): Record<string, string> | undefined => {
     if (!range || !editorElement.contains(range.startContainer) || !editorElement.contains(range.endContainer)) {
         return undefined;
@@ -393,7 +396,7 @@ export const getUndoFocusContext = (editorElement: Element, range?: Range): Reco
     };
 };
 
-// 在撤销操作全部应用后，根据插入前保存的焦点位置重建选区。
+// After all undo operations have been applied, rebuild the selection from the focus position saved before the insert.
 export const restoreUndoFocus = (protyle: IProtyle, operations: IOperation[]) => {
     const operation = operations.find(item => item.context?.undoFocusId);
     if (!operation) {
@@ -463,7 +466,7 @@ export const setLastNodeRange = (editElement: Element, range: Range, setStart = 
         if (!lastNode.lastChild) {
             break;
         }
-        // 最后一个为多种行内元素嵌套
+        // The last one is a nesting of multiple inline elements
         lastNode = lastNode.lastChild as Element;
     }
     // https://github.com/siyuan-note/siyuan/issues/12753
@@ -514,7 +517,7 @@ export const focusByOffset = (container: Element, start: number, end: number, is
     if (!container) {
         return false;
     }
-    // 空块无法 focus
+    // An empty block can't be focused
     const editElement = getContenteditableElement(container);
     if (editElement) {
         container = editElement;
@@ -619,7 +622,8 @@ export const setInsertWbrHTML = (nodeElement: HTMLElement, range: Range, protyle
         if (cellElement) {
             const offset = getSelectionOffset(cellElement, nodeElement, range);
             const cloneNode = nodeElement.cloneNode(true) as HTMLElement;
-            // 通过单元格在行内的索引在克隆树中定位对应单元格，避免在原 DOM 上增删 class 残留 class="" https://github.com/siyuan-note/siyuan/issues/18084
+            // Locate the corresponding cell in the cloned tree using the cell's index within its row, avoiding
+            // a leftover class="" on the original DOM from adding/removing a class https://github.com/siyuan-note/siyuan/issues/18084
             const cellIndex = Array.from(cellElement.parentElement.children).indexOf(cellElement);
             const rowIndex = Array.from(nodeElement.querySelector("table").rows).indexOf(cellElement.parentElement as HTMLTableRowElement);
             const cloneCellElement = cloneNode.querySelector("table").rows[rowIndex].cells[cellIndex];
@@ -645,7 +649,7 @@ export const focusByWbr = (element: Element, range: Range) => {
     if (wbrElements.length === 0) {
         return;
     }
-    // 没找到 wbr 产生多个的地方，先顶顶
+    // Haven't found where multiple wbr elements get produced; papering over it for now
     wbrElements.forEach((item, index) => {
         if (index !== 0) {
             item.remove();
@@ -659,7 +663,7 @@ export const focusByWbr = (element: Element, range: Range) => {
         } else if (wbrElement.nextSibling) {
             if (wbrElement.nextSibling.nodeType === 3) {
                 if (wbrElement.nextSibling.textContent === Constants.ZWSP) {
-                    // <wbr>零宽空格text
+                    // <wbr>zero-width-space text
                     range.setStart(wbrElement.nextSibling, 1);
                 } else {
                     // <wbr>text
@@ -670,17 +674,18 @@ export const focusByWbr = (element: Element, range: Range) => {
                 range.setStartAfter(wbrElement);
             }
         } else {
-            // 内容为空
+            // Content is empty
             range.setStart(wbrElement.parentElement, 0);
         }
     } else {
         const wbrPreviousSibling = hasPreviousSibling(wbrElement);
         if (wbrPreviousSibling && wbrElement.previousElementSibling === wbrPreviousSibling) {
             if (wbrElement.previousElementSibling.lastChild?.nodeType === 3) {
-                // <em>text</em><wbr> 需把光标放在里面，因为 chrome 点击后也是默认在里面
+                // <em>text</em><wbr> needs the caret placed inside it, since Chrome also defaults to placing it
+                // there after a click
                 range.setStart(wbrElement.previousElementSibling.lastChild, wbrElement.previousElementSibling.lastChild.textContent.length);
             } else if (wbrPreviousSibling.nodeType !== 3 && (wbrPreviousSibling as HTMLElement).classList.contains("img")) {
-                // <img><wbr>, 删除图片后的唯一的一个字符
+                // <img><wbr>, the only remaining character after deleting the image
                 range.setStartAfter(wbrPreviousSibling);
             } else {
                 // <span class="hljs-function"><span class="hljs-keyword">fun</span></span>
@@ -717,7 +722,8 @@ export const focusBlock = (element: Element, parentElement?: HTMLElement, toStar
         return false;
     }
 
-    // hr、嵌入块、数学公式、iframe、音频、视频、图表渲染块等，删除段落块后，光标位置矫正 https://github.com/siyuan-note/siyuan/issues/4143
+    // For hr/embed blocks/math formulas/iframe/audio/video/chart render blocks etc, correct the caret position
+    // after a paragraph block is deleted https://github.com/siyuan-note/siyuan/issues/4143
     if (element.classList.contains("render-node") || element.classList.contains("iframe") || element.classList.contains("hr") || element.classList.contains("av")) {
         const range = document.createRange();
         const type = element.getAttribute("data-type");
@@ -798,17 +804,17 @@ export const focusBlock = (element: Element, parentElement?: HTMLElement, toStar
         }
         let range;
         if (toStart) {
-            // 需要定位到第一个 child https://github.com/siyuan-note/siyuan/issues/5930
+            // Needs to be positioned at the first child https://github.com/siyuan-note/siyuan/issues/5930
             range = setFirstNodeRange(cursorElement, getEditorRange(cursorElement));
             range.collapse(true);
         } else {
             let focusHljs = false;
-            // 定位到末尾 https://github.com/siyuan-note/siyuan/issues/5982
+            // Position at the end https://github.com/siyuan-note/siyuan/issues/5982
             if (element.getAttribute("data-type") === "NodeCodeBlock") {
-                // 代码块末尾定位需在 /n 之前 https://github.com/siyuan-note/siyuan/issues/9141，https://github.com/siyuan-note/siyuan/issues/9189
+                // Positioning at the end of a code block must be before the trailing \n https://github.com/siyuan-note/siyuan/issues/9141, https://github.com/siyuan-note/siyuan/issues/9189
                 let lastNode = cursorElement.lastChild;
                 if (!lastNode) {
-                    // 粘贴 ``` 报错
+                    // Pasting ``` throws an error
                     cursorElement.innerHTML = "\n";
                     lastNode = cursorElement.lastChild;
                 }
@@ -838,7 +844,7 @@ export const focusBlock = (element: Element, parentElement?: HTMLElement, toStar
     } else if (parentElement) {
         parentElement.focus();
     } else {
-        // li 下面为 hr、嵌入块、数学公式、iframe、音频、视频、图表渲染块等时递归处理
+        // Recurse when a list item's child is an hr/embed block/math formula/iframe/audio/video/chart render block, etc.
         if (isContainerBlock(element)) {
             return focusBlock(element.querySelector("[data-node-id]"), parentElement, toStart);
         }
@@ -851,7 +857,7 @@ export const focusSideBlock = (updateElement: Element) => {
         let sideBlockElement;
         let collapse;
         if (updateElement.nextElementSibling &&
-            !updateElement.nextElementSibling.classList.contains("protyle-attr") // 用例 https://ld246.com/article/1661928364696
+            !updateElement.nextElementSibling.classList.contains("protyle-attr") // Example case https://ld246.com/article/1661928364696
         ) {
             collapse = true;
             sideBlockElement = getNextBlock(updateElement) as HTMLElement;

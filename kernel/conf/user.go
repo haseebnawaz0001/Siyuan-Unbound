@@ -36,10 +36,10 @@ type User struct {
 	UserTrafficAPIGet               float64      `json:"userTrafficAPIGet"`
 	UserTrafficAPIPut               float64      `json:"userTrafficAPIPut"`
 	UserTrafficTime                 float64      `json:"userTrafficTime"`
-	UserSiYuanSubscriptionPlan      float64      `json:"userSiYuanSubscriptionPlan"`   // -1：未订阅，0：标准订阅，1：教育订阅，2：试用订阅
-	UserSiYuanSubscriptionStatus    float64      `json:"userSiYuanSubscriptionStatus"` // -1：未订阅，0：订阅可用，1：订阅封禁，2：订阅过期
-	UserSiYuanSubscriptionType      float64      `json:"userSiYuanSubscriptionType"`   // 0 年付订阅；1 终生订阅；2 月付订阅（目前不支持）
-	UserSiYuanOneTimePayStatus      float64      `json:"userSiYuanOneTimePayStatus"`   // 0 功能特性未付费；1 功能特性已付费
+	UserSiYuanSubscriptionPlan      float64      `json:"userSiYuanSubscriptionPlan"`   // -1: not subscribed, 0: standard subscription, 1: education subscription, 2: trial subscription
+	UserSiYuanSubscriptionStatus    float64      `json:"userSiYuanSubscriptionStatus"` // -1: not subscribed, 0: subscription available, 1: subscription banned, 2: subscription expired
+	UserSiYuanSubscriptionType      float64      `json:"userSiYuanSubscriptionType"`   // 0 annual subscription; 1 lifetime subscription; 2 monthly subscription (not currently supported)
+	UserSiYuanOneTimePayStatus      float64      `json:"userSiYuanOneTimePayStatus"`   // 0 feature not paid for; 1 feature paid for
 }
 
 type UserTitle struct {

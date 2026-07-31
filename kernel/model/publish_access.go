@@ -43,9 +43,9 @@ import (
 
 type PublishAccessItem struct {
 	ID       string `json:"id"`
-	Visible  bool   `json:"visible"`  // 是否发布可见
-	Password string `json:"password"` // 密码，为空字符串时表示无密码
-	Disable  bool   `json:"disable"`  // 是否禁止发布
+	Visible  bool   `json:"visible"`  // Whether it is visible when published
+	Password string `json:"password"` // Password; an empty string means no password
+	Disable  bool   `json:"disable"`  // Whether publishing is disabled
 }
 
 type PublishAccess []*PublishAccessItem
@@ -155,7 +155,8 @@ func PurgePublishAccess() {
 	if err != nil {
 		return
 	}
-	// 必须在所有笔记本都打开的情况下才能执行清除工作，否则会把关闭的笔记本里文档的发布访问控制状态清除
+	// This cleanup can only run when all notebooks are open, otherwise it would clear the publish
+	// access control state of documents in closed notebooks
 	for _, box := range boxes {
 		if box.Closed {
 			return
@@ -301,7 +302,7 @@ func FilterViewByPublishAccess(c *gin.Context, publishAccess PublishAccess, view
 		table := ret.(*av.Table)
 		filteredRows := []*av.TableRow{}
 		for _, row := range table.Rows {
-			// 默认第一个属性是文档块
+			// The first field is assumed to be the document block
 			var bt *treenode.BlockTree
 			if len(row.Cells) > 0 {
 				if row.Cells[0].Value.Block != nil {
@@ -312,7 +313,7 @@ func FilterViewByPublishAccess(c *gin.Context, publishAccess PublishAccess, view
 				}
 			}
 			if bt != nil {
-				// 不显示禁止文档
+				// Don't show a disallowed document
 				if !CheckPathAccessableByPublishIgnore(bt.BoxID, bt.Path, publishIgnore) {
 					row = nil
 				}
@@ -331,7 +332,7 @@ func FilterViewByPublishAccess(c *gin.Context, publishAccess PublishAccess, view
 		gallery := ret.(*av.Gallery)
 		filteredCards := []*av.GalleryCard{}
 		for _, card := range gallery.Cards {
-			// 默认第一个属性是文档块
+			// The first field is assumed to be the document block
 			var bt *treenode.BlockTree
 			if len(card.Values) > 0 {
 				if card.Values[0].Value.Block != nil {
@@ -342,14 +343,14 @@ func FilterViewByPublishAccess(c *gin.Context, publishAccess PublishAccess, view
 				}
 			}
 			if bt != nil {
-				// 替换封面
+				// Replace the cover
 				newCoverContent := FilterContentByPublishAccess(c, publishAccess, bt.BoxID, bt.Path, card.CoverContent, true)
 				if card.CoverContent != newCoverContent {
 					card.CoverContent = newCoverContent
 					card.CoverURL = ""
 				}
 
-				// 不显示禁止文档
+				// Don't show a disallowed document
 				if !CheckPathAccessableByPublishIgnore(bt.BoxID, bt.Path, publishIgnore) {
 					card = nil
 				}
@@ -368,7 +369,7 @@ func FilterViewByPublishAccess(c *gin.Context, publishAccess PublishAccess, view
 		kanban := ret.(*av.Kanban)
 		filteredCards := []*av.KanbanCard{}
 		for _, card := range kanban.Cards {
-			// 默认第一个属性是文档块
+			// The first field is assumed to be the document block
 			var bt *treenode.BlockTree
 			if len(card.Values) > 0 {
 				if card.Values[0].Value.Block != nil {
@@ -379,14 +380,14 @@ func FilterViewByPublishAccess(c *gin.Context, publishAccess PublishAccess, view
 				}
 			}
 			if bt != nil {
-				// 替换封面
+				// Replace the cover
 				newCoverContent := FilterContentByPublishAccess(c, publishAccess, bt.BoxID, bt.Path, card.CoverContent, true)
 				if card.CoverContent != newCoverContent {
 					card.CoverContent = newCoverContent
 					card.CoverURL = ""
 				}
 
-				// 不显示禁止文档
+				// Don't show a disallowed document
 				if !CheckPathAccessableByPublishIgnore(bt.BoxID, bt.Path, publishIgnore) {
 					card = nil
 				}
@@ -549,7 +550,7 @@ func FilterBlockInfoByPublishAccess(c *gin.Context, publishAccess PublishAccess,
 func FilterContentByPublishAccess(c *gin.Context, publishAccess PublishAccess, box string, docPath string, content string, onlyIcon bool) (ret string) {
 	ret = content
 
-	// 密码访问
+	// Password-protected access
 	passwordID, password := GetPathPasswordByPublishAccess(box, docPath, publishAccess)
 	if password != "" {
 		if !CheckPublishAuthCookie(c, passwordID, password) {
@@ -572,7 +573,7 @@ func FilterContentByPublishAccess(c *gin.Context, publishAccess PublishAccess, b
 		}
 	}
 
-	// 禁止访问
+	// Access forbidden
 	ID := box
 	if docPath != "/" {
 		ID = strings.TrimSuffix(path.Base(docPath), ".sy")
@@ -608,7 +609,8 @@ func FilterEmbedBlocksByPublishAccess(c *gin.Context, publishAccess PublishAcces
 		accessible := CheckPathAccessableByPublishIgnore(block.Box, block.Path, publishIgnore) &&
 			(password == "" || CheckPublishAuthCookie(c, passwordID, password))
 		if !accessible {
-			// 不返回不可访问的查询结果，避免泄漏结果数量、顺序和访问控制边界。
+			// Don't return inaccessible query results, to avoid leaking result count, order, or access
+			// control boundaries.
 			continue
 		}
 
@@ -825,7 +827,8 @@ func filterLayoutItemByPublishIgnore(publishIgnore PublishAccess, item map[strin
 				}
 			}
 			if !hasActive && len(activeTimes) > 0 {
-				// 如果原本激活的tab刚好被去掉了，就选择日期最新的一个tab激活
+				// If the tab that was originally active happened to be removed, activate the tab with
+				// the most recent date instead
 				maxIndex := 0
 				for i, activeTime := range activeTimes {
 					if activeTime > activeTimes[maxIndex] {
@@ -911,7 +914,7 @@ func reassignTagCounts(tag *Tag, counts map[string]int) (ret *Tag) {
 func FilterLocalStorageByPublishAccess(publishAccess PublishAccess, localStorage map[string]any) (ret map[string]any) {
 	ret = localStorage
 	publishIgnore := GetInvisiblePublishAccess(publishAccess)
-	// 清空搜索历史记录
+	// Clear the search history
 	searchKeysItem := ret["local-searchkeys"]
 	if searchKeysItem != nil {
 		searchKeys := searchKeysItem.(map[string]any)
@@ -992,7 +995,8 @@ func FilterRecentDocsByPublishAccess(c *gin.Context, publishAccess PublishAccess
 func FilterCriteriaByPublishAccess(c *gin.Context, publishAccess PublishAccess, criteria []*Criterion) (ret []*Criterion) {
 	ret = []*Criterion{}
 	publishIgnore := GetInvisiblePublishAccess(publishAccess)
-	// IDPath 元素可能是笔记本 ID、文档 ID，或 "笔记本ID/文档ID[.sy]" 路径串，这里统一解析出文档 ID
+	// An IDPath element may be a notebook ID, a document ID, or a "notebookID/docID[.sy]" path
+	// string; resolve it uniformly here to a document ID
 	blockIDs := map[string]struct{}{}
 	for _, criterion := range criteria {
 		for _, p := range criterion.IDPath {
@@ -1000,7 +1004,7 @@ func FilterCriteriaByPublishAccess(c *gin.Context, publishAccess PublishAccess, 
 			if p == "" {
 				continue
 			}
-			// 路径形式取末段并去掉 .sy 后缀
+			// For a path-form value, take the last segment and strip the .sy suffix
 			id := strings.TrimSuffix(path.Base(p), ".sy")
 			if id != "" && id != "." && id != "/" {
 				blockIDs[id] = struct{}{}
@@ -1025,7 +1029,7 @@ func FilterCriteriaByPublishAccess(c *gin.Context, publishAccess PublishAccess, 
 			}
 			bt := blockTrees[id]
 			if bt == nil {
-				// 关联的文档不存在，视为不可访问
+				// The associated document doesn't exist, treat it as inaccessible
 				accessible = false
 				break
 			}
@@ -1037,11 +1041,12 @@ func FilterCriteriaByPublishAccess(c *gin.Context, publishAccess PublishAccess, 
 			accessible = true
 		}
 		if !accessible {
-			// 若 IDPath 全部不可访问（或引用了不可见文档），整条丢弃，避免泄露 HPath
+			// If every entry in IDPath is inaccessible (or references an invisible document), drop the
+			// whole criterion to avoid leaking HPath
 			continue
 		}
 
-		// 复制一份后再清空搜索/替换关键字，避免污染缓存
+		// Clone it before clearing the search/replace keywords, to avoid polluting the cache
 		cloned := *criterion
 		cloned.K = ""
 		cloned.R = ""

@@ -94,7 +94,7 @@ export class Tree {
                 style = `padding-left: ${(item.depth * 18) || 4}px;margin-right: 2px`;
             }
             const showArrow = hasChild || (item.type === "backlink" && !isM);
-            // data-id 需要添加 item.id，否则大纲更新时 name 不一致导致 https://github.com/siyuan-note/siyuan/issues/11843
+            // data-id needs to include item.id, otherwise a name mismatch when the outline updates causes https://github.com/siyuan-note/siyuan/issues/11843
             html += `<li class="b3-list-item${isM ? "" : " b3-list-item--hide-action"}" 
 ${item.id ? 'data-node-id="' + item.id + '"' : ""} 
 ${item.box ? 'data-notebook-id="' + item.box + '"' : ""} 
@@ -236,7 +236,7 @@ data-def-path="${item.defPath}">
                     break;
                 }
                 if (target.classList.contains("b3-list-item__action") && this.click) {
-                    // 移动端书签父节点删除按钮
+                    // Mobile bookmark parent-node delete button
                     const liElement = hasClosestByTag(target, "LI");
                     if (liElement) {
                         this.click(liElement, event);
@@ -273,7 +273,7 @@ data-def-path="${item.defPath}">
                     return;
                 }
                 event.dataTransfer.setData("text/html", liElement.outerHTML);
-                // 设置了的话 drop 就无法监听 alt event.dataTransfer.dropEffect = "move";
+                // Setting event.dataTransfer.dropEffect = "move"; here would prevent drop from listening for alt
                 liElement.style.opacity = "0.38";
                 window.siyuan.dragElement = liElement;
             }

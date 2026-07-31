@@ -135,7 +135,8 @@ func IsPetalsEnabled() bool {
 	}
 
 	if !Conf.Bazaar.Trust {
-		// 移动端没有集市模块，所以要默认开启，桌面端和 Docker 容器需要用户手动确认过信任后才能开启
+		// The mobile app has no bazaar module, so it should be enabled by default; on desktop and Docker
+		// containers it can only be enabled after the user manually confirms trust
 		if util.Container == util.ContainerStd || util.Container == util.ContainerDocker {
 			return false
 		}
@@ -144,7 +145,8 @@ func IsPetalsEnabled() bool {
 }
 
 func LoadPetals(frontend string, isPublish bool) (ret []*Petal) {
-	// 调用 setPetalEnabled 接口之后推送消息到所有前端实例，接着会同时调用 loadPetals 接口，合并相同类型的请求为一次执行
+	// After calling setPetalEnabled, a message is pushed to all frontend instances, which then all call
+	// loadPetals concurrently; coalesce requests of the same kind into a single execution
 	key := "loadPetals:" + frontend + ":" + strconv.FormatBool(isPublish)
 	v, err, _ := loadPetalsFlight.Do(key, func() (any, error) {
 		return loadPetals(frontend, isPublish, false), nil
@@ -276,7 +278,8 @@ func loadCode(petal *Petal) {
 				found[name] = true
 			}
 			if 0 < len(langFiles) {
-				// 按 Conf.Lang、en、zh-CN 及其历史下划线文件名依次回退，最后取首个可用文件
+				// Fall back through Conf.Lang, en, zh-CN and their legacy underscore-style filenames in
+				// order, taking the first available file
 				candidates := make([]string, 0, 6)
 				candidateSeen := make(map[string]bool, 6)
 				for _, lang := range []string{Conf.Lang, "en", "zh-CN"} {
@@ -386,7 +389,7 @@ func getPetals() (ret []*Petal) {
 		if filelock.IsExist(pluginJSONPath) {
 			tmp = append(tmp, petal)
 		} else {
-			// 插件不存在时，删除对应的持久化信息
+			// If the plugin doesn't exist, remove its persisted info
 			bazaar.RemovePackageInfo("plugins", petal.Name)
 		}
 	}

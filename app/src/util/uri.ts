@@ -92,7 +92,7 @@ const processSiYuanUriPlugins = (app: App, uriObj: URL): boolean => {
         if (!app.plugins.some(item => item.models[pluginNameOrTabType])) {
             return false;
         }
-        // siyuan://plugins/plugin-samplecustom_tab?title=自定义页签&icon=iconFace&data={"text": "This is the custom plugin tab I opened via protocol."}
+        // siyuan://plugins/plugin-samplecustom_tab?title=CustomTab&icon=iconFace&data={"text": "This is the custom plugin tab I opened via protocol."}
         /// #if !MOBILE
         // https://github.com/siyuan-note/siyuan/pull/9256
         const data = (() => {
@@ -105,7 +105,7 @@ const processSiYuanUriPlugins = (app: App, uriObj: URL): boolean => {
         })();
         let icon = uriObj.searchParams.get("icon");
         if (icon && !/^[a-zA-Z0-9]+$/.test(icon)) {
-            icon = null; // 拒绝非法 icon 值，使用默认图标
+            icon = null; // Reject an invalid icon value and use the default icon
         }
         openFile({
             app,

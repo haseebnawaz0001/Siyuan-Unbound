@@ -26,13 +26,13 @@ func TestAssetContentFieldRegexpUsesArguments(t *testing.T) {
 	payload := "x'); DELETE FROM asset_contents_fts_case_insensitive; --"
 	clause, args := assetContentFieldRegexp(payload)
 	if "(name REGEXP ? OR content REGEXP ?)" != clause {
-		t.Fatalf("正则过滤子句未使用占位符：%q", clause)
+		t.Fatalf("regex filter clause does not use a placeholder: %q", clause)
 	}
 	if strings.Contains(clause, payload) {
-		t.Fatalf("正则过滤子句不应包含用户输入：%q", clause)
+		t.Fatalf("regex filter clause should not contain user input: %q", clause)
 	}
 	if 2 != len(args) || payload != args[0] || payload != args[1] {
-		t.Fatalf("正则过滤参数错误：%v", args)
+		t.Fatalf("regex filter arguments are wrong: %v", args)
 	}
 }
 
@@ -44,25 +44,25 @@ func TestBuildAssetContentTypeFilterUsesArguments(t *testing.T) {
 		".md":   false,
 	})
 	if " AND ext IN (?, ?)" != clause {
-		t.Fatalf("资源类型过滤子句错误：%q", clause)
+		t.Fatalf("asset type filter clause is wrong: %q", clause)
 	}
 	if strings.Contains(clause, payload) {
-		t.Fatalf("资源类型过滤子句不应包含用户输入：%q", clause)
+		t.Fatalf("asset type filter clause should not contain user input: %q", clause)
 	}
 	if !slices.Equal(args, []any{payload, ".txt"}) {
-		t.Fatalf("资源类型过滤参数错误：%v", args)
+		t.Fatalf("asset type filter arguments are wrong: %v", args)
 	}
 }
 
 func TestBuildAssetContentTypeFilterEmpty(t *testing.T) {
 	clause, args := buildAssetContentTypeFilter(nil)
 	if "" != clause || 0 != len(args) {
-		t.Fatalf("未指定资源类型时不应生成过滤条件：%q %v", clause, args)
+		t.Fatalf("no filter condition should be generated when no asset type is specified: %q %v", clause, args)
 	}
 
 	clause, args = buildAssetContentTypeFilter(map[string]bool{".txt": false})
 	if " AND 1 = 0" != clause || 0 != len(args) {
-		t.Fatalf("全部禁用的资源类型应返回空结果条件：%q %v", clause, args)
+		t.Fatalf("when all asset types are disabled, an always-empty-result condition should be returned: %q %v", clause, args)
 	}
 }
 

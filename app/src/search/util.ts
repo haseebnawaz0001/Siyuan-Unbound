@@ -81,7 +81,7 @@ export const openGlobalSearch = (app: App, text: string, replace: boolean, searc
     });
 };
 
-// closeCB 不存在为页签搜索
+// When closeCB doesn't exist, it's a tab search
 export const genSearch = (app: App, config: Config.IUILayoutTabSearchConfig, element: HTMLElement, closeCB?: () => void) => {
     let includeChild = true;
     let enableIncludeChild = false;
@@ -530,7 +530,7 @@ export const genSearch = (app: App, config: Config.IUILayoutTabSearchConfig, ele
                 inputEvent(element, config, edit, true);
                 break;
             } else if (target.id === "searchReplace") {
-                // ctrl+P 不需要保存
+                // ctrl+P doesn't need to save
                 config.hasReplace = !config.hasReplace;
                 element.querySelectorAll(".search__header")[1].classList.toggle("fn__none");
                 element.querySelector("#criteria .b3-chip--current")?.classList.remove("b3-chip--current");
@@ -806,7 +806,7 @@ export const genSearch = (app: App, config: Config.IUILayoutTabSearchConfig, ele
                     let isClick = event.detail === 1;
                     let isDblClick = event.detail === 2;
                     /// #if BROWSER
-                    if (isIPad()) { // 需要进行 ipad 判断 https://github.com/siyuan-note/siyuan/issues/12704
+                    if (isIPad()) { // Need to check for iPad https://github.com/siyuan-note/siyuan/issues/12704
                         const newDate = Date.now();
                         isClick = newDate - lastClickTime > Constants.TIMEOUT_DBLCLICK;
                         isDblClick = !isClick;
@@ -1233,7 +1233,7 @@ export const getArticle = (options: {
                         }
                     }
                 });
-                // 只能放在 onGet 后，否则 title 不会更新 https://github.com/siyuan-note/siyuan/issues/16739
+                // This must go after onGet, otherwise the title won't update https://github.com/siyuan-note/siyuan/issues/16739
                 if (options.edit.protyle.options.render.title) {
                     options.edit.protyle.title.render(options.edit.protyle, response);
                 }
@@ -1368,7 +1368,8 @@ export const inputEvent = (element: Element, config: Config.IUILayoutTabSearchCo
                 page: config.page || 1,
                 pageSize: 32,
             };
-            // 限定在单个加密 box 内搜索时带 notebook，让内核走加密 db；跨 box 或全局搜索走原函数
+            // When search is scoped to a single encrypted box, pass the notebook so the kernel uses the encrypted
+            // db; for cross-box or global search, use the original function
             const idPaths = config.idPath || [];
             if (idPaths.length > 0) {
                 const box = idPaths[0].split("/")[0];

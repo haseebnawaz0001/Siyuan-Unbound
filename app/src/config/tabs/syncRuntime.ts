@@ -9,22 +9,22 @@ import {
     refreshSyncTabPanels,
 } from "./syncUi";
 
-/** 账号同步 Tab 根节点 */
+/** Root node of the account and sync tab */
 export let syncTabElement: HTMLElement | undefined;
 
-/** 设置对话框关闭后释放 Tab 根节点引用，避免持有已脱离文档的 DOM */
+/** Releases the reference to the tab root once the setting dialog is closed, so that no detached DOM is kept alive */
 export const clearSyncTabElement = () => {
     syncTabElement = undefined;
 };
 
-/** 账号同步 Tab 挂载后的额外初始化（注册表 mount 之后调用） */
+/** Extra initialization of the account and sync tab, called after the registry has mounted it */
 export const mountSyncTabExtras = (root: HTMLElement) => {
     syncTabElement = root;
     refreshSyncTabPanels(root);
     updateAccountSwitchesVisibility(root);
 };
 
-/** 切换同步提供商等场景：刷新云空间相关区块并重置云目录列表 */
+/** Refreshes the cloud space blocks and resets the cloud directory list, for example after switching the sync provider */
 export const refreshSyncCloudSpaceGroup = (root: Element) => {
     refreshSyncTabPanels(root);
     const syncConfigElement = root.querySelector("#syncCloudList");
@@ -34,7 +34,7 @@ export const refreshSyncCloudSpaceGroup = (root: Element) => {
     }
 };
 
-/** 账号同步 Tab：按控件 id 提交配置并更新本地运行时 */
+/** Account and sync tab: submits the config by control id and updates the local runtime */
 export const patchSyncConfig = (controlId: string, value: unknown) => {
     switch (controlId) {
         case "account.displayTitle": {

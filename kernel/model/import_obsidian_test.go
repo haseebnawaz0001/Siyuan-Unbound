@@ -41,13 +41,13 @@ func TestAnalyzeObsidianVault(t *testing.T) {
 	}
 	if vault.Analysis.MarkdownCount != 1 || vault.Analysis.ImportableAssetCount != 2 || vault.Analysis.ImportableAssetSize != 12 ||
 		vault.Analysis.UnreferencedFileCount != 1 {
-		t.Fatalf("分析统计不正确：%+v", vault.Analysis)
+		t.Fatalf("analysis stats are incorrect: %+v", vault.Analysis)
 	}
 	if len(vault.ImportAssets) != 2 || vault.ImportAssets[obsidianPathKey("archive.zip")] == nil {
-		t.Fatalf("未引用资源文件未加入导入计划：%+v", vault.ImportAssets)
+		t.Fatalf("unreferenced asset file was not added to the import plan: %+v", vault.ImportAssets)
 	}
 	if vault.Analysis.SkippedHiddenCount != 0 {
-		t.Fatalf("Vault 配置目录不应计入跳过路径：%d", vault.Analysis.SkippedHiddenCount)
+		t.Fatalf("the vault config directory should not count as a skipped path: %d", vault.Analysis.SkippedHiddenCount)
 	}
 }
 
@@ -67,13 +67,13 @@ func TestRevalidateObsidianVaultDetectsAttachmentListChanges(t *testing.T) {
 		t.Fatal(err)
 	}
 	if err = revalidateObsidianVault(context.Background(), vault); err != nil {
-		t.Fatalf("未变更的 Vault 重新校验失败：%v", err)
+		t.Fatalf("revalidation of an unchanged vault failed: %v", err)
 	}
 	if err = os.WriteFile(filepath.Join(root, "added.pdf"), []byte("added"), 0644); err != nil {
 		t.Fatal(err)
 	}
 	if err = revalidateObsidianVault(context.Background(), vault); err == nil || !strings.Contains(err.Error(), "attachment file list changed") {
-		t.Fatalf("资源文件列表变更未被检出：%v", err)
+		t.Fatalf("change to the asset file list was not detected: %v", err)
 	}
 }
 
@@ -103,11 +103,11 @@ func TestObsidianVaultValidationErrors(t *testing.T) {
 
 func TestIsObsidianImportableFileMode(t *testing.T) {
 	if !isObsidianImportableFileMode(0644) {
-		t.Fatal("普通文件应允许导入")
+		t.Fatal("a regular file should be allowed to import")
 	}
 	for _, mode := range []os.FileMode{os.ModeDir, os.ModeNamedPipe, os.ModeSocket, os.ModeDevice, os.ModeCharDevice, os.ModeIrregular} {
 		if isObsidianImportableFileMode(mode) {
-			t.Fatalf("特殊文件不应允许导入：%v", mode)
+			t.Fatalf("a special file should not be allowed to import: %v", mode)
 		}
 	}
 }
@@ -136,7 +136,7 @@ func TestScanObsidianSourceHTMLContexts(t *testing.T) {
 	data := []byte("<span data-link=\"[[attr]]\">[[inline]]</span> [[outside]]\n<div>\n[[block]]\n</div>\n<!-- [[comment]] -->")
 	scan := scanObsidianSource(data)
 	if len(scan.Wikis) != 1 || scan.Wikis[0].Target != "outside" {
-		t.Fatalf("HTML 中的语法不应参与转换：%+v", scan.Wikis)
+		t.Fatalf("syntax inside HTML should not participate in conversion: %+v", scan.Wikis)
 	}
 }
 
@@ -275,7 +275,7 @@ func TestTransformAndParseObsidianMarkdown(t *testing.T) {
 	transformedText := string(transformed)
 	footnoteMatch := regexp.MustCompile(`\(\((\d{14}-[a-z0-9]{7}) "\[1\]"\)\)`).FindStringSubmatch(transformedText)
 	if len(footnoteMatch) != 2 {
-		t.Fatalf("脚注引用未转换为静态块引用：\n%s", transformedText)
+		t.Fatalf("footnote reference was not converted to a static block reference:\n%s", transformedText)
 	}
 	footnoteID := footnoteMatch[1]
 	for _, expected := range []string{"((" + note.ID + " \"Alias\"))", "((" + note.ID + " 'Note'))", "((" + headingID + " 'Section'))", "{{SELECT * FROM blocks WHERE id = '" + headingID + "'}}", "assets/" + asset.FinalName, "width: 100px", "{: id=\"" + current.BlockIDs["paragraph"] + "\"}"} {
@@ -284,7 +284,7 @@ func TestTransformAndParseObsidianMarkdown(t *testing.T) {
 		}
 	}
 	if !strings.Contains(transformedText, "%%secret%%") {
-		t.Fatalf("注释没有原样保留：\n%s", transformedText)
+		t.Fatalf("comment was not preserved as-is:\n%s", transformedText)
 	}
 	if stats.ConvertedLinks != 4 || stats.ConvertedEmbeds != 1 || stats.ConvertedFootnotes != 1 || stats.PreservedComments != 1 {
 		t.Fatalf("unexpected transform stats: %#v", stats)

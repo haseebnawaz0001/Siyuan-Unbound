@@ -16,41 +16,41 @@
 
 package av
 
-// ViewGroup 描述了视图分组规则的结构。
+// ViewGroup describes the structure of a view's grouping rule.
 type ViewGroup struct {
-	Field     string      `json:"field"`           // 分组字段 ID
-	Method    GroupMethod `json:"method"`          // 分组方式
-	Range     *GroupRange `json:"range,omitempty"` // 分组范围
-	Order     GroupOrder  `json:"order"`           // 分组排序规则
-	HideEmpty bool        `json:"hideEmpty"`       // 是否隐藏空分组
+	Field     string      `json:"field"`           // ID of the field to group by
+	Method    GroupMethod `json:"method"`          // Grouping method
+	Range     *GroupRange `json:"range,omitempty"` // Grouping range
+	Order     GroupOrder  `json:"order"`           // Group sort order
+	HideEmpty bool        `json:"hideEmpty"`       // Whether to hide empty groups
 }
 
-// GroupMethod 描述了分组方式。
+// GroupMethod describes the grouping method.
 type GroupMethod int
 
 const (
-	GroupMethodValue        GroupMethod = iota // 按值分组
-	GroupMethodRangeNum                        // 按数字范围分组
-	GroupMethodDateRelative                    // 按相对日期分组
-	GroupMethodDateDay                         // 按天日期分组
-	GroupMethodDateWeek                        // 按周日期分组
-	GroupMethodDateMonth                       // 按月日期分组
-	GroupMethodDateYear                        // 按年日期分组
+	GroupMethodValue        GroupMethod = iota // Group by value
+	GroupMethodRangeNum                        // Group by numeric range
+	GroupMethodDateRelative                    // Group by relative date
+	GroupMethodDateDay                         // Group by day
+	GroupMethodDateWeek                        // Group by week
+	GroupMethodDateMonth                       // Group by month
+	GroupMethodDateYear                        // Group by year
 )
 
-// GroupRange 描述了分组范围的结构。
+// GroupRange describes the structure of a grouping range.
 type GroupRange struct {
-	NumStart float64 `json:"numStart"` // 数字范围起始值
-	NumEnd   float64 `json:"numEnd"`   // 数字范围结束值
-	NumStep  float64 `json:"numStep"`  // 数字范围步长
+	NumStart float64 `json:"numStart"` // Start value of the numeric range
+	NumEnd   float64 `json:"numEnd"`   // End value of the numeric range
+	NumStep  float64 `json:"numStep"`  // Step size of the numeric range
 }
 
-// GroupOrder 描述了分组排序规则。
+// GroupOrder describes the group sort order.
 type GroupOrder int
 
 const (
-	GroupOrderAsc          = iota // 升序
-	GroupOrderDesc                // 降序
-	GroupOrderMan                 // 手动排序
-	GroupOrderSelectOption        // 同选择的选项排序（仅单选和多选字段适用） https://github.com/siyuan-note/siyuan/issues/15500
+	GroupOrderAsc          = iota // Ascending order
+	GroupOrderDesc                // Descending order
+	GroupOrderMan                 // Manual order
+	GroupOrderSelectOption        // Follow the select option order (applies only to single-select and multi-select fields) https://github.com/siyuan-note/siyuan/issues/15500
 )

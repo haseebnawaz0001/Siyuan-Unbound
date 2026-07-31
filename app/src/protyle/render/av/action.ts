@@ -242,7 +242,8 @@ export const avClick = (protyle: IProtyle, event: MouseEvent & { target: HTMLEle
                             item.querySelector(".av__firstcol use").setAttribute("xlink:href", "#iconUncheck");
                             item.classList.remove("av__row--select");
                         });
-                        // 同步清空虚拟滚动选中快照，避免被 trim 掉的行回填后仍带选中态
+                        // Also clear the virtual scroll selection snapshot, to avoid rows removed by
+                        // trim still carrying the selected state after being refilled
                         blockElement.querySelectorAll(".av__body").forEach((bodyEl: HTMLElement) => {
                             resetAVRowSelect(bodyEl, []);
                         });
@@ -923,7 +924,7 @@ export const updateAVName = (protyle: IProtyle, blockElement: Element) => {
     blockElement.setAttribute("updated", newUpdated);
     nameElement.dataset.title = newData;
 
-    // 当前页面不能进行推送，否则光标会乱跳
+    // The current page must not be pushed to, otherwise the cursor would jump around
     Array.from(protyle.wysiwyg.element.querySelectorAll(`.av[data-av-id="${avId}"]`)).forEach((item: HTMLElement) => {
         if (blockElement === item) {
             return;
@@ -943,7 +944,7 @@ export const updateAttrViewCellAnimation = (cellElement: HTMLElement, value: IAV
     pin?: boolean,
     type?: TAVCol
 }) => {
-    // 属性面板更新列名
+    // The attribute panel updates the column name
     if (!cellElement) {
         return;
     }

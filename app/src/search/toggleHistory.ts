@@ -228,7 +228,7 @@ export const saveKeyList = (type: "keys" | "replaceKeys", value: string) => {
     if (list.length > window.siyuan.config.search.limit) {
         list.splice(window.siyuan.config.search.limit, list.length - window.siyuan.config.search.limit);
     }
-    // new Set 后需重新赋值
+    // Must be reassigned after new Set
     window.siyuan.storage[Constants.LOCAL_SEARCHKEYS][type] = list;
     setStorageVal(Constants.LOCAL_SEARCHKEYS, window.siyuan.storage[Constants.LOCAL_SEARCHKEYS]);
 };

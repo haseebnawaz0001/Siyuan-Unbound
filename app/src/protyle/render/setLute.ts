@@ -1,13 +1,16 @@
-// Lute 配置全部读取全局 window.siyuan.config / window.siyuan.emojis，跨编辑器一致，
-// 因此所有 Protyle 编辑器共用同一个 Lute 实例，将内存与初始化开销从 O(编辑器数) 降为 O(1)。
-// AgentChat 不复用此共享单例，而是通过 getAgentLute 构建独立实例，使渲染不受编辑器设置影响。
+// The Lute config entirely reads from the global window.siyuan.config / window.siyuan.emojis, which
+// is consistent across editors, so all Protyle editors share the same Lute instance, reducing memory
+// and initialization overhead from O(number of editors) to O(1).
+// AgentChat does not reuse this shared singleton; instead it builds an independent instance via
+// getAgentLute, so its rendering is unaffected by editor settings.
 let luteInstance: Lute | undefined;
 
 /**
- * 获取（首次调用时创建）共享 Lute 单例。
+ * Gets the shared Lute singleton (creating it on first call).
  *
- * 仅在首次创建时应用 options，后续调用直接返回已缓存的实例 ——
- * Lute 配置本就源于全局 config，跨编辑器一致，无需按编辑器区分。
+ * options are only applied on first creation; subsequent calls directly return the cached instance —
+ * the Lute config is inherently derived from the global config and is consistent across editors, so
+ * there's no need to distinguish by editor.
  */
 export const getLute = (options: ILuteOptions): Lute => {
     if (!luteInstance) {
@@ -17,20 +20,21 @@ export const getLute = (options: ILuteOptions): Lute => {
 };
 
 /**
- * 直接获取已初始化的共享 Lute 单例。
- * 供 emoji 等无需传入 options 的场景使用；尚未创建时返回 undefined。
+ * Directly gets the already-initialized shared Lute singleton.
+ * Used for scenarios like emoji that don't need to pass in options; returns undefined if not yet created.
  */
 export const getLuteInstance = (): Lute | undefined => {
     return luteInstance;
 };
 
 /**
- * 为智能体（AgentChat）构建独立的 Lute 实例。
+ * Builds an independent Lute instance for the agent (AgentChat).
  *
- * 与共享单例不同：不读取 window.siyuan.config.editor.markdown 的语法开关，
- * 而是把所有 Markdown 行内语法（斜体/粗体/删除线/上下标/标签/行内公式/标记）硬编码启用，
- * 使 LLM 输出始终按标准 Markdown 渲染，不受用户「编辑器 → Markdown 语法设置」的影响。
- * 每次调用都返回新实例，与编辑器渲染相互隔离。
+ * Unlike the shared singleton: it does not read the syntax toggles from
+ * window.siyuan.config.editor.markdown, but instead hardcodes all Markdown inline syntax (italic,
+ * bold, strikethrough, superscript/subscript, tags, inline formulas, marks) as enabled, so LLM output
+ * is always rendered as standard Markdown, unaffected by the user's "Editor -> Markdown syntax
+ * settings". Each call returns a new instance, isolated from editor rendering.
  */
 export const getAgentLute = (options: ILuteOptions): Lute => {
     const lute: Lute = Lute.New();
@@ -58,7 +62,7 @@ export const getAgentLute = (options: ILuteOptions): Lute => {
     lute.SetKramdownIAL(true);
     lute.SetSuperBlock(true);
     lute.SetCallout(true);
-    // 行内语法全部启用，不随编辑器设置变化。
+    // All inline syntax is enabled, independent of editor settings.
     lute.SetInlineAsterisk(true);
     lute.SetInlineUnderscore(true);
     lute.SetSup(true);
@@ -83,7 +87,7 @@ export const getAgentLute = (options: ILuteOptions): Lute => {
 };
 
 /**
- * 根据全局配置与传入选项构建一个新的 Lute 实例，供共享单例初始化使用。
+ * Builds a new Lute instance based on the global config and the given options, used to initialize the shared singleton.
  */
 const setLute = (options: ILuteOptions) => {
     const lute: Lute = Lute.New();
@@ -138,6 +142,6 @@ const setLute = (options: ILuteOptions) => {
     lute.SetDataTask(true);
     lute.SetExportNormalizeTaskListMarker(true);
     lute.SetArbitraryTaskListItemMarker(true);
-    lute.SetEnsureListItemParagraph(true); // 空列表项下创建子列表前补一个空段落
+    lute.SetEnsureListItemParagraph(true); // Add an empty paragraph before creating a sub-list under an empty list item
     return lute;
 };

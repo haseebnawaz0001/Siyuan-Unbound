@@ -28,7 +28,7 @@ export const setRefDynamicText = (data: {
     "rootID": string
 }) => {
     getAllEditor().forEach(editor => {
-        // 不能对比 rootId，否则嵌入块中的锚文本无法更新
+        // Cannot compare rootId, otherwise anchor text inside embed blocks won't update
         editor.protyle.wysiwyg.element.querySelectorAll(`[data-node-id="${data.blockID}"] span[data-type~="block-ref"][data-subtype="d"][data-id="${data.defBlockID}"]`).forEach(item => {
             item.innerHTML = data.refText;
         });
@@ -58,9 +58,9 @@ export const setDefRefCount = (data: {
         if (data.rootID === data.blockID) {
             return;
         }
-        // 不能对比 rootId，否则嵌入块中的锚文本无法更新
+        // Cannot compare rootId, otherwise anchor text inside embed blocks won't update
         editor.protyle.wysiwyg.element.querySelectorAll(`[data-node-id="${data.blockID}"]`).forEach(item => {
-            // 不能直接查询，否则列表中会获取到第一个列表项的 attr https://github.com/siyuan-note/siyuan/issues/12738
+            // Cannot query directly, otherwise the first list item's attr would be picked up in a list https://github.com/siyuan-note/siyuan/issues/12738
             const countElement = item.lastElementChild?.querySelector(".protyle-attr--refcount");
             if (countElement) {
                 if (data.refCount === 0) {
@@ -127,8 +127,10 @@ export const lockScreen = async (app: App) => {
 
 };
 
-// forceQuit 用于内核已断连、无法走 /api/system/exit 的场景：绕过内核 HTTP，直接通知宿主（Electron 主进程 /
-// 移动端原生容器）退出。浏览器/Docker 等纯 Web 环境无宿主可调，只能关闭当前页。
+// forceQuit is for scenarios where the kernel has already disconnected and /api/system/exit is unreachable: it
+// bypasses the kernel's HTTP and notifies the host (the Electron main process / the mobile native container)
+// directly to quit. In pure web environments like browser/Docker with no host to call, it can only close the
+// current page.
 export const forceQuit = () => {
     /// #if !BROWSER
     ipcRenderer.send(Constants.SIYUAN_QUIT, location.port);
@@ -194,7 +196,7 @@ export const exitSiYuan = async (setCurrentWorkspace = true) => {
     }
     /// #endif
     fetchPost("/api/system/exit", {force: false, setCurrentWorkspace}, (response) => {
-        if (response.code === 1) { // 同步执行失败
+        if (response.code === 1) { // Sync execution failed
             const msgId = showMessage(response.msg, response.data.closeTimeout, "error");
             const buttonElement = document.querySelector(`#message [data-id="${msgId}"] button`);
             if (buttonElement) {
@@ -223,7 +225,7 @@ export const exitSiYuan = async (setCurrentWorkspace = true) => {
                     });
                 });
             }
-        } else if (response.code === 2) { // 提示新安装包
+        } else if (response.code === 2) { // Prompt about a new install package
             hideMessage();
 
             /// #if !BROWSER
@@ -238,14 +240,14 @@ export const exitSiYuan = async (setCurrentWorkspace = true) => {
                 fetchPost("/api/system/exit", {
                     force: true,
                     setCurrentWorkspace,
-                    execInstallPkg: 1 // 0：默认检查新版本，1：不返回安装包，2：返回安装包路径并退出
+                    execInstallPkg: 1 // 0: default, check for a new version; 1: don't return the install package; 2: return the install package path and quit
                 }, () => {
                     /// #if !BROWSER
                     ipcRenderer.send(Constants.SIYUAN_QUIT, location.port);
                     /// #endif
                 });
             });
-        } else { // 正常退出
+        } else { // Normal exit
             /// #if !BROWSER
             ipcRenderer.send(Constants.SIYUAN_QUIT, location.port);
             /// #else
@@ -331,7 +333,7 @@ export const progressLoading = (data: IWebSocketData) => {
         document.body.insertAdjacentHTML("beforeend", `<div id="progress" style="z-index: ${++window.siyuan.zIndex}"></div>`);
         progressElement = document.getElementById("progress");
     }
-    // code 0: 有进度；1: 无进度；2: 关闭
+    // code 0: has progress; 1: no progress; 2: close
     if (data.code === 2) {
         progressElement.remove();
         return;

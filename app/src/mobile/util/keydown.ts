@@ -5,7 +5,7 @@ import {getCurrentEditor} from "../editor";
 import {filterHotkey} from "../../boot/globalEvent/commonHotkey";
 
 export const mobileKeydown = (app: App, event: KeyboardEvent) => {
-    // 移动端输入框默认填充无 event.key
+    // Mobile input field autofill has no event.key
     if (!event.key || filterHotkey(event, app)) {
         return;
     }

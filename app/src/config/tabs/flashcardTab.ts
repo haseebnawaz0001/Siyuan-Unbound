@@ -1,6 +1,6 @@
 import type {SettingTabBuilder} from "../setting/builder";
 
-/** 闪卡 Tab：各组注册实现（由 setting/tabs.ts 调用） */
+/** Flashcard tab: registration of each group, called from setting/tabs.ts */
 const registerFlashcardCreationGroup = (tab: SettingTabBuilder) => {
     const group = tab.group("creation", window.siyuan.languages.configGroupCardCreation);
 

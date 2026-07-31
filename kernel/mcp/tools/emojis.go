@@ -27,16 +27,17 @@ import (
 	"github.com/siyuan-note/siyuan/kernel/util"
 )
 
-// builtinEmojiUnicodes 缓存内置 emoji 的全部 unicode 码点（来自 appearance/emojis/conf.json）。
-// 与前端 getRandomEmoji() 数据源一致，但刻意排除用户自定义图片，
-// 保持随机图标风格统一、避免误用用户的重要图片。
+// builtinEmojiUnicodes caches all unicode code points of the built-in emoji (sourced from
+// appearance/emojis/conf.json).
+// This matches the frontend getRandomEmoji() data source, but deliberately excludes user-customized images, to
+// keep the random-icon style consistent and avoid accidentally using the user's important images.
 var (
 	builtinEmojiUnicodes     []string
 	builtinEmojiUnicodesOnce sync.Once
 )
 
-// loadBuiltinEmojiUnicodes 懒加载内置 emoji 的 unicode 列表。
-// 失败时回退到一个固定码点，调用方始终拿到可用值。
+// loadBuiltinEmojiUnicodes lazily loads the list of built-in emoji unicode code points.
+// On failure it falls back to a fixed code point, so the caller always gets a usable value.
 func loadBuiltinEmojiUnicodes() {
 	builtinEmojiUnicodesOnce.Do(func() {
 		confPath := filepath.Join(util.AppearancePath, "emojis", "conf.json")
@@ -74,7 +75,7 @@ func loadBuiltinEmojiUnicodes() {
 	})
 }
 
-// randomEmoji 返回一个随机的内置 emoji unicode 码点（如 "1f4d6"）。
+// randomEmoji returns a random built-in emoji unicode code point (e.g. "1f4d6").
 func randomEmoji() string {
 	loadBuiltinEmojiUnicodes()
 	return builtinEmojiUnicodes[rand.Intn(len(builtinEmojiUnicodes))]

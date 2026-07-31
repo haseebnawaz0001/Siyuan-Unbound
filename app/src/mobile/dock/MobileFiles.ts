@@ -137,7 +137,7 @@ export class MobileFiles extends Model {
                     event.stopPropagation();
                     break;
                 } else if (type === "publish-access") {
-                    // 顶部栏中的按钮
+                    // Button in the top bar
                     target.classList.toggle("block__icon--active");
                     const editingPublishAccess = target.classList.contains("block__icon--active");
                     this.element.querySelectorAll(".b3-list-item__icon").forEach(item => {
@@ -185,7 +185,8 @@ export class MobileFiles extends Model {
                 } else if (type === "open") {
                     const notebookId = target.getAttribute("data-url");
                     const liElement = target.closest("li");
-                    // 加密笔记本关闭（锁定）时点"打开"先弹解锁框，解锁成功后再挂载
+                    // When an encrypted notebook is closed (locked), clicking "open" first shows the unlock dialog,
+                    // and it is only mounted after unlocking succeeds
                     if (liElement && liElement.getAttribute("data-encrypted") === "true") {
                         openEncryptedNotebook(this.app, notebookId, liElement.querySelector(".b3-list-item__text").textContent);
                     } else {
@@ -295,13 +296,14 @@ export class MobileFiles extends Model {
             }
 
             if (state.isDragging) {
-                // 进入拖拽后阻止原生滚动，避免列表伴随手指滚动
+                // Once dragging starts, prevent native scrolling so the list doesn't scroll along with the finger
                 event.preventDefault();
                 event.stopPropagation();
                 state.ghostElement.style.left = `${touch.clientX}px`;
                 state.ghostElement.style.top = `${touch.clientY}px`;
 
-                // 手指接近列表上下边缘时自动滚动，避免拖拽时触不到屏外目标
+                // Auto-scroll when the finger nears the top/bottom edge of the list, so off-screen drag targets
+                // remain reachable
                 dragOverScroll({clientY: touch.clientY} as MouseEvent, this.element.getBoundingClientRect(), this.element);
 
                 const target = document.elementFromPoint(touch.clientX, touch.clientY);
@@ -369,7 +371,7 @@ export class MobileFiles extends Model {
                     selectRootElements.push(state.selectedElement);
                 } else {
                     const dataPath = state.selectedElement.getAttribute("data-path");
-                    // 禁止父节点移动到子节点 https://github.com/siyuan-note/siyuan/issues/12539
+                    // Prevent moving a parent node into its own child node https://github.com/siyuan-note/siyuan/issues/12539
                     if (newElement.getAttribute("data-path").startsWith(dataPath.replace(".sy", ""))) {
                         this.clearDragIndicators();
                         this.touchDragState = null;
@@ -627,10 +629,10 @@ export class MobileFiles extends Model {
             } else {
                 const hiddenElement = liElement.querySelector(".fn__hidden");
                 if (hiddenElement) {
-                    // 原先无子文档：显示展开箭头
+                    // Previously had no sub-documents: show the expand arrow
                     hiddenElement.classList.remove("fn__hidden");
                 } else if (liElement.querySelector(".b3-list-item__arrow--open")) {
-                    // 父文档已展开：刷新子列表
+                    // Parent document is already expanded: refresh the sub-list
                     this.getLeaf(liElement, notebookId, true);
                 }
                 break;
@@ -678,7 +680,8 @@ export class MobileFiles extends Model {
 
     private genNotebook(item: INotebook) {
         const editingPublishAccess = this.actionsElement.querySelector('[data-type="publish-access"]').classList.contains("block__icon--active");
-        // 加密笔记本关闭（锁定）时用 🔒 提示需解锁；打开（解锁）后恢复正常 emoji
+        // When an encrypted notebook is closed (locked), use 🔒 to indicate it needs unlocking; once opened
+        // (unlocked), restore the normal emoji
         const iconContent = (item.encrypted && item.closed)
             ? "🔒️"
             : unicode2Emoji(item.icon || window.siyuan.storage[Constants.LOCAL_IMAGES].note);
@@ -801,7 +804,7 @@ export class MobileFiles extends Model {
             }
         }
         const newElement = this.element.querySelector(`[data-url="${data.toNotebook}"] li[data-path="${data.toPath}"]`) as HTMLElement;
-        // 重新展开移动到的新文件夹
+        // Re-expand the new folder that was moved to
         if (newElement) {
             const emojiElement = newElement.querySelector(".b3-list-item__icon");
             if (emojiElement.innerHTML === unicode2Emoji(window.siyuan.storage[Constants.LOCAL_IMAGES].file)) {
@@ -821,7 +824,7 @@ export class MobileFiles extends Model {
     }
 
     private onRemove(data: IWebSocketData) {
-        // "doc2heading" 后删除文件或挂载帮助文档前的 unmount
+        // Unmount before removing a file after "doc2heading" or before mounting the help document
         if (data.cmd === "closeBox" || data.cmd === "removeBox") {
             setNoteBook((notebooks) => {
                 const targetElement = this.element.querySelector(`ul[data-url="${data.data.box}"] li[data-path="${"/"}"]`);
@@ -857,11 +860,11 @@ export class MobileFiles extends Model {
         data.data.ids.forEach((item: string) => {
             const targetElement = this.element.querySelector(`li.b3-list-item[data-node-id="${item}"]`);
             if (targetElement) {
-                // 子节点展开则删除
+                // Remove the sub-list if the child nodes are expanded
                 if (targetElement.nextElementSibling?.tagName === "UL") {
                     targetElement.nextElementSibling.remove();
                 }
-                // 移除当前节点
+                // Remove the current node
                 const parentElement = targetElement.parentElement.previousElementSibling as HTMLElement;
                 if (targetElement.parentElement.childElementCount === 1) {
                     if (parentElement) {
@@ -951,10 +954,10 @@ export class MobileFiles extends Model {
         });
         let nextElement = liElement.nextElementSibling;
         if (nextElement && nextElement.tagName === "UL") {
-            // 文件展开时，刷新
+            // Refresh when the file is expanded
             const tempElement = document.createElement("template");
             tempElement.innerHTML = fileHTML;
-            // 保持文件夹展开状态
+            // Keep the folder's expanded state
             nextElement.querySelectorAll(":scope > .b3-list-item > .b3-list-item__toggle> .b3-list-item__arrow--open").forEach(item => {
                 const openLiElement = hasClosestByClassName(item, "b3-list-item");
                 if (openLiElement) {
@@ -995,7 +998,7 @@ export class MobileFiles extends Model {
         }
         const liElement = this.element.querySelector(`ul[data-url="${data.box}"] li[data-path="${data.path}"]`);
         if (liElement.nextElementSibling && liElement.nextElementSibling.tagName === "UL") {
-            // 文件展开时，刷新
+            // Refresh when the file is expanded
             liElement.nextElementSibling.remove();
         }
         const arrowElement = liElement.querySelector(".b3-list-item__arrow");
@@ -1077,7 +1080,7 @@ export class MobileFiles extends Model {
     }, setStorage = true, isSetCurrent = true) {
         const treeElement = this.element.querySelector(`[data-url="${notebookId}"]`);
         if (!treeElement) {
-            // 有文件树和编辑器的布局初始化时，文件树还未挂载
+            // The file tree is not yet mounted during layout initialization with a file tree and editor
             return;
         }
         const boxDocID = window.siyuan.config.fileTree.boxDocEnabled ? notebookId : "";

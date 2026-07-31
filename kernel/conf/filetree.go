@@ -21,28 +21,28 @@ import (
 )
 
 type FileTree struct {
-	AlwaysSelectOpenedFile   bool   `json:"alwaysSelectOpenedFile"`   // 是否自动选中当前打开的文件
-	OpenFilesUseCurrentTab   bool   `json:"openFilesUseCurrentTab"`   // 在当前页签打开文件
-	DocIconClickExpand       bool   `json:"docIconClickExpand"`       // 单击文档图标时展开或折叠下级文档
-	ParentDocClickExpand     bool   `json:"parentDocClickExpand"`     // 单击父文档标题时展开或折叠下级文档
-	BoxDocEnabled            *bool  `json:"boxDocEnabled"`            // 是否启用顶层笔记本文档
-	RefCreateSaveBox         string `json:"refCreateSaveBox"`         // 块引时新建文档存储笔记本
-	RefCreateSavePath        string `json:"refCreateSavePath"`        // 块引时新建文档存储路径
-	DocCreateSaveBox         string `json:"docCreateSaveBox"`         // 新建文档存储笔记本
-	DocCreateSavePath        string `json:"docCreateSavePath"`        // 新建文档存储路径
-	ShorthandSaveBox         string `json:"shorthandSaveBox"`         // 闪念速记存储笔记本
-	ShorthandSavePath        string `json:"shorthandSavePath"`        // 闪念速记存储路径
-	MaxListCount             int    `json:"maxListCount"`             // 最大列出数量
-	MaxOpenTabCount          int    `json:"maxOpenTabCount"`          // 最大打开页签数量
-	AllowCreateDeeper        bool   `json:"allowCreateDeeper"`        // 允许创建超过 7 层深度的子文档
-	RemoveDocWithoutConfirm  bool   `json:"removeDocWithoutConfirm"`  // 删除文档时是否不需要确认
-	CloseTabsOnStart         bool   `json:"closeTabsOnStart"`         // 启动时关闭所有页签
-	UseSingleLineSave        bool   `json:"useSingleLineSave"`        // 使用单行保存文档 .sy 和属性视图 .json
-	LargeFileWarningSize     int    `json:"largeFileWarningSize"`     // 大文件警告大小（单位：MB）
-	CreateDocAtTop           *bool  `json:"createDocAtTop"`           // 在顶部创建新文档 https://github.com/siyuan-note/siyuan/issues/16327
-	Sort                     int    `json:"sort"`                     // 排序方式
-	RecentDocsMaxListCount   int    `json:"recentDocsMaxListCount"`   // 最近的文档最大列出数量
-	NoSplitScreenWhenOpenTab bool   `json:"noSplitScreenWhenOpenTab"` // 打开页签时不分屏 https://github.com/siyuan-note/siyuan/issues/16833
+	AlwaysSelectOpenedFile   bool   `json:"alwaysSelectOpenedFile"`   // Whether to automatically select the currently open file
+	OpenFilesUseCurrentTab   bool   `json:"openFilesUseCurrentTab"`   // Open files in the current tab
+	DocIconClickExpand       bool   `json:"docIconClickExpand"`       // Expand or collapse child documents when clicking the document icon
+	ParentDocClickExpand     bool   `json:"parentDocClickExpand"`     // Expand or collapse child documents when clicking the parent document title
+	BoxDocEnabled            *bool  `json:"boxDocEnabled"`            // Whether the top-level notebook document is enabled
+	RefCreateSaveBox         string `json:"refCreateSaveBox"`         // Notebook to store new documents created via block ref
+	RefCreateSavePath        string `json:"refCreateSavePath"`        // Path to store new documents created via block ref
+	DocCreateSaveBox         string `json:"docCreateSaveBox"`         // Notebook to store new documents
+	DocCreateSavePath        string `json:"docCreateSavePath"`        // Path to store new documents
+	ShorthandSaveBox         string `json:"shorthandSaveBox"`         // Notebook to store quick notes
+	ShorthandSavePath        string `json:"shorthandSavePath"`        // Path to store quick notes
+	MaxListCount             int    `json:"maxListCount"`             // Max list count
+	MaxOpenTabCount          int    `json:"maxOpenTabCount"`          // Max open tab count
+	AllowCreateDeeper        bool   `json:"allowCreateDeeper"`        // Allow creating child documents deeper than 7 levels
+	RemoveDocWithoutConfirm  bool   `json:"removeDocWithoutConfirm"`  // Whether confirmation is skipped when removing a document
+	CloseTabsOnStart         bool   `json:"closeTabsOnStart"`         // Close all tabs on startup
+	UseSingleLineSave        bool   `json:"useSingleLineSave"`        // Save document .sy and attribute view .json as a single line
+	LargeFileWarningSize     int    `json:"largeFileWarningSize"`     // Large file warning size (in MB)
+	CreateDocAtTop           *bool  `json:"createDocAtTop"`           // Create new documents at the top https://github.com/siyuan-note/siyuan/issues/16327
+	Sort                     int    `json:"sort"`                     // Sort mode
+	RecentDocsMaxListCount   int    `json:"recentDocsMaxListCount"`   // Max list count for recent documents
+	NoSplitScreenWhenOpenTab bool   `json:"noSplitScreenWhenOpenTab"` // Do not split the screen when opening a tab https://github.com/siyuan-note/siyuan/issues/16833
 }
 
 func NewFileTree() *FileTree {

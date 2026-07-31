@@ -116,7 +116,7 @@ func writeRuntimeLocked(sessionID string, runtime *agentRuntime) error {
 	if runtime == nil {
 		return nil
 	}
-	// runtime 只能附着在已经存在的会话上，避免迟到的 checkpoint 复活已删除会话。
+	// runtime can only attach to an already-existing session, to avoid a late checkpoint reviving a deleted session.
 	if _, err := os.Stat(filepath.Join(sessionsDir(), sessionID, "session.json")); err != nil {
 		return err
 	}
@@ -340,8 +340,10 @@ func applyRuntimeTurnToSessionLocked(session map[string]any, turn *agentRuntimeT
 		}
 	}
 
-	// 当前 turn 的 assistant 内容以 runtime 为权威；前端只补充 thinking/confirm/question 等 UI 条目。
-	// 用权威 assistant 逐个替换前端占位可尽量保留 UI 条目的相对位置；缺少占位时再追加到末尾。
+	// The runtime is authoritative for the current turn's assistant content; the frontend only contributes
+	// UI entries like thinking/confirm/question.
+	// Replacing frontend placeholders one by one with the authoritative assistant entries preserves the
+	// relative position of UI entries as much as possible; when there is no placeholder, append to the end instead.
 	authoritative := make([]any, 0, len(turn.Delta)+1)
 	for i, message := range turn.Delta {
 		if message.Role != "assistant" {
@@ -386,7 +388,8 @@ func applyRuntimeTurnToSessionLocked(session map[string]any, turn *agentRuntimeT
 		})
 	}
 
-	// regenerate 在启动前已经把旧回答截断到目标 user，因此 user 之后的 UI 条目都属于当前 turn。
+	// Before starting, regenerate has already truncated the old answer back to the target user entry, so every
+	// UI entry after that user entry belongs to the current turn.
 	merged := append([]any(nil), entries[:anchor+1]...)
 	authoritativeIndex := 0
 	for _, raw := range entries[anchor+1:] {
@@ -435,7 +438,7 @@ func applyRuntimeTurnToSessionLocked(session map[string]any, turn *agentRuntimeT
 	return nil
 }
 
-// mergeRuntimeIntoSessionLocked 仅在 API 返回值中叠加未提交 turn，不直接改写 session.json。
+// mergeRuntimeIntoSessionLocked only overlays the uncommitted turn onto the API return value, it never rewrites session.json directly.
 func mergeRuntimeIntoSessionLocked(sessionID string, session map[string]any) error {
 	runtime, err := loadRuntimeLocked(sessionID)
 	if err != nil {

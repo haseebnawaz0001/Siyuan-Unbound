@@ -121,7 +121,7 @@ func LoginAuth(c *gin.Context) {
 		util.WrongAuthCount++
 		workspaceSession.Captcha = gulu.Rand.String(7)
 		if util.NeedCaptcha() {
-			ret.Code = 1 // 需要渲染验证码
+			ret.Code = 1 // needs to render a captcha
 		}
 
 		if err := session.Save(c); err != nil {
@@ -205,7 +205,7 @@ func CheckReadonly(c *gin.Context) {
 }
 
 func CheckAuth(c *gin.Context) {
-	// 已通过 JWT 认证
+	// Already authenticated via JWT
 	if role := GetGinContextRole(c); IsValidRole(role, []Role{
 		RoleAdministrator,
 		RoleEditor,
@@ -215,7 +215,7 @@ func CheckAuth(c *gin.Context) {
 		return
 	}
 
-	// 通过 API token (header: Authorization)
+	// Authenticate via API token (header: Authorization)
 	if authHeader := c.GetHeader("Authorization"); "" != authHeader {
 		var token string
 		if after, ok := strings.CutPrefix(authHeader, "Token "); ok {
@@ -241,7 +241,7 @@ func CheckAuth(c *gin.Context) {
 		}
 	}
 
-	// 通过 API token (query-params: token)
+	// Authenticate via API token (query-params: token)
 	if token := c.Query("token"); "" != token {
 		if Conf.Api.Token == token {
 			c.Set(RoleContextKey, RoleAdministrator)
@@ -257,7 +257,7 @@ func CheckAuth(c *gin.Context) {
 	//logging.LogInfof("check auth for [%s]", c.Request.RequestURI)
 	localhost := util.IsLocalHost(c.Request.RemoteAddr)
 
-	// 未设置锁屏密码
+	// Lock screen password is not set
 	if "" == Conf.AccessAuthCode {
 		// Skip the empty access authorization code check https://github.com/siyuan-note/siyuan/issues/9709
 		if util.SiYuanAccessAuthCodeBypass {
@@ -286,7 +286,7 @@ func CheckAuth(c *gin.Context) {
 		return
 	}
 
-	// 放过 /appearance/ 等（不要扩大到 /stage/ 否则鉴权会有问题）
+	// Allow /appearance/ etc. through (don't broaden this to /stage/ or auth checks will break)
 	if strings.HasPrefix(c.Request.RequestURI, "/appearance/") ||
 		strings.HasPrefix(c.Request.RequestURI, "/stage/build/export/") ||
 		strings.HasPrefix(c.Request.RequestURI, "/stage/protyle/") {
@@ -294,7 +294,7 @@ func CheckAuth(c *gin.Context) {
 		return
 	}
 
-	// 放过来自本机的某些请求
+	// Allow certain requests from localhost through
 	if localhost {
 		if strings.HasPrefix(c.Request.RequestURI, "/assets/") || strings.HasPrefix(c.Request.RequestURI, "/export/") {
 			c.Set(RoleContextKey, RoleAdministrator)
@@ -320,7 +320,7 @@ func CheckAuth(c *gin.Context) {
 		}
 	}
 
-	// 通过 Cookie
+	// Authenticate via cookie
 	session := util.GetSession(c)
 	workspaceSession := util.GetWorkspaceSession(session)
 	if workspaceSession.AccessAuthCode == Conf.AccessAuthCode {
@@ -329,9 +329,9 @@ func CheckAuth(c *gin.Context) {
 		return
 	}
 
-	// 通过 BasicAuth (header: Authorization)
+	// Authenticate via BasicAuth (header: Authorization)
 	if username, password, ok := c.Request.BasicAuth(); ok {
-		// 使用锁屏密码作为密码
+		// Use the lock screen password as the password
 		if util.WorkspaceName == username && Conf.AccessAuthCode == password {
 			c.Set(RoleContextKey, RoleAdministrator)
 			c.Next()
@@ -348,7 +348,7 @@ func CheckAuth(c *gin.Context) {
 		return
 	}
 
-	// 跳过访问授权页
+	// Skip the access authorization page
 	if "/check-auth" == c.Request.URL.Path {
 		c.Next()
 		return
@@ -448,9 +448,10 @@ func Recover(c *gin.Context) {
 	c.Next()
 }
 
-// Activity 记录用户写操作时间，用于 AutoFixIndex 的空闲判断。
-// 只认会产生数据变更的事务类请求（/api/transactions*），因为只有写操作才会引入索引不一致；
-// 读操作和前端定时轮询（如 /api/ai/embeddingStat）不计入，避免 SiYuan 开着却不操作时被判为活跃。
+// Activity records the timestamp of the user's write operations, used for AutoFixIndex's idle detection.
+// Only transactional requests that actually change data (/api/transactions*) count, since only write
+// operations can introduce index inconsistency; read operations and frontend periodic polling (e.g.
+// /api/ai/embeddingStat) don't count, so SiYuan isn't considered active just because it's open and idle.
 func Activity(c *gin.Context) {
 	if strings.HasPrefix(c.Request.URL.Path, "/api/transactions") {
 		util.RefreshActivity()

@@ -37,7 +37,7 @@ export const updateListOrder = (listElement: Element, sIndex?: number) => {
     }
     let starIndex: number;
     Array.from(listElement.children).forEach((item, index) => {
-        // https://github.com/siyuan-note/siyuan/issues/16315 第三点会有为空的情况
+        // Can be empty for point 3 of https://github.com/siyuan-note/siyuan/issues/16315
         if (!item.classList.contains("li")) {
             return;
         }
@@ -50,7 +50,7 @@ export const updateListOrder = (listElement: Element, sIndex?: number) => {
                 starIndex = parseInt(item.getAttribute("data-marker"));
             }
         } else if (item.classList.contains("li")) {
-            // 保证列表项的缩放和常规列表属性的存在
+            // Ensure the list item's zoom and regular list attributes still exist
             starIndex++;
             item.setAttribute("data-marker", (starIndex) + ".");
             item.querySelector(".protyle-action--order").textContent = (starIndex) + ".";
@@ -96,7 +96,7 @@ export const addSubList = (protyle: IProtyle, nodeElement: Element, range: Range
         return false;
     }
     const subListElement = parentItemElement.querySelector(".list");
-    // 无列表块：在列表项块的最后一个子块后面插入新的列表块
+    // No list block: insert a new list block after the list item's last child block
     if (!subListElement) {
         const lastElement = getLastChildBlock(parentItemElement);
         if (!lastElement) {
@@ -121,7 +121,7 @@ export const addSubList = (protyle: IProtyle, nodeElement: Element, range: Range
         return true;
     }
 
-    // 有列表块：在列表块的最后一个列表项块后插入新的列表项块
+    // A list block exists: insert a new list item block after the list block's last list item block
     const lastSubItem = getLastChildBlock(subListElement);
     if (!lastSubItem) {
         return false;
@@ -165,7 +165,7 @@ export const listIndent = (protyle: IProtyle, liItemElements: Element[], range: 
     const html = previousElement.parentElement.outerHTML;
     const lastPreviousElement = getLastChildBlock(previousElement);
     if (lastPreviousElement && lastPreviousElement.getAttribute("data-type") === "NodeList") {
-        // 上一个列表的最后一项为子列表
+        // The previous list's last item is a nested list
         const previousLastListHTML = lastPreviousElement.outerHTML;
 
         const doOperations: IOperation[] = [];
@@ -458,12 +458,12 @@ export const breakList = (protyle: IProtyle, blockElement: Element, range: Range
 };
 
 /**
- * 反向缩进列表
+ * Outdent a list
  * @param protyle
  * @param liItemElements
  * @param range
  * @param isDelete
- * @param deleteElement 末尾反向删除时才会传入
+ * @param deleteElement Only passed when forward-deleting at the end
  */
 export const listOutdent = async (protyle: IProtyle, liItemElements: Element[], range: Range, isDelete = false, deleteElement?: Element) => {
     liItemElements.forEach(item => {
@@ -480,7 +480,7 @@ export const listOutdent = async (protyle: IProtyle, liItemElements: Element[], 
     const liElement = liItemElements[0].parentElement;
     const liId = liElement.getAttribute("data-node-id");
     if (!liId) {
-        // zoom in 列表项
+        // A zoomed-in list item
         return;
     }
     const parentLiItemElement = getParentBlock(liElement);
@@ -493,12 +493,12 @@ export const listOutdent = async (protyle: IProtyle, liItemElements: Element[], 
         return;
     }
     if (liElement.previousElementSibling?.classList.contains("protyle-action") && !parentParentElement.getAttribute("data-node-id")) {
-        // https://ld246.com/article/1691981936960 情况下 zoom in 列表项
+        // A zoomed-in list item in the situation from https://ld246.com/article/1691981936960
         return;
     }
     if (parentLiItemElement.classList.contains("protyle-wysiwyg") || parentLiItemElement.classList.contains("sb") ||
         parentLiItemElement.classList.contains("bq") || parentLiItemElement.classList.contains("callout")) {
-        // 顶层列表
+        // A top-level list
         const topDoOperations: IOperation[] = [];
         const topUndoOperations: IOperation[] = [];
         range.collapse(false);
@@ -529,7 +529,7 @@ export const listOutdent = async (protyle: IProtyle, liItemElements: Element[], 
                     id,
                     previousID: index === 1 ? undefined : topPreviousID,
                     parentID: item.getAttribute("data-node-id"),
-                    data: blockElement.contains(range.startContainer) ? "focus" : "" // 标记需要 focus，https://ld246.com/article/1650018446988/comment/1650081404993?r=Vanessa#comments
+                    data: blockElement.contains(range.startContainer) ? "focus" : "" // Marked as needing focus, see https://ld246.com/article/1650018446988/comment/1650081404993?r=Vanessa#comments
                 });
                 topPreviousID = id;
                 previousElement.after(blockElement);
@@ -537,7 +537,7 @@ export const listOutdent = async (protyle: IProtyle, liItemElements: Element[], 
             });
         });
         if (!window.siyuan.config.editor.listLogicalOutdent && !nextElement.classList.contains("protyle-attr")) {
-            // 传统缩进
+            // Traditional outdent
             let newId;
             if (!lastBlockElement || lastBlockElement.getAttribute("data-subtype") !== nextElement.getAttribute("data-subtype")) {
                 newId = Lute.NewNodeID();
@@ -611,12 +611,12 @@ export const listOutdent = async (protyle: IProtyle, liItemElements: Element[], 
         });
 
         if (liElement.childElementCount === 1) {
-            // 列表只有一项
+            // The list only has one item
             topDoOperations.push({
                 action: "delete",
                 id: liId
             });
-            // 聚焦列表，第一个列表项反向缩进后刷新会关闭页签
+            // Focused on the list: refreshing after outdenting the first list item would close the tab
             if (liId === protyle.block.id) {
                 protyle.block.id = protyle.block.parentID;
             }
@@ -645,7 +645,7 @@ export const listOutdent = async (protyle: IProtyle, liItemElements: Element[], 
         }
         if (liElement.childElementCount !== 1 && parentLiItemElement.classList.contains("sb") &&
             parentLiItemElement.getAttribute("data-sb-layout") === "col") {
-            // 合并到同一个 transaction，避免新超级块 id 在第二个 transaction 中找不到
+            // Merge into the same transaction, otherwise the new superblock's id wouldn't be found in a second transaction
             const mergeOperations = await turnsIntoOneTransaction({
                 protyle,
                 selectsElement: [liElement, liElement.nextElementSibling],
@@ -663,7 +663,7 @@ export const listOutdent = async (protyle: IProtyle, liItemElements: Element[], 
     }
 
     if (liElement.childElementCount === 2 && parentLiItemElement.childElementCount === 3) {
-        // 列表项里仅有包含一个列表项的列表，如 1. 1. 1 https://github.com/siyuan-note/insider/issues/494
+        // A list item containing only a list with a single list item, e.g. 1. 1. 1 https://github.com/siyuan-note/insider/issues/494
         range.collapse(false);
         moveToPrevious(deleteElement, range, isDelete);
         range.insertNode(document.createElement("wbr"));
@@ -758,7 +758,7 @@ export const listOutdent = async (protyle: IProtyle, liItemElements: Element[], 
         }
     });
     if (!window.siyuan.config.editor.listLogicalOutdent && !nextElement.classList.contains("protyle-attr")) {
-        // 传统缩进
+        // Traditional outdent
         let newId;
         if (!lastBlockElement || !lastBlockElement.classList.contains("list")) {
             newId = Lute.NewNodeID();
@@ -880,7 +880,7 @@ export const listOutdent = async (protyle: IProtyle, liItemElements: Element[], 
             id: parentLiItemElement.getAttribute("data-node-id"),
             data: parentLiItemElement.outerHTML,
             previousID: getPreviousBlockSibling(parentLiItemElement)?.getAttribute("data-node-id"),
-            // https://github.com/siyuan-note/siyuan/issues/9237 无 previousID
+            // No previousID for https://github.com/siyuan-note/siyuan/issues/9237
             parentID: getParentBlock(parentLiItemElement).getAttribute("data-node-id"),
         });
         parentLiItemElement.remove();

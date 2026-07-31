@@ -197,7 +197,7 @@ func BatchSetBlockAttrs(blockAttrs []map[string]any) (err error) {
 	}
 
 	IncSync()
-	// 不做锚文本刷新
+	// Don't refresh anchor text
 	return
 }
 
@@ -275,14 +275,16 @@ func setNodeAttrs(node *ast.Node, tree *parse.Tree, nameValues map[string]string
 	return
 }
 
-// attrsAffectRefText 判断本次属性变更是否可能影响引用处的动态锚文本。
+// attrsAffectRefText determines whether this attribute change might affect the dynamic anchor text at reference sites.
 //
-// 动态锚文本（ref-d）由定义块的 name（命名）或 title（文档标题）派生而来，
-// 仅当这两个属性发生变化时才需要调用 refreshDynamicRefText 去刷新引用方文档；
-// 其他属性（如锁定状态、滚动位置、自定义属性等）不影响锚文本，跳过刷新可避免
-// 对引用方文档的无意义落盘和历史记录生成（详见 https://github.com/siyuan-note/siyuan/issues/18058）。
+// Dynamic anchor text (ref-d) is derived from the defining block's name or title (document title), so
+// refreshDynamicRefText only needs to be called to refresh referencing documents when one of those two attributes
+// changes. Other attributes (lock state, scroll position, custom attributes, etc.) don't affect the anchor text, and
+// skipping the refresh for them avoids pointless disk writes and history generation on the referencing documents
+// (see https://github.com/siyuan-note/siyuan/issues/18058).
 //
-// 注意：若后续动态锚文本的派生规则扩展到其他属性，需同步在本函数的白名单中补齐。
+// Note: if the derivation rules for dynamic anchor text are later extended to other attributes, this function's
+// whitelist must be updated to match.
 func attrsAffectRefText(nameValues map[string]string) bool {
 	for name := range nameValues {
 		switch strings.ToLower(name) {
@@ -293,15 +295,17 @@ func attrsAffectRefText(nameValues map[string]string) bool {
 	return false
 }
 
-// attrsAffectAvBlock 判断本次属性变更是否可能影响数据库（属性视图）主键块的显示。
+// attrsAffectAvBlock determines whether this attribute change might affect the display of a database (attribute
+// view) primary key block.
 //
-// 数据库主键块的 icon 和 content 由 getNodeAvBlockText 从块的 icon、name、
-// custom-sy-av-s-text-<avID> 属性派生，这些属性变更时需调用 updateAttributeViewBlockText
-// 同步到 AV JSON，否则数据库视图中显示的图标/内容不会更新。
+// A database primary key block's icon and content are derived by getNodeAvBlockText from the block's icon, name, and
+// custom-sy-av-s-text-<avID> attributes. When these attributes change, updateAttributeViewBlockText must be called to
+// sync them into the AV JSON, otherwise the icon/content shown in the database view won't update.
 //
-// 该同步原本由 refreshDynamicRefText 顺带完成，但 #18058 的锚文本刷新优化用 attrsAffectRefText
-// 门槛拦截了非 name/title 属性的刷新，导致 icon 变更不再触发同步，故此处独立解耦触发
-// （详见 https://github.com/siyuan-note/siyuan/issues/18204）。
+// This sync used to be done incidentally by refreshDynamicRefText, but the anchor-text refresh optimization from
+// #18058 uses attrsAffectRefText as a gate that blocks refreshes for non-name/title attributes, so icon changes no
+// longer trigger the sync. Hence the trigger is decoupled and handled independently here
+// (see https://github.com/siyuan-note/siyuan/issues/18204).
 func attrsAffectAvBlock(nameValues map[string]string) bool {
 	for name := range nameValues {
 		lowerName := strings.ToLower(name)
@@ -330,7 +334,8 @@ func setNodeAttrsWithTx(tx *Transaction, node *ast.Node, tree *parse.Tree, nameV
 }
 
 func setNodeAttrs0(node *ast.Node, nameValues map[string]string, boxID string) (oldAttrs map[string]string, err error) {
-	// 加密笔记本不支持书签和标签（依赖全局 SQLite 聚合，加密笔记本是孤岛）
+	// Encrypted notebooks don't support bookmarks and tags (they rely on global SQLite aggregation, and encrypted
+	// notebooks are isolated islands)
 	if IsEncryptedBox(boxID) && boxID != "" {
 		for name := range nameValues {
 			switch strings.ToLower(name) {
@@ -347,7 +352,7 @@ func setNodeAttrs0(node *ast.Node, nameValues map[string]string, boxID string) (
 		value = util.RemoveInvalidRetainCtrl(value)
 		value = strings.TrimSpace(value)
 		lowerName := strings.ToLower(name)
-		// 转换为小写再验证属性名
+		// Lowercase the name before validating the attribute name
 		if !isValidAttrName(lowerName) {
 			err = errors.New(Conf.Language(25) + " [" + node.ID + "]")
 			return
@@ -357,7 +362,7 @@ func setNodeAttrs0(node *ast.Node, nameValues map[string]string, boxID string) (
 			return
 		}
 
-		// 处理文档标签 https://github.com/siyuan-note/siyuan/issues/13311
+		// Handle document tags https://github.com/siyuan-note/siyuan/issues/13311
 		if lowerName == "tags" {
 			var tags []string
 			tmp := strings.SplitSeq(value, ",")
@@ -380,20 +385,20 @@ func setNodeAttrs0(node *ast.Node, nameValues map[string]string, boxID string) (
 		}
 
 		if "" == value {
-			// 删除属性
+			// Delete the attribute
 			if name != lowerName {
 				if _, exists := newAttrsUnEsc[name]; exists {
-					// 仅删除完全匹配的包含大写字母的属性
+					// Only delete an attribute that matches exactly, including uppercase letters
 					delete(newAttrsUnEsc, name)
 					continue
 				}
 			}
 			delete(newAttrsUnEsc, lowerName)
 		} else {
-			// 添加或更新属性
-			// 删除大小写完全匹配的属性
+			// Add or update the attribute
+			// Delete the attribute matching exactly on case
 			delete(newAttrsUnEsc, name)
-			// 保存小写的属性 https://github.com/siyuan-note/siyuan/issues/16447
+			// Save the lowercase attribute https://github.com/siyuan-note/siyuan/issues/16447
 			newAttrsUnEsc[lowerName] = html.EscapeAttrVal(value)
 		}
 	}
@@ -406,41 +411,41 @@ func setNodeAttrs0(node *ast.Node, nameValues map[string]string, boxID string) (
 	return
 }
 
-// isValidAttrName 验证属性名是否合法
+// isValidAttrName validates whether the attribute name is legal
 func isValidAttrName(name string) bool {
 	n := len(name)
 	if n == 0 {
 		return false
 	}
 
-	// 首字符必须是小写字母
+	// The first character must be a lowercase letter
 	c := name[0]
 	if c < 'a' || c > 'z' {
 		return false
 	}
 
-	// 后续字符只能是小写字母、数字、连字符
+	// Subsequent characters may only be lowercase letters, digits, or hyphens
 	if c != 'c' {
 		return validateChars(name, 1, n)
 	}
 
-	// 首字符是 'c'，检查自定义属性 custom- 前缀
+	// The first character is 'c', check for the custom attribute custom- prefix
 	if n >= 7 && name[1] == 'u' && name[2] == 's' && name[3] == 't' && name[4] == 'o' && name[5] == 'm' && name[6] == '-' {
 		if n == 7 {
-			return false // 不允许只包含前缀
+			return false // Not allowed to contain only the prefix
 		}
 
 		if c = name[7]; c < 'a' || c > 'z' {
-			return false // 首字符必须是小写字母
+			return false // The first character must be a lowercase letter
 		}
 		return validateChars(name, 7, n)
 	}
 
-	// 非自定义属性
+	// Not a custom attribute
 	return validateChars(name, 1, n)
 }
 
-// validateChars 验证从指定索引开始的字符是否合法（小写字母、数字、连字符）
+// validateChars validates that the characters starting from the given index are legal (lowercase letters, digits, hyphens)
 func validateChars(name string, startIdx, n int) bool {
 	for i := startIdx; i < n; i++ {
 		c := name[i]

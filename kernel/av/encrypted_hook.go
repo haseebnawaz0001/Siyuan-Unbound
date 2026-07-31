@@ -1,9 +1,10 @@
 // SiYuan - Refactor your thinking
 // Copyright (c) 2020-present, b3log.org
 //
-// 本文件为加密笔记本的 AV 定义提供笔记本级存储与 DEK 加解密支持。
-// 与 filesys/crypto_hook.go 同模式：av 包不直接 import model（避免循环依赖），
-// 由 model 层在 init 时注入回调函数。
+// This file provides notebook-level storage and DEK encrypt/decrypt support for AV definitions
+// in encrypted notebooks.
+// Same pattern as filesys/crypto_hook.go: the av package does not import model directly (to avoid
+// circular dependencies); the model layer injects the callback functions at init.
 
 package av
 
@@ -20,34 +21,42 @@ import (
 	"github.com/vmihailenco/msgpack/v5"
 )
 
-// AVDEKProvider 由 model 层注入，返回已解锁加密笔记本的 DEK。
-// 返回 (nil, nil) 表示该 box 非加密或未解锁——此时 AV 定义明文存储，对普通笔记本透明。
+// AVDEKProvider is injected by the model layer; it returns the DEK of an unlocked encrypted
+// notebook.
+// Returning (nil, nil) means the box is not encrypted or is not unlocked -- in that case the AV
+// definition is stored as plaintext, transparent to regular notebooks.
 var AVDEKProvider func(boxID string) ([]byte, error)
 
-// AVLockAcquire / AVLockRelease 由 model 层注入，在获取 DEK 前后持 box 读锁，
-// 防止 LockBox 在 AV 加解密期间清除缓存。非加密 box 的注入为空时不影响行为。
+// AVLockAcquire / AVLockRelease are injected by the model layer to hold the box read lock before
+// and after obtaining the DEK, preventing LockBox from clearing the cache during AV encryption or
+// decryption. Behavior is unaffected when the injection is nil for a non-encrypted box.
 var AVLockAcquire func(boxID string)
 var AVLockRelease func(boxID string)
 
-// AVEncryptedBoxIDs 由 model 层注入，返回所有已打开的加密 boxID 列表。
-// 供 AV 路径 fallback 时遍历查找。
+// AVEncryptedBoxIDs is injected by the model layer; it returns the list of all currently opened
+// encrypted box IDs.
+// Used when iterating over AV path fallbacks.
 var AVEncryptedBoxIDs func() []string
 
-// AVIsEncryptedBox 由 model 层注入，判断 boxID 是否为加密笔记本。
+// AVIsEncryptedBox is injected by the model layer; it reports whether boxID is an encrypted notebook.
 var AVIsEncryptedBox func(boxID string) bool
 
-// AVGetBlockBoxID 由 model 层注入，返回 blockID 所在的 boxID（查 blocktree）。
-// 用于镜像写入时校验源块与 AV 定义是否处于同一加密边界。
+// AVGetBlockBoxID is injected by the model layer; it returns the boxID that blockID belongs to
+// (looked up via the blocktree).
+// Used to verify that the source block and the AV definition are within the same encryption
+// boundary when writing mirrors.
 var AVGetBlockBoxID func(blockID string) string
 
-// pendingAVBox 记录首次创建的 AV 归属哪个加密 box。
-// handler 层创建 AV 前调 SetAVBoxID(avID, boxID)，SaveAttributeView 时
-// findAttributeViewPath 会先查 pending 映射，找到则写入对应加密笔记本路径。
+// pendingAVBox records which encrypted box a newly created AV belongs to.
+// The handler layer calls SetAVBoxID(avID, boxID) before creating the AV; when SaveAttributeView
+// runs, findAttributeViewPath first checks the pending map and, if found, writes to the
+// corresponding encrypted notebook path.
 var pendingAVBox = map[string]string{}
 var pendingAVBoxLock = sync.RWMutex{}
 
-// SetAVBoxID 预设 AV 定义的归属 box。加密笔记本创建 AV 时调用，boxID 为空时清理映射。
-// 普通笔记本不需要调（AV 默认走全局路径）。
+// SetAVBoxID presets the owning box of an AV definition. Called when an encrypted notebook creates
+// an AV; clears the mapping when boxID is empty.
+// Regular notebooks don't need to call this (AV defaults to the global path).
 func SetAVBoxID(avID, boxID string) {
 	pendingAVBoxLock.Lock()
 	defer pendingAVBoxLock.Unlock()
@@ -58,16 +67,16 @@ func SetAVBoxID(avID, boxID string) {
 	}
 }
 
-// GetAVBoxID 查询 AV 定义的归属 box（供 handler 层判断）。
+// GetAVBoxID looks up the owning box of an AV definition (used by the handler layer for decisions).
 func GetAVBoxID(avID string) string {
 	pendingAVBoxLock.RLock()
 	defer pendingAVBoxLock.RUnlock()
 	return pendingAVBox[avID]
 }
 
-// attributeViewDataPathByBox 返回指定 box 的 AV 定义路径。
-// 加密 box：<DataDir>/<boxID>/storage/av/<avID>.json
-// 普通 box（boxID 为空）：<DataDir>/storage/av/<avID>.json
+// attributeViewDataPathByBox returns the AV definition path for the given box.
+// Encrypted box: <DataDir>/<boxID>/storage/av/<avID>.json
+// Regular box (boxID empty): <DataDir>/storage/av/<avID>.json
 func attributeViewDataPathByBox(avID, boxID string) string {
 	if !ast.IsNodeIDPattern(avID) || (boxID != "" && !ast.IsNodeIDPattern(boxID)) {
 		return ""
@@ -79,28 +88,31 @@ func attributeViewDataPathByBox(avID, boxID string) string {
 	return filepath.Join(util.DataDir, "storage", "av", avID+".json")
 }
 
-// FindAttributeViewPath 按 fallback 逻辑查找 AV 定义文件的实际路径。
-// 1. 先查 pendingAVBox（首次创建预设的 boxID），不检查文件是否存在（首次创建场景）
-// 2. 查全局 storage/av/（普通 box）
-// 3. 遍历已打开的加密笔记本查找
-// 返回找到的路径和对应的 boxID（普通 box 返回空 boxID）。找不到返回空串。
+// FindAttributeViewPath looks up the actual path of the AV definition file using fallback logic.
+//  1. First check pendingAVBox (the boxID preset at first creation), without checking whether the
+//     file exists (first-creation scenario)
+//  2. Check the global storage/av/ (regular box)
+//  3. Iterate over already-opened encrypted notebooks
+//
+// Returns the found path and the corresponding boxID (regular box returns an empty boxID). Returns
+// an empty string if not found.
 func FindAttributeViewPath(avID string) (path string, boxID string) {
 	if !ast.IsNodeIDPattern(avID) {
 		return
 	}
 
-	// 先查 pendingAVBox（首次创建场景），不要求文件存在
+	// Check pendingAVBox first (first-creation scenario); doesn't require the file to exist
 	if pendingBoxID := GetAVBoxID(avID); pendingBoxID != "" {
 		encPath := attributeViewDataPathByBox(avID, pendingBoxID)
-		// pending 存在就直接返回该 box 路径（首次创建时文件尚不存在）
+		// If pending exists, return that box's path directly (the file doesn't exist yet on first creation)
 		return encPath, pendingBoxID
 	}
-	// 查全局
+	// Check the global path
 	globalPath := attributeViewDataPathByBox(avID, "")
 	if filelock.IsExist(globalPath) {
 		return globalPath, ""
 	}
-	// 遍历已打开的加密笔记本查找
+	// Iterate over already-opened encrypted notebooks
 	if AVEncryptedBoxIDs != nil {
 		for _, encBoxID := range AVEncryptedBoxIDs() {
 			encPath := attributeViewDataPathByBox(avID, encBoxID)
@@ -112,7 +124,8 @@ func FindAttributeViewPath(avID string) (path string, boxID string) {
 	return "", ""
 }
 
-// FindAttributeViewPathInBox 只在指定 box 内查找 AV 定义，避免加密上下文落回全局路径。
+// FindAttributeViewPathInBox looks up the AV definition only within the specified box, to avoid
+// an encrypted context falling back to the global path.
 func FindAttributeViewPathInBox(avID, boxID string) (path string, retBoxID string) {
 	if !ast.IsNodeIDPattern(avID) || (boxID != "" && !ast.IsNodeIDPattern(boxID)) {
 		return
@@ -120,10 +133,10 @@ func FindAttributeViewPathInBox(avID, boxID string) (path string, retBoxID strin
 
 	if pendingBoxID := GetAVBoxID(avID); pendingBoxID != "" {
 		if pendingBoxID == boxID {
-			// pending 匹配目标 box，直接返回（首次创建时文件尚不存在）
+			// pending matches the target box, return directly (the file doesn't exist yet on first creation)
 			return attributeViewDataPathByBox(avID, pendingBoxID), pendingBoxID
 		}
-		// pending 映射属于其他 box，不遮蔽本 box 的文件查找，继续检查磁盘
+		// The pending mapping belongs to another box; don't let it shadow this box's file lookup, keep checking disk
 	}
 	avPath := attributeViewDataPathByBox(avID, boxID)
 	if filelock.IsExist(avPath) {
@@ -132,17 +145,17 @@ func FindAttributeViewPathInBox(avID, boxID string) (path string, retBoxID strin
 	return "", boxID
 }
 
-// readAttributeViewData 按 fallback 逻辑读取 AV 定义数据（自动解密）。
+// readAttributeViewData reads AV definition data using fallback logic (with automatic decryption).
 func readAttributeViewData(avID string) ([]byte, error) {
 	path, boxID := FindAttributeViewPath(avID)
 	if path == "" {
-		return nil, nil // 文件不存在，由调用方处理
+		return nil, nil // File doesn't exist; let the caller handle it
 	}
 	data, err := filelock.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-	// 加密笔记本的数据需解密
+	// Data from encrypted notebooks needs to be decrypted
 	if boxID != "" {
 		data, err = decryptAVData(boxID, avID, data)
 		if err != nil {
@@ -152,13 +165,14 @@ func readAttributeViewData(avID string) ([]byte, error) {
 	return data, nil
 }
 
-// ReadAttributeViewData 是 readAttributeViewData 的导出版本，供 model.export 等外部包
-// 读取 AV 定义明文（含加密笔记本的笔记本级 AV 自动解密）。
+// ReadAttributeViewData is the exported version of readAttributeViewData, for external packages
+// such as model.export to read the plaintext AV definition (including automatic decryption of
+// notebook-level AVs in encrypted notebooks).
 func ReadAttributeViewData(avID string) ([]byte, error) {
 	return readAttributeViewData(avID)
 }
 
-// ReadAttributeViewDataInBox 只读取指定 box 内的 AV 定义明文。
+// ReadAttributeViewDataInBox reads the plaintext AV definition only within the specified box.
 func ReadAttributeViewDataInBox(avID, boxID string) ([]byte, error) {
 	path, retBoxID := FindAttributeViewPathInBox(avID, boxID)
 	if path == "" {
@@ -177,8 +191,9 @@ func ReadAttributeViewDataInBox(avID, boxID string) ([]byte, error) {
 	return data, nil
 }
 
-// writeAttributeViewData 写入 AV 定义数据（自动加密）。
-// boxID 为空时写全局路径（普通 box），非空时写加密笔记本路径并加密。
+// writeAttributeViewData writes AV definition data (with automatic encryption).
+// When boxID is empty, writes to the global path (regular box); when non-empty, writes to the
+// encrypted notebook path and encrypts the data.
 func writeAttributeViewData(avID, boxID string, data []byte) error {
 	if !ast.IsNodeIDPattern(avID) {
 		return ErrInvalidAttributeViewID
@@ -188,12 +203,12 @@ func writeAttributeViewData(avID, boxID string, data []byte) error {
 	}
 
 	path := attributeViewDataPathByBox(avID, boxID)
-	// 确保目录存在
+	// Ensure the directory exists
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
-	// 加密笔记本的数据需加密
+	// Data for encrypted notebooks needs to be encrypted
 	if boxID != "" {
 		var err error
 		data, err = encryptAVData(boxID, avID, data)
@@ -204,9 +219,9 @@ func writeAttributeViewData(avID, boxID string, data []byte) error {
 	return filelock.WriteFile(path, data)
 }
 
-// mirrorBlocksPath 返回镜像索引文件的路径。
-// 加密 box：<DataDir>/<boxID>/storage/av/blocks.msgpack
-// 普通 box：<DataDir>/storage/av/blocks.msgpack
+// mirrorBlocksPath returns the path of the mirror index file.
+// Encrypted box: <DataDir>/<boxID>/storage/av/blocks.msgpack
+// Regular box: <DataDir>/storage/av/blocks.msgpack
 func mirrorBlocksPath(boxID string) string {
 	if boxID != "" {
 		return filepath.Join(util.DataDir, boxID, "storage", "av", "blocks.msgpack")
@@ -214,16 +229,19 @@ func mirrorBlocksPath(boxID string) string {
 	return filepath.Join(util.DataDir, "storage", "av", "blocks.msgpack")
 }
 
-// mirrorBlocksPathByAvID 通过 AV 定义的归属 box 返回镜像索引路径。
-// 先查 findAttributeViewPath（含 pendingAVBox fallback），找到则返回对应 box 的镜像路径。
-// 找不到则返回全局路径。
+// mirrorBlocksPathByAvID returns the mirror index path via the owning box of the AV definition.
+// First checks findAttributeViewPath (including the pendingAVBox fallback); if found, returns the
+// mirror path for that box.
+// Returns the global path if not found.
 func mirrorBlocksPathByAvID(avID string) string {
 	_, boxID := FindAttributeViewPath(avID)
 	return mirrorBlocksPath(boxID)
 }
 
-// readMirrorBlocks 按路径读取镜像索引（boxID 为空读全局，非空读加密 box）。
-// 加密笔记本的镜像索引是 DEK 加密的密文，读取后需解密。
+// readMirrorBlocks reads the mirror index by path (reads global when boxID is empty, reads the
+// encrypted box when non-empty).
+// The mirror index of an encrypted notebook is ciphertext encrypted with the DEK and needs to be
+// decrypted after reading.
 func readMirrorBlocks(boxID string) (ret map[string][]string) {
 	ret = map[string][]string{}
 	p := mirrorBlocksPath(boxID)
@@ -236,7 +254,7 @@ func readMirrorBlocks(boxID string) (ret map[string][]string) {
 		return
 	}
 	if boxID != "" {
-		// 加密笔记本的镜像索引是密文，解密后再反序列化
+		// The mirror index of an encrypted notebook is ciphertext; decrypt before unmarshaling
 		dec, decErr := decryptAVData(boxID, "mirror", data)
 		if decErr != nil {
 			logging.LogErrorf("decrypt attribute view blocks failed: %s", decErr)
@@ -251,8 +269,8 @@ func readMirrorBlocks(boxID string) (ret map[string][]string) {
 	return
 }
 
-// writeMirrorBlocks 按路径写入镜像索引。
-// 加密笔记本的镜像索引写入前用 DEK 加密。
+// writeMirrorBlocks writes the mirror index by path.
+// The mirror index of an encrypted notebook is encrypted with the DEK before writing.
 func writeMirrorBlocks(boxID string, data map[string][]string) error {
 	p := mirrorBlocksPath(boxID)
 	if err := os.MkdirAll(filepath.Dir(p), 0755); err != nil {
@@ -263,7 +281,7 @@ func writeMirrorBlocks(boxID string, data map[string][]string) error {
 		return err
 	}
 	if boxID != "" {
-		// 加密笔记本的镜像索引写入前加密
+		// Encrypt the mirror index of an encrypted notebook before writing
 		enc, encErr := encryptAVData(boxID, "mirror", raw)
 		if encErr != nil {
 			return encErr
@@ -273,8 +291,8 @@ func writeMirrorBlocks(boxID string, data map[string][]string) error {
 	return filelock.WriteFile(p, raw)
 }
 
-// 路径形如 <DataDir>/<boxID>/storage/av/<avID>.json → 返回 boxID。
-// 全局路径 <DataDir>/storage/av/<avID>.json → 返回空串。
+// Paths of the form <DataDir>/<boxID>/storage/av/<avID>.json -> returns boxID.
+// The global path <DataDir>/storage/av/<avID>.json -> returns an empty string.
 func avBoxIDFromPath(absPath string) string {
 	rel, err := filepath.Rel(util.DataDir, absPath)
 	if err != nil {
@@ -286,7 +304,8 @@ func avBoxIDFromPath(absPath string) string {
 		return ""
 	}
 	boxID := parts[0]
-	// 全局路径的第一段是 "storage"，加密笔记本路径的第一段是 boxID（节点 ID 格式）
+	// The first segment of a global path is "storage"; the first segment of an encrypted notebook
+	// path is a boxID (node ID format)
 	if boxID == "storage" {
 		return ""
 	}
@@ -303,10 +322,10 @@ func encryptAVData(boxID, avID string, data []byte) ([]byte, error) {
 	}
 	dek, err := AVDEKProvider(boxID)
 	if err != nil {
-		return nil, err // 加密但未解锁，拒绝写盘避免明文泄漏
+		return nil, err // Encrypted but not unlocked; refuse to write to disk to avoid leaking plaintext
 	}
 	if dek == nil {
-		return data, nil // 非加密 box
+		return data, nil // Non-encrypted box
 	}
 	avKey := util.DeriveSubKey(dek, "siyuan/av")
 	aad := avAAD(boxID, avID)
@@ -330,10 +349,10 @@ func decryptAVDataLocked(boxID, avID string, data []byte) ([]byte, error) {
 	}
 	dek, err := AVDEKProvider(boxID)
 	if err != nil {
-		return nil, err // 加密但未解锁，拒绝读盘
+		return nil, err // Encrypted but not unlocked; refuse to read from disk
 	}
 	if dek == nil {
-		return data, nil // 非加密 box
+		return data, nil // Non-encrypted box
 	}
 	avKey := util.DeriveSubKey(dek, "siyuan/av")
 	aad := avAAD(boxID, avID)
@@ -351,17 +370,18 @@ func avAAD(boxID, avID string) string {
 	}
 }
 
-// EncryptAVData 是 encryptAVData 的导出版本，供 model 层（导入/复制数据库等）统一加密 AV 定义。
+// EncryptAVData is the exported version of encryptAVData, for the model layer (import/copy
+// database, etc.) to uniformly encrypt AV definitions.
 func EncryptAVData(boxID, avID string, data []byte) ([]byte, error) {
 	return encryptAVData(boxID, avID, data)
 }
 
-// DecryptAVData 是 decryptAVData 的导出版本。
+// DecryptAVData is the exported version of decryptAVData.
 func DecryptAVData(boxID, avID string, data []byte) ([]byte, error) {
 	return decryptAVData(boxID, avID, data)
 }
 
-// DecryptAVDataLocked 在调用方已持有对应 box 读锁时解密 AV 数据。
+// DecryptAVDataLocked decrypts AV data when the caller already holds the corresponding box's read lock.
 func DecryptAVDataLocked(boxID, avID string, data []byte) ([]byte, error) {
 	return decryptAVDataLocked(boxID, avID, data)
 }

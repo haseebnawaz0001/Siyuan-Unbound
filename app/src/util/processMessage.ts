@@ -67,7 +67,7 @@ export const processMessage = (response: IWebSocketData) => {
         return false;
     }
 
-    // 小于 0 为提示：-2 提示；-1 报错，大于 0 的错误需处理，等于 0 的为正常操作
+    // Less than 0 is a notice: -2 is a notice; -1 is an error, errors greater than 0 need handling, and 0 is a normal operation
     if (response.code < 0) {
         showMessage(response.msg, response.data ? (response.data.closeTimeout || 0) : 0, response.code === -1 ? "error" : "info");
         return false;

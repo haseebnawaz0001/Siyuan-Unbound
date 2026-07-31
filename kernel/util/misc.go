@@ -136,7 +136,7 @@ func UnescapeHTML(s string) (ret string) {
 }
 
 func HasUnclosedHtmlTag(htmlStr string) bool {
-	// 检查未闭合注释
+	// Check for unclosed comments
 	openIdx := 0
 	for {
 		start := strings.Index(htmlStr[openIdx:], "<!--")
@@ -146,12 +146,12 @@ func HasUnclosedHtmlTag(htmlStr string) bool {
 		start += openIdx
 		end := strings.Index(htmlStr[start+4:], "-->")
 		if end == -1 {
-			return true // 存在未闭合注释
+			return true // An unclosed comment exists
 		}
 		openIdx = start + 4 + end + 3
 	}
 
-	// 去除所有注释内容
+	// Strip out all comment content
 	commentRe := regexp.MustCompile(`<!--[\s\S]*?-->`)
 	htmlStr = commentRe.ReplaceAllString(htmlStr, "")
 
@@ -171,7 +171,7 @@ func HasUnclosedHtmlTag(htmlStr string) bool {
 			stack = append(stack, tag)
 		} else {
 			if len(stack) == 0 || stack[len(stack)-1] != tag {
-				return true // 闭合标签不匹配
+				return true // Closing tag mismatch
 			}
 			stack = stack[:len(stack)-1]
 		}
@@ -232,9 +232,9 @@ func Convert2Float(s string) (float64, bool) {
 	return ret, true
 }
 
-// CountIf 统计数字列表中满足指定比较条件的元素个数。
-// op 为比较操作符："gt"/"lt"/"eq"/"ge"/"le"，threshold 为比较阈值。
-// 例如 CountIf(values, "gt", 0) 统计大于 0 的个数。非数字元素按 0 处理。
+// CountIf counts the elements in a numeric list that satisfy the given comparison condition.
+// op is the comparison operator: "gt"/"lt"/"eq"/"ge"/"le", and threshold is the comparison threshold.
+// For example, CountIf(values, "gt", 0) counts how many are greater than 0. Non-numeric elements are treated as 0.
 func CountIf(list any, op string, threshold any) int {
 	thresholdF, ok := ToFloat64(threshold)
 	if !ok {
@@ -276,7 +276,7 @@ func CountIf(list any, op string, threshold any) int {
 	return count
 }
 
-// ToFloat64 将常用数值/字符串类型转换为 float64。
+// ToFloat64 converts common numeric/string types to float64.
 func ToFloat64(v any) (float64, bool) {
 	switch x := v.(type) {
 	case float64:
@@ -335,7 +335,7 @@ var unsafeSVGElements = map[string]struct{}{
 	"set":              {},
 }
 
-// SanitizeSVG 使用 XML 语义过滤 SVG，避免 HTML 与 XML 解析规则差异导致活动内容绕过过滤。
+// SanitizeSVG filters SVG using XML semantics, to avoid differences between HTML and XML parsing rules letting active content bypass the filter.
 func SanitizeSVG(svgInput string) (string, error) {
 	decoder := xml.NewDecoder(strings.NewReader(svgInput))
 	decoder.Strict = true
@@ -439,7 +439,7 @@ func SanitizeSVG(svgInput string) (string, error) {
 		case xml.Directive:
 			return "", fmt.Errorf("svg directives are not allowed")
 		case xml.ProcInst:
-			// XML 声明和处理指令不影响 SVG 图像内容，输出时统一省略。
+			// XML declarations and processing instructions don't affect the SVG image content, so they are uniformly omitted from the output.
 		}
 	}
 

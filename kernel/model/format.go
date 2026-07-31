@@ -48,9 +48,9 @@ func AutoSpace(rootID string) (err error) {
 
 		switch n.Type {
 		case ast.NodeTextMark:
-			luteEngine.MergeSameTextMark(n) // 合并相邻的同类行级节点
+			luteEngine.MergeSameTextMark(n) // Merge adjacent text-mark nodes of the same kind
 		case ast.NodeCodeBlockCode:
-			// 代码块中包含 ``` 时 `优化排版` 异常 `Optimize typography` exception when code block contains ``` https://github.com/siyuan-note/siyuan/issues/15843
+			// `Optimize typography` exception when code block contains ``` https://github.com/siyuan-note/siyuan/issues/15843
 			n.Tokens = bytes.ReplaceAll(n.Tokens, []byte(editor.Zwj+"```"), []byte("```"))
 			n.Tokens = bytes.ReplaceAll(n.Tokens, []byte("```"), []byte(editor.Zwj+"```"))
 		}
@@ -60,12 +60,12 @@ func AutoSpace(rootID string) (err error) {
 	rootIAL := tree.Root.KramdownIAL
 	addBlockIALNodes(tree, false)
 
-	// 第一次格式化为了合并相邻的文本节点
+	// The first format pass merges adjacent text nodes
 	formatRenderer := render.NewFormatRenderer(tree, luteEngine.RenderOptions, luteEngine.ParseOptions)
 	md := formatRenderer.Render()
 	newTree := parseKTree(md)
 	newTree.Root.Spec = treenode.CurrentSpec
-	// 第二次格式化启用自动空格
+	// The second format pass enables auto-spacing
 	luteEngine.SetAutoSpace(true)
 	formatRenderer = render.NewFormatRenderer(newTree, luteEngine.RenderOptions, luteEngine.ParseOptions)
 	md = formatRenderer.Render()

@@ -137,12 +137,13 @@ export const correctHotkey = (app: App) => {
 };
 
 export const filterHotkey = (event: KeyboardEvent, app: App) => {
-    // https://github.com/siyuan-note/siyuan/issues/9848 忘记为什么要阻止了 .av__mask 的情况，测了下没问题就先移除
+    // https://github.com/siyuan-note/siyuan/issues/9848 forgot why the .av__mask case was blocked; testing showed
+    // no issues, so it's removed for now
     if (document.getElementById("progress") || document.getElementById("errorLog") || event.isComposing) {
         return true;
     }
     const target = event.target as HTMLElement;
-    // 点击最近的文档列表会 dispatch keydown 的 Enter https://github.com/siyuan-note/siyuan/issues/12967
+    // Clicking the recent documents list dispatches a keydown Enter https://github.com/siyuan-note/siyuan/issues/12967
     if (event.isTrusted && isNotCtrl(event) && !event.shiftKey && !event.altKey &&
         !["INPUT", "TEXTAREA"].includes(target.tagName) &&
         ["0", "1", "2", "3", "4", "j", "k", "l", ";", "s", " ", "p", "enter", "a", "s", "d", "f", "q", "x"].includes(event.key.toLowerCase())) {
@@ -163,7 +164,7 @@ export const filterHotkey = (event: KeyboardEvent, app: App) => {
         }
     }
 
-    // 仅处理以下快捷键操作
+    // Only handle the following hotkey actions
     if (isNotCtrl(event) && event.key !== "Escape" && !event.shiftKey && !event.altKey &&
         Constants.KEYCODELIST[event.keyCode] !== "PageUp" &&
         Constants.KEYCODELIST[event.keyCode] !== "PageDown" &&
@@ -187,7 +188,8 @@ export const filterHotkey = (event: KeyboardEvent, app: App) => {
     if (!event.altKey && event.shiftKey && isNotCtrl(event)) {
         if (event.key === "Shift") {
             window.siyuan.shiftIsPressed = true;
-            // 按下 Shift 时隐藏表格列宽调整手柄，以便 Shift+滚轮可以横向滚动表格 https://github.com/siyuan-note/siyuan/issues/13828
+            // Hide the table column-width resize handle while Shift is held, so Shift+wheel can scroll the table
+            // horizontally https://github.com/siyuan-note/siyuan/issues/13828
             document.body.classList.add("body--shift-pressed");
             if (!event.repeat) {
                 showPopover(app, true);

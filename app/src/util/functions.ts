@@ -50,7 +50,7 @@ export const isArrayEqual = (arr1: string[], arr2: string[]) => {
 };
 
 export const getRandom = (min: number, max: number) => {
-    return Math.floor(Math.random() * (max - min + 1)) + min; //含最大值，含最小值
+    return Math.floor(Math.random() * (max - min + 1)) + min; // Inclusive of both max and min
 };
 
 export const getSearch = (key: string, link = window.location.search) => {
@@ -62,7 +62,7 @@ export const getSearch = (key: string, link = window.location.search) => {
 };
 
 /**
- * 判断是否是移动端或浏览器环境
+ * Determines whether this is a mobile or browser environment
  */
 export const isBrowser = () => {
     /// #if BROWSER
@@ -115,18 +115,21 @@ export const duplicateNameAddOne = (name: string) => {
 };
 
 /// #if !BROWSER
-// 红绿灯为原生控件不随缩放变化，缩小时按 zoom 补偿 --b3-toolbar-left-mac 避免与工具栏内容重叠
+// The traffic-light buttons are a native control that does not scale with zoom; when zoomed out,
+// compensate --b3-toolbar-left-mac based on zoom to avoid overlapping the toolbar content
 export const setToolbarLeftMac = (zoom: number) => {
-    // 非桌面端、非 macOS 不补偿（让 body--win32 的 class 规则生效）
+    // No compensation on non-desktop or non-macOS (let the body--win32 class rules take effect)
     if (!window.siyuan.config || getBackend() !== "darwin") {
         return;
     }
-    // 全屏下红绿灯隐藏，清除内联补偿让 body--fullscreen 的 5px 生效
+    // The traffic-light buttons are hidden in fullscreen; clear the inline compensation so
+    // body--fullscreen's 5px takes effect
     if (zoom >= .9 || document.body.classList.contains("body--fullscreen")) {
         document.body.style.removeProperty("--b3-toolbar-left-mac");
         return;
     }
-    // 从 :root 读取主题基础值（默认 74px，兼容第三方主题），除以 zoom 让缩放后恢复到基础原生像素
+    // Read the theme's base value from :root (default 74px, for compatibility with third-party
+    // themes), and divide by zoom to restore it to the base native pixel value after scaling
     const base = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--b3-toolbar-left-mac")) || 74;
     document.body.style.setProperty("--b3-toolbar-left-mac", (base / zoom * .9) + "px");
 };

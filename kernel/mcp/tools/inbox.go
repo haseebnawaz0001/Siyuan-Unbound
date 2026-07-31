@@ -27,8 +27,10 @@ import (
 	"github.com/88250/lute/ast"
 )
 
-// InboxTool 把收集箱（云端剪藏、消息、语音/视频/文件等）暴露给智能体，使其能够列出、阅读并把内容批量转为本地文档。
-// 收集箱数据存放在思源云端，需要订阅会员；底层复用 model 层的云端 shorthand 读写函数。
+// InboxTool exposes the inbox (cloud web clippings, messages, audio/video/file attachments, etc) to the agent,
+// letting it list, read, and batch-convert content into local documents.
+// Inbox data is stored in the SiYuan cloud and requires a subscription; the underlying implementation reuses
+// the model layer's cloud shorthand read/write functions.
 var InboxTool = &Tool{
 	Name:        "inbox",
 	Description: "Inbox management (cloud-clipped web pages, messages, and audio/video/file attachments; requires subscription). Actions: list(page=1), get(id), convert(ids, notebook, path=/, remove_after=true) — converts one or more shorthands into local documents under the target notebook, deleting the cloud originals on success.",
@@ -68,7 +70,8 @@ func inboxHandler(args map[string]any) (CallToolResult, error) {
 	}, nil
 }
 
-// inboxList 分页列出收集箱，仅返回摘要而非正文，控制 token 开销；正文用 get 按需拉取。
+// inboxList paginates the inbox listing, returning only summaries rather than the full body to control token
+// cost; the body is fetched on demand via get.
 func inboxList(args map[string]any) (CallToolResult, error) {
 	page := 1
 	if v, ok := args["page"]; ok {
@@ -116,7 +119,7 @@ func inboxList(args map[string]any) (CallToolResult, error) {
 	return CallToolResult{Content: []ContentItem{{Type: "text", Text: sb.String()}}}, nil
 }
 
-// inboxGet 取单条收集箱详情，返回完整 markdown 正文（shorthandMd）。
+// inboxGet fetches a single inbox item's detail, returning the full markdown body (shorthandMd).
 func inboxGet(args map[string]any) (CallToolResult, error) {
 	id, _ := args["id"].(string)
 	if id == "" {
@@ -141,8 +144,10 @@ func inboxGet(args map[string]any) (CallToolResult, error) {
 	return CallToolResult{Content: []ContentItem{{Type: "text", Text: sb.String()}}}, nil
 }
 
-// inboxConvert 把一条或多条剪藏转为本地文档：取云端 md → 本地建文档 → 成功后清理云端原件。
-// 失败的条目不会被删除，也不会中断后续条目的处理；返回逐条结果供智能体汇报与生成文档链接。
+// inboxConvert converts one or more clippings into local documents: fetch the cloud md -> create the local
+// document -> clean up the cloud original on success.
+// A failed item is not deleted and does not interrupt processing of the remaining items; a per-item result is
+// returned for the agent to report and to generate document links.
 func inboxConvert(args map[string]any) (CallToolResult, error) {
 	notebook, _ := args["notebook"].(string)
 	if notebook == "" {
@@ -165,7 +170,7 @@ func inboxConvert(args map[string]any) (CallToolResult, error) {
 		}
 	}
 
-	// 解析目标父路径（与 document.create 保持一致的 hPath→fsPath 解析逻辑）。
+	// Resolve the target parent path (using the same hPath->fsPath resolution logic as document.create).
 	parentPath := "/"
 	parentDir := parentDir(hPath)
 	if parentDir != "/" {
@@ -194,7 +199,8 @@ func inboxConvert(args map[string]any) (CallToolResult, error) {
 			title = "Untitled"
 		}
 		md, _ := sh["shorthandMd"].(string)
-		// content 为空（既无 md 也无渲染正文）但有来源 URL 时，回退为 markdown 链接，与前端行为一致。
+		// When content is empty (neither md nor a rendered body) but a source URL exists, fall back to a
+		// markdown link, matching the frontend's behavior.
 		if md == "" {
 			if content, _ := sh["shorthandContent"].(string); content == "" {
 				if url, _ := sh["shorthandURL"].(string); url != "" {
@@ -215,7 +221,7 @@ func inboxConvert(args map[string]any) (CallToolResult, error) {
 		sb.WriteString(fmt.Sprintf("- [%s] %s -> created %s\n", id, title, tree.Root.ID))
 	}
 
-	// 仅在全部转换成功的条目上清理云端原件；失败条目保留以便重试。
+	// Clean up cloud originals only for items that converted successfully; failed items are kept for retrying.
 	if removeAfter && len(successIDs) > 0 {
 		if err := model.RemoveCloudShorthands(successIDs); err != nil {
 			sb.WriteString("\nWARNING: failed to remove cloud originals: " + err.Error())
@@ -227,7 +233,7 @@ func inboxConvert(args map[string]any) (CallToolResult, error) {
 	return CallToolResult{Content: []ContentItem{{Type: "text", Text: sb.String()}}}, nil
 }
 
-// parseShorthandIDs 兼容字符串（逗号分隔）和数组两种形态的 ids 入参，去除空白与重复。
+// parseShorthandIDs supports both a string (comma-separated) and an array form for the ids argument, trimming whitespace and removing duplicates.
 func parseShorthandIDs(v any) []string {
 	if v == nil {
 		return nil
@@ -272,7 +278,7 @@ func parseShorthandIDs(v any) []string {
 	return out
 }
 
-// toInt 把 JSON 反序列化出的数字（float64）或整数类型安全地转成 int。
+// toInt safely converts a number (float64) or integer type unmarshaled from JSON into an int.
 func toInt(v any) (int, bool) {
 	switch n := v.(type) {
 	case float64:
@@ -287,7 +293,7 @@ func toInt(v any) (int, bool) {
 	return 0, false
 }
 
-// toBool 把 JSON 反序列化出的布尔值安全地转成 bool。
+// toBool safely converts a boolean value unmarshaled from JSON into a bool.
 func toBool(v any) (bool, bool) {
 	if b, ok := v.(bool); ok {
 		return b, true

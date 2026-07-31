@@ -84,10 +84,10 @@ func TestCheckAssetContentReadonlyStatement(t *testing.T) {
 	}()
 
 	if err = CheckAssetContentReadonlyStatement("SELECT id FROM asset_contents"); err != nil {
-		t.Fatalf("只读语句校验失败：%s", err)
+		t.Fatalf("read-only statement validation failed: %s", err)
 	}
 	if err = CheckAssetContentReadonlyStatement("DELETE FROM asset_contents"); err == nil {
-		t.Fatal("写入语句不应通过只读校验")
+		t.Fatal("a write statement should not pass read-only validation")
 	}
 }
 
@@ -125,23 +125,23 @@ func TestCheckReadonlyStatementForMainAndEncryptedDatabases(t *testing.T) {
 	for _, boxID := range []string{"", encryptedBoxID} {
 		for _, stmt := range readonlyStatements {
 			if err = CheckReadonlyStatementInBox(stmt, boxID); err != nil {
-				t.Fatalf("自定义只读语句校验失败 [box=%s, stmt=%s]：%s", boxID, stmt, err)
+				t.Fatalf("custom read-only statement validation failed [box=%s, stmt=%s]: %s", boxID, stmt, err)
 			}
 		}
 		if err = CheckReadonlyStatementInBox("DELETE FROM blocks", boxID); err == nil {
-			t.Fatalf("写入语句不应通过只读校验 [box=%s]", boxID)
+			t.Fatalf("a write statement should not pass read-only validation [box=%s]", boxID)
 		}
 		if err = CheckReadonlyStatementInBox("ATTACH DATABASE ':memory:' AS attached", boxID); err == nil {
-			t.Fatalf("ATTACH 语句不应通过只读校验 [box=%s]", boxID)
+			t.Fatalf("an ATTACH statement should not pass read-only validation [box=%s]", boxID)
 		}
 		if err = CheckReadonlyStatementInBox("BEGIN", boxID); err == nil {
-			t.Fatalf("事务控制语句不应通过只读校验 [box=%s]", boxID)
+			t.Fatalf("a transaction-control statement should not pass read-only validation [box=%s]", boxID)
 		}
 		if err = CheckReadonlyStatementInBox("PRAGMA query_only = OFF", boxID); err == nil {
-			t.Fatalf("PRAGMA 语句不应通过只读校验 [box=%s]", boxID)
+			t.Fatalf("a PRAGMA statement should not pass read-only validation [box=%s]", boxID)
 		}
 	}
 	if err = CheckSingleStatement("SELECT id FROM blocks; DELETE FROM blocks"); err == nil {
-		t.Fatal("堆叠语句不应通过单语句校验")
+		t.Fatal("a stacked statement should not pass single-statement validation")
 	}
 }

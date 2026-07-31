@@ -1,6 +1,6 @@
 import {createConfigNamespaceApi} from "../util/namespaceApi";
 
-/** 文档 Tab 命名空间：设置面板注册项 save */
+/** Doc tree config namespace, used as the save handler of the items registered in the setting panel */
 export const fileConfigApi = createConfigNamespaceApi<Config.IFileTree>({
     namespace: "fileTree",
     getConfig: () => window.siyuan.config.fileTree,

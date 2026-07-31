@@ -40,7 +40,7 @@ const sendTrafficLightPosition = (zoom: number) => {
     /// #endif
 };
 
-/** 同步顶栏隐藏后的布局（运行时切换 hideToolbar 时调用） */
+/** Sync the layout after the top bar is hidden (called when toggling hideToolbar at runtime) */
 export const syncHideToolbarLayout = () => {
     document.body.classList.toggle("body--toolbar-hide", window.siyuan.config.appearance.hideToolbar);
     resizeTopBar();
@@ -126,7 +126,8 @@ export const initBar = (app: App) => {
                 window.siyuan.menus.menu.remove();
                 window.siyuan.menus.menu.element.setAttribute("data-name", Constants.MENU_BAR_MORE);
                 (target.getAttribute("data-hideids") || "").split(",").forEach((itemId) => {
-                    // data-hideids 可能为空字符串，split(",") 会得到 [""]，导致 querySelector("#") 抛出无效选择器异常
+                    // data-hideids may be an empty string; split(",") would then yield [""], causing
+                    // querySelector("#") to throw an invalid-selector exception
                     if (!itemId) {
                         return;
                     }

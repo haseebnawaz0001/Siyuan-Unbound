@@ -162,7 +162,7 @@ class PDFViewerApplication {
         /** @type {ImageAltTextSettings} */
         this.imageAltTextSettings = null
         this.isInitialViewSet = false
-        // NOTE 不使用 initialBookmark
+        // NOTE initialBookmark is not used
         this.isViewerEmbedded = true
         this.url = ""
         this.baseUrl = ""
@@ -1348,7 +1348,7 @@ class PDFViewerApplication {
                             spreadMode = stored.spreadMode | 0;
                         }
                     }
-                    // NOTE 定位分页，最后通过 showHighlight 进行高亮
+                    // NOTE navigate to the page here; highlighting is done afterward via showHighlight
                     if (hash.indexOf("page=") === -1 && this.pdfId) {
                         hash += `&page=${this.pdfId}`;
                     }
@@ -1416,7 +1416,7 @@ class PDFViewerApplication {
                     // To prevent any future issues, e.g. the document being completely
                     // blank on load, always trigger rendering here.
                     pdfViewer.update();
-                    // NOTE: 没有渲染完就切换页签导致 https://ld246.com/article/1677072688346
+                    // NOTE: switching tabs before rendering finishes causes the issue in https://ld246.com/article/1677072688346
                     const tabElement = hasClosestByClassName(pdfViewer.container, "fn__flex-1")
                     if (tabElement) {
                         tabElement.removeAttribute("data-loading")
@@ -2791,7 +2791,7 @@ function onTouchEnd(evt) {
 }
 
 function onClick(evt) {
-    // 点击后证快捷键可正常使用，select 等也可正常使用 https://github.com/siyuan-note/siyuan/issues/7869
+    // Ensure keyboard shortcuts work normally after clicking; select and other elements also work normally https://github.com/siyuan-note/siyuan/issues/7869
     if (!["SELECT", "TEXTAREA", "INPUT"].includes(evt.target.tagName)) {
         this.pdfViewer.focus();
     }
@@ -2818,7 +2818,7 @@ function onKeyUp(evt) {
     if (!pdfInstance) {
         return
     }
-    // NOTE 4+ 版本不知道为 r 后不 focus 了
+    // NOTE: not sure why, in version 4+, focus no longer happens after r
     if (!["SELECT", "TEXTAREA", "INPUT"].includes(evt.target.tagName)) {
         pdfInstance.pdfViewer.focus();
     }
@@ -2827,7 +2827,7 @@ function onKeyUp(evt) {
     if (evt.key === "Control") {
         pdfInstance._isCtrlKeyDown = false;
     }
-    // NOTE 快捷键高亮取消
+    // NOTE shortcut key cancels the highlight tool
     if (([92, 91, 68].includes(evt.keyCode) || evt.ctrlKey || evt.altKey) && pdfInstance.appConfig.toolbar.rectAnno.classList.contains('toggled')) {
         pdfInstance.appConfig.toolbar.rectAnno.dispatchEvent(new MouseEvent('click'))
     }

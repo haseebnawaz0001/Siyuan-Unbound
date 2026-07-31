@@ -10,11 +10,11 @@ import {loadAssets} from "../../util/assets";
 import {remountOpenSettingTab} from "../setting/mount";
 import {createConfigNamespaceApi} from "../util/namespaceApi";
 
-/** 主题模式下拉框初值：合并 mode / modeOS */
+/** Initial value of the theme mode select, combining mode and modeOS */
 export const appearanceThemeModeValue = (): number =>
     window.siyuan.config.appearance.modeOS ? 2 : window.siyuan.config.appearance.mode;
 
-/** 主题模式选择：合并 mode / modeOS 后提交 */
+/** Theme mode selection, split back into mode and modeOS before it is submitted */
 export const saveThemeMode = (value: number) => {
     const OSThemeMode = window.matchMedia("(prefers-color-scheme: dark)").matches ? 1 : 0;
     fetchPost("/api/setting/setAppearance", {
@@ -99,7 +99,7 @@ const applyAppearanceConfig = async (data: Config.IAppearance) => {
     /// #endif
 };
 
-/** 外观 Tab 命名空间：设置面板注册项 save */
+/** Appearance config namespace, used as the save handler of the items registered in the setting panel */
 export const appearanceConfigApi = createConfigNamespaceApi<Config.IAppearance>({
     namespace: "appearance",
     getConfig: () => window.siyuan.config.appearance,

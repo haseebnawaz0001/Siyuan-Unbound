@@ -36,11 +36,11 @@ import (
 
 var downloadPackageFlight singleflight.Group
 
-// downloadBazaarFile 下载集市文件
+// downloadBazaarFile downloads a bazaar file
 func downloadBazaarFile(repoURLHash string, pushProgress bool) (data []byte, err error) {
 	repoURLHashTrimmed := strings.TrimPrefix(repoURLHash, "https://github.com/")
 	v, err, _ := downloadPackageFlight.Do(repoURLHash, func() (any, error) {
-		// repoURLHash: https://github.com/88250/Comfortably-Numb@6286912c381ef3f83e455d06ba4d369c498238dc 或带路径 /README.md
+		// repoURLHash: https://github.com/88250/Comfortably-Numb@6286912c381ef3f83e455d06ba4d369c498238dc or with a path suffix like /README.md
 		repoURL := repoURLHash[:strings.LastIndex(repoURLHash, "@")]
 		u := util.BazaarOSSServer + "/package/" + repoURLHashTrimmed
 		buf := &bytes.Buffer{}
@@ -67,7 +67,7 @@ func downloadBazaarFile(repoURLHash string, pushProgress bool) (data []byte, err
 	return v.([]byte), nil
 }
 
-// InstallPackage 安装集市包
+// InstallPackage installs a bazaar package
 func InstallPackage(repoURL, repoHash, installPath, pkgType, packageName string) error {
 	repoURLHash := repoURL + "@" + repoHash
 	data, err := downloadBazaarFile(repoURLHash, true)
@@ -78,11 +78,11 @@ func InstallPackage(repoURL, repoHash, installPath, pkgType, packageName string)
 		return err
 	}
 
-	// 记录安装时间
+	// record the install time
 	now := time.Now()
 	setPackageInstallTime(pkgType, packageName, now)
 
-	// 文件夹的修改时间设置为当前安装时间
+	// set the folder's modification time to the current install time
 	if err = os.Chtimes(installPath, now, now); err != nil {
 		logging.LogWarnf("set package [%s] folder mtime failed: %s", packageName, err)
 	}
@@ -123,7 +123,7 @@ func installPackage(data []byte, installPath string) (err error) {
 	return
 }
 
-// UninstallPackage 卸载集市包
+// UninstallPackage uninstalls a bazaar package
 func UninstallPackage(installPath string) (err error) {
 	if err = os.RemoveAll(installPath); err != nil {
 		logging.LogErrorf("remove [%s] failed: %s", installPath, err)

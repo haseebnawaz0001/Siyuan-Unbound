@@ -28,7 +28,7 @@ export const tabCodeBlock = (protyle: IProtyle, nodeElement: HTMLElement,
         });
     }
     let language = nodeElement.querySelector(".protyle-action__language").textContent;
-    // 语言优先级处理 https://github.com/siyuan-note/siyuan/issues/14767
+    // Language priority handling https://github.com/siyuan-note/siyuan/issues/14767
     if (range.commonAncestorContainer.nodeType === 1) {
         const snippetClassName = (range.commonAncestorContainer as HTMLElement).className;
         if (snippetClassName.startsWith("language-")) {

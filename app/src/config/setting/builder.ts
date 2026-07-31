@@ -18,7 +18,7 @@ import {applySettingTabSearchVisibility, mountSettingTab} from "./mount";
 
 type SaveFn = (value: unknown) => void | Promise<void>;
 
-/** 侧栏 / 菜单等壳层字段（`SettingBuilder.tab` / `panel` 入参均平铺） */
+/** Shell fields used by the sidebar and the menus, passed flattened to both `SettingBuilder.tab` and `panel` */
 export interface SettingTabShell<TId extends string = string> {
     id: TId;
     icon: string;
@@ -27,9 +27,9 @@ export interface SettingTabShell<TId extends string = string> {
 }
 
 interface ItemsSettingTabOptions<TId extends string = string> extends SettingTabShell<TId> {
-    /** 控件未指定 save 时，按控件 id 提交配置变更 */
+    /** Submits the config change based on the control id, used when the control does not define its own save */
     defaultSave?: (controlId: string, value: unknown) => void;
-    /** 条目 mount 完成后的 SettingTab 级初始化（如记录根节点、拉取动态数据） */
+    /** SettingTab level initialization once the items are mounted, for example storing the root node or fetching dynamic data */
     afterMount?: (root: HTMLElement, app?: App) => void | Promise<void>;
 }
 
@@ -43,7 +43,7 @@ type ControlSpecBase = {
     desc?: string;
     save?: SaveFn;
     afterMount?: (root: HTMLElement) => void | Promise<void>;
-    /** 省略时按控件 id 从 config 读取；嵌套 / 派生项需显式传入 */
+    /** When omitted the value is read from the config by control id, nested / derived items have to pass it explicitly */
     readConfig?: () => unknown;
 };
 type SwitchSpec = ControlSpecBase;
@@ -63,7 +63,7 @@ type SelectSpec = ControlSpecBase & {
         value: number | string;
         label?: string;
     }[];
-    /** 省略时按控件 id 从 config 读取；虚拟 / 派生项需显式传入 */
+    /** When omitted the value is read from the config by control id, virtual / derived items have to pass it explicitly */
     readConfig?: () => number | string;
 };
 type TextSpec = ControlSpecBase & {
@@ -152,7 +152,7 @@ const stackLinesToControls = (lines: StackLine[]): CompositeControlSpec[] => {
     return controls;
 };
 
-/** stack 组合行内逐行注册；由 `SettingGroupBuilder.stack` 回调使用 */
+/** Registers the lines of a stack row one by one, used from the `SettingGroupBuilder.stack` callback */
 class StackLineBuilder {
     private readonly lines: StackLine[] = [];
 
@@ -165,7 +165,7 @@ class StackLineBuilder {
         return this;
     }
 
-    /** 为上一行（通常为 title / desc）追加右侧按钮 */
+    /** Appends a button on the right of the previous line, which is usually a title or a desc */
     button(spec: StackButtonSpec) {
         const last = this.lines[this.lines.length - 1];
         if (last) {
@@ -220,7 +220,7 @@ class SettingGroupBuilder<TId extends string> {
     ) {}
 
     /**
-     * 注册标准单行控件（`kind: full`）。
+     * Registers a standard single row control (`kind: full`).
      */
     private registerFullItem(
         id: string,
@@ -364,7 +364,7 @@ class SettingGroupBuilder<TId extends string> {
     }
 
     /**
-     * 纯展示 / 自行绑定事件的块。
+     * A block that is purely presentational or binds its own events.
      */
     slot(spec: SlotSpec) {
         const id = `${this.tab.id}.__slot.${spec.key}`;
@@ -381,7 +381,7 @@ class SettingGroupBuilder<TId extends string> {
     }
 
     /**
-     * 自定义 HTML 块 + 内嵌控件 save：分别声明 render 项与 binding 项。
+     * Custom HTML block plus save handlers for the embedded controls, declared as a render item and binding items.
      */
     composite(spec: CompositeSpec) {
         this.slot({
@@ -414,14 +414,14 @@ export class SettingTabBuilder<TId extends string = string> {
     }
 }
 
-/** `scanSearch` 返回值：侧栏过滤用 `matches`，条目型 SettingTab 另含可见条目 ID / 分组 ID */
+/** Return value of `scanSearch`: the sidebar filters on `matches`, item based SettingTabs also get the visible item / group IDs */
 export interface SettingTabSearchResult {
     matches: boolean;
     visibleItemIds?: Set<string>;
     visibleGroupIds?: Set<string>;
 }
 
-/** mount 时的搜索上下文（`keywords` 由壳层持有，与扫描结果在调用处拼装） */
+/** Search context passed to mount, the shell owns `keywords` and merges it with the scan result at the call site */
 export interface SettingTabMountContext {
     keywords: string;
     visibleItemIds?: Set<string>;
@@ -451,7 +451,7 @@ export class SettingBuilder {
                 return;
             }
             registered = true;
-            // 延迟注册至首次 mount / scanSearch：import 时 languages 未就绪，且搜索可能先于 mount
+            // Registration is deferred to the first mount / scanSearch: languages are not ready at import time, and a search may come before mount
             register(new SettingTabBuilder(options));
         };
         return {
@@ -490,7 +490,7 @@ export class SettingBuilder {
         let tabSearchIndex: readonly string[] | undefined;
         return {
             ...shell,
-            // panel 型 Tab 不支持 rebuild（无注册项可清），忽略该参数以对齐 SettingTab.mount 签名
+            // Panel style tabs do not support rebuild as there is nothing registered to clear, the parameter is ignored to keep the SettingTab.mount signature
             mount: async (root, {keywords} = {}, app, _rebuild) => {
                 void _rebuild;
                 mount(root, keywords, app);
@@ -504,10 +504,10 @@ export class SettingBuilder {
                 }
                 let matches = false;
                 if (tabSearchTitle.length > 0 && tabSearchTitle.includes(keywords)) {
-                    // 匹配标签页标题
+                    // Matched the tab title
                     matches = true;
                 } else if (tabSearchIndex.some((s) => s.includes(keywords))) {
-                    // 匹配标签页内部文案
+                    // Matched some text inside the tab
                     matches = true;
                 }
                 return {matches};

@@ -94,7 +94,8 @@ func skillLoad(args map[string]any) (CallToolResult, error) {
 		}, nil
 	}
 
-	// 变量（非敏感）在技能正文注入对话时解析，让 LLM 看到实际值；密钥不进上下文。
+	// Variables (non-secret) are resolved when the skill body is injected into the conversation, so the LLM
+	// sees the actual values; secrets never enter the context.
 	content = model.Conf.Variables.Resolve(content)
 
 	result := "<skill_content name=\"" + name + "\">\n\n" + content + "\n\n</skill_content>"

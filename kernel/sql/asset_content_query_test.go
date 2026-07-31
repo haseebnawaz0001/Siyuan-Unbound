@@ -43,7 +43,7 @@ func TestAssetContentQueryArguments(t *testing.T) {
 	stmt := "SELECT id, name, ext, path, size, updated, content FROM asset_contents_fts_case_insensitive WHERE content = ?"
 	results := SelectAssetContentsRawStmtNoParseArgs(stmt, []any{"needle"}, 10)
 	if 1 != len(results) || "id" != results[0].ID {
-		t.Fatalf("FTS 参数查询结果错误：%v", results)
+		t.Fatalf("incorrect FTS parameterized query result: %v", results)
 	}
 
 	payload := "needle'; DELETE FROM asset_contents_fts_case_insensitive; --"
@@ -55,6 +55,6 @@ func TestAssetContentQueryArguments(t *testing.T) {
 		t.Fatal(err)
 	}
 	if 1 != count {
-		t.Fatalf("绑定参数中的 SQL 不应被执行，当前记录数为 %d", count)
+		t.Fatalf("SQL embedded in a bound argument should not be executed, current record count is %d", count)
 	}
 }

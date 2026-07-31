@@ -32,23 +32,24 @@ import (
 var encryptionMagic = [4]byte{'S', 'E', 'N', 'C'}
 
 const (
-	// EncryptionSpec 表示 AES-GCM 密文信封规范版本。旧版密文没有信封头，读取时保持兼容。
+	// EncryptionSpec represents the AES-GCM ciphertext envelope spec version. Legacy ciphertext has no envelope header; reading stays compatible with it.
 	EncryptionSpec byte = 1
 
 	encryptionAlgorithmAES256GCM byte = 1
 	encryptionEnvelopeHeaderSize      = len(encryptionMagic) + 3 // magic + spec + algorithm + nonce length
 )
 
-// Argon2Params 是 Argon2id 密钥派生函数的参数。参数本身不是秘密，会随配置落盘，以便跨平台一致地派生密钥。
-// 默认值遵循 OWASP 2023 推荐（64 MB 内存 / 3 次迭代 / 4 线程 / 32 字节输出）。
+// Argon2Params holds the parameters for the Argon2id key derivation function. The parameters themselves are not
+// secret and are persisted with the configuration, so keys can be derived consistently across platforms.
+// The defaults follow the OWASP 2023 recommendation (64 MB memory / 3 iterations / 4 threads / 32-byte output).
 type Argon2Params struct {
-	Memory      uint32 `json:"memory"`      // 单次派生占用的内存，单位 KB
-	Iterations  uint32 `json:"iterations"`  // 遍历内存的次数
-	Parallelism uint8  `json:"parallelism"` // 并行线程数
-	KeyLength   uint32 `json:"keyLength"`   // 输出密钥长度，单位字节
+	Memory      uint32 `json:"memory"`      // Memory used per derivation, in KB
+	Iterations  uint32 `json:"iterations"`  // Number of passes over memory
+	Parallelism uint8  `json:"parallelism"` // Number of parallel threads
+	KeyLength   uint32 `json:"keyLength"`   // Output key length, in bytes
 }
 
-// DefaultArgon2Params 返回 OWASP 2023 推荐的 Argon2id 参数。
+// DefaultArgon2Params returns the OWASP 2023-recommended Argon2id parameters.
 func DefaultArgon2Params() Argon2Params {
 	return Argon2Params{
 		Memory:      64 * 1024,
@@ -58,9 +59,11 @@ func DefaultArgon2Params() Argon2Params {
 	}
 }
 
-// ValidateArgon2Params 校验 Argon2id 参数是否在合理范围内。
-// KeyLength 为 0 时视为旧配置，返回默认值；非零但不合法的参数返回错误。
-// 防止恶意备份设置极大内存导致 OOM，或过弱参数降低安全性。
+// ValidateArgon2Params validates whether the Argon2id parameters are within a reasonable range.
+// When KeyLength is 0 it is treated as a legacy config and the defaults are returned; a non-zero but invalid
+// parameter returns an error.
+// This prevents a malicious backup from setting an extremely large memory value to cause OOM, or from setting
+// overly weak parameters that reduce security.
 func ValidateArgon2Params(p Argon2Params) (Argon2Params, error) {
 	if p.KeyLength == 0 {
 		return DefaultArgon2Params(), nil
@@ -86,24 +89,25 @@ func ValidateArgon2Params(p Argon2Params) (Argon2Params, error) {
 	return p, nil
 }
 
-// DeriveKey 用 Argon2id 从密码派生密钥。同一 password+salt+params 多次调用结果一致。
+// DeriveKey derives a key from a password using Argon2id. The same password+salt+params always produce the same result.
 func DeriveKey(password string, salt []byte, p Argon2Params) []byte {
 	return argon2.IDKey([]byte(password), salt, p.Iterations, p.Memory, p.Parallelism, p.KeyLength)
 }
 
-// Encrypt 用 AES-256-GCM 加密。每次调用生成随机 nonce，因此同一明文多次加密结果不同。
-// 返回格式：magic(4B) || spec(1B) || algorithm(1B) || nonceLength(1B) || nonce || ciphertext || GCM tag(16B)。
+// Encrypt encrypts with AES-256-GCM. Each call generates a random nonce, so encrypting the same plaintext
+// multiple times produces different results.
+// Return format: magic(4B) || spec(1B) || algorithm(1B) || nonceLength(1B) || nonce || ciphertext || GCM tag(16B).
 func Encrypt(key, plaintext []byte) ([]byte, error) {
 	return encryptGCM(key, plaintext, nil, "Encrypt")
 }
 
-// Decrypt 对应 Encrypt 的解密。兼容旧版 nonce||ciphertext||tag 格式。
-// 密钥错误或密文被篡改时返回错误（GCM 自带完整性校验）。
+// Decrypt is the decryption counterpart to Encrypt. Compatible with the legacy nonce||ciphertext||tag format.
+// Returns an error if the key is wrong or the ciphertext has been tampered with (GCM has built-in integrity checking).
 func Decrypt(key, ciphertext []byte) ([]byte, error) {
 	return decryptGCM(key, ciphertext, nil, "Decrypt")
 }
 
-// EncryptionNonce 从 AES-GCM 密文中提取 nonce，兼容旧版无信封头格式。
+// EncryptionNonce extracts the nonce from AES-GCM ciphertext, compatible with the legacy format without an envelope header.
 func EncryptionNonce(ciphertext []byte) ([]byte, error) {
 	if hasEncryptionMagic(ciphertext) {
 		if len(ciphertext) < encryptionEnvelopeHeaderSize {
@@ -127,30 +131,34 @@ func EncryptionNonce(ciphertext []byte) ([]byte, error) {
 	return append([]byte(nil), ciphertext[:12]...), nil
 }
 
-// DeriveSubKey 用 HKDF-SHA256 从主 DEK 派生用途隔离的子密钥。
-// 同一 (dek, purpose) 多次调用结果一致；不同 purpose 派生出相互独立的子密钥，
-// 实现用途分离——.sy/assets/AV 各用独立子密钥，互不可替代，限制单点密钥泄漏的影响面。
+// DeriveSubKey derives a purpose-isolated subkey from the master DEK using HKDF-SHA256.
+// The same (dek, purpose) always produces the same result; different purposes derive mutually independent
+// subkeys, achieving purpose separation -- .sy/assets/AV each use their own subkey, none interchangeable, which
+// limits the blast radius of a single key leak.
 func DeriveSubKey(dek []byte, purpose string) []byte {
-	// HKDF info 用 purpose 字节；salt 为 nil（DEK 本身已是高熵随机密钥，无需额外 salt）
+	// Use the purpose bytes as HKDF info; salt is nil (the DEK itself is already a high-entropy random key, no extra salt needed)
 	r := hkdf.New(sha256.New, dek, nil, []byte(purpose))
 	out := make([]byte, 32) // AES-256
 	if _, err := io.ReadFull(r, out); err != nil {
-		// hkdf.Read 不应出错（除非 dek 为空）；防御性 panic 避免静默返回弱密钥
+		// hkdf.Read should not fail (unless dek is empty); defensive panic to avoid silently returning a weak key
 		panic("hkdf derive failed: " + err.Error())
 	}
 	return out
 }
 
-// EncryptWithAAD 用 AES-256-GCM 加密并绑定 AAD（附加认证数据）。
-// AAD 不被加密，但参与 GCM 认证——解密时必须提供相同 AAD，否则认证失败。
-// 把用途/boxID/路径等元数据放入 AAD，可防止同 box 内密文被替换用途或路径（bind 到上下文）。
-// 返回格式与 Encrypt 一致，但 AAD 参与校验。
+// EncryptWithAAD encrypts with AES-256-GCM and binds AAD (additional authenticated data).
+// AAD is not encrypted but participates in GCM authentication -- decryption must supply the same AAD, or
+// authentication fails.
+// Putting metadata like purpose/boxID/path into AAD prevents ciphertext within the same box from being swapped
+// between purposes or paths (bound to context).
+// The return format matches Encrypt, but AAD participates in verification.
 func EncryptWithAAD(key, plaintext, aad []byte) ([]byte, error) {
 	return encryptGCM(key, plaintext, aad, "EncryptWithAAD")
 }
 
-// DecryptWithAAD 对应 EncryptWithAAD 的解密，兼容旧版 nonce||ciphertext||tag 格式。
-// AAD 不匹配或密文被篡改时返回错误。
+// DecryptWithAAD is the decryption counterpart to EncryptWithAAD, compatible with the legacy
+// nonce||ciphertext||tag format.
+// Returns an error if AAD doesn't match or the ciphertext has been tampered with.
 func DecryptWithAAD(key, ciphertext, aad []byte) ([]byte, error) {
 	return decryptGCM(key, ciphertext, aad, "DecryptWithAAD")
 }
@@ -225,31 +233,34 @@ func hasEncryptionMagic(ciphertext []byte) bool {
 	return len(ciphertext) >= len(encryptionMagic) && bytes.Equal(ciphertext[:len(encryptionMagic)], encryptionMagic[:])
 }
 
-// IsCiphertext 判断给定字节是否以加密信封魔数开头（即是否为密文）。
-// 供历史索引等无法取得 boxID/DEK 的路径做防御性检测：读到密文时跳过解析而非按 JSON 报错，
-// 避免加密笔记本的 AV 等对象因路径迁移（同步、导入、历史布局变化）落到全局位置时产生噪声错误。
+// IsCiphertext determines whether the given bytes start with the encryption envelope magic (i.e. whether it's
+// ciphertext).
+// Used by paths like history indexing that can't obtain the boxID/DEK, as a defensive check: when ciphertext is
+// encountered, skip parsing instead of erroring out as invalid JSON, avoiding noisy errors when an encrypted
+// notebook's AV or other objects end up at a global location due to path migration (sync, import, legacy layout
+// changes).
 func IsCiphertext(data []byte) bool {
 	return hasEncryptionMagic(data)
 }
 
-// envelopeAAD 把公开信封头和调用方 AAD 一并纳入 GCM 认证，防止规范或算法标识被篡改。
+// envelopeAAD folds the public envelope header and the caller's AAD together into GCM authentication, preventing the spec or algorithm identifier from being tampered with.
 func envelopeAAD(header, aad []byte) []byte {
 	ret := make([]byte, 0, len(header)+len(aad))
 	ret = append(ret, header...)
 	return append(ret, aad...)
 }
 
-// GenerateSalt 生成随机 salt（16 字节）。
+// GenerateSalt generates a random salt (16 bytes).
 func GenerateSalt() ([]byte, error) {
 	return randomBytes(16)
 }
 
-// GenerateDEK 生成随机数据密钥（32 字节，AES-256）。
+// GenerateDEK generates a random data encryption key (32 bytes, AES-256).
 func GenerateDEK() ([]byte, error) {
 	return randomBytes(32)
 }
 
-// randomBytes 从 crypto/rand 读取指定长度的随机字节。
+// randomBytes reads the given number of random bytes from crypto/rand.
 func randomBytes(n int) ([]byte, error) {
 	b := make([]byte, n)
 	if _, err := rand.Read(b); err != nil {

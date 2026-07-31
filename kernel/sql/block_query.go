@@ -341,8 +341,9 @@ func QueryNoLimit(stmt string) (ret []map[string]any, err error) {
 	return queryRawStmt(stmt, math.MaxInt)
 }
 
-// QueryNoLimitArgs 与 QueryNoLimit 一致，但支持参数化查询（stmt 中用 ? 占位，args 顺序填入）。
-// 用于 embedding 索引器按 fail_count/last_tried 调度时的带参 SELECT。
+// QueryNoLimitArgs behaves like QueryNoLimit but supports a parameterized query (use ? placeholders in stmt,
+// filled in order by args).
+// Used by the embedding indexer for parameterized SELECTs when scheduling by fail_count/last_tried.
 func QueryNoLimitArgs(stmt string, args ...any) (ret []map[string]any, err error) {
 	return queryRawStmtArgs(stmt, args, math.MaxInt)
 }
@@ -350,13 +351,13 @@ func QueryNoLimitArgs(stmt string, args ...any) (ret []map[string]any, err error
 func Query(stmt string, limit int) (ret []map[string]any, err error) {
 	originalStmt := stmt
 	// Kernel API `/api/query/sql` support `||` operator https://github.com/siyuan-note/siyuan/issues/9662
-	// 这里为了支持 || 操作符，使用了另一个 sql 解析器，但是这个解析器无法处理 UNION https://github.com/siyuan-note/siyuan/issues/8226
-	// 考虑到 UNION 的使用场景不多，这里还是以支持 || 操作符为主
+	// A second SQL parser is used here to support the || operator, but this parser can't handle UNION https://github.com/siyuan-note/siyuan/issues/8226
+	// Since UNION isn't used much, supporting the || operator is prioritized here
 	p := sqlparser2.NewParser(strings.NewReader(stmt))
 	parsedStmt2, err := p.ParseStatement()
 	if err != nil {
 		if !strings.Contains(stmt, "||") {
-			// 这个解析器无法处理 || 连接字符串操作符
+			// This parser can't handle the || string-concatenation operator
 			parsedStmt, err2 := sqlparser.Parse(stmt)
 			if nil != err2 {
 				return queryRawStmt(stmt, limit)
@@ -528,7 +529,7 @@ func queryRawStmt(stmt string, limit int) (ret []map[string]any, err error) {
 	return
 }
 
-// queryRawStmtArgs 与 queryRawStmt 一致，但走带参数的 query，避免 SQL 拼接注入与时间格式问题。
+// queryRawStmtArgs behaves like queryRawStmt but goes through a parameterized query, avoiding SQL-concatenation injection and time-format issues.
 func queryRawStmtArgs(stmt string, args []any, limit int) (ret []map[string]any, err error) {
 	rows, err := query(stmt, args...)
 	if err != nil {
@@ -573,8 +574,9 @@ func SelectBlocksRawStmtNoParse(stmt string, limit int) (ret []*Block) {
 	return selectBlocksRawStmt(stmt, limit)
 }
 
-// SelectBlocksRawStmtArgs 与 selectBlocksRawStmt 行为一致，但通过绑定参数执行，
-// 绕开 sqlparser 解析（vitess 会把 "?" 改写为 ":vN" 导致占位失效），用于含用户可控参数的搜索语句。
+// SelectBlocksRawStmtArgs behaves like selectBlocksRawStmt but executes with bound arguments, bypassing sqlparser
+// parsing (vitess rewrites "?" to ":vN", which breaks the placeholders); used for search statements that contain
+// user-controllable parameters.
 func SelectBlocksRawStmtArgs(stmt string, args []any, limit int) (ret []*Block) {
 	rows, err := query(stmt, args...)
 	if err != nil {
@@ -757,8 +759,9 @@ func SelectBlocksRegex(stmt string, exp *regexp.Regexp, name, alias, memo, ial b
 	return
 }
 
-// SelectBlocksRegexArgs 与 SelectBlocksRegex 行为一致，但通过绑定参数执行，
-// 绕开 sqlparser 解析（vitess 会把 "?" 改写为 ":vN" 导致占位失效），用于含用户可控参数的正则搜索。
+// SelectBlocksRegexArgs behaves like SelectBlocksRegex but executes with bound arguments, bypassing sqlparser
+// parsing (vitess rewrites "?" to ":vN", which breaks the placeholders); used for regex searches that contain
+// user-controllable parameters.
 func SelectBlocksRegexArgs(stmt string, exp *regexp.Regexp, name, alias, memo, ial bool, page, pageSize int, args ...any) (ret []*Block) {
 	rows, err := query(stmt, args...)
 	if err != nil {

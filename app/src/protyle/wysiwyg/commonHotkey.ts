@@ -149,11 +149,11 @@ export const upSelect = (options: {
         const innerText = nodeEditableElement.innerText;
         const isExpandUp = matchHotKey(window.siyuan.config.keymap.editor.general.expandUp.custom, options.event);
         if (!isMac() && isExpandUp) {
-            // Windows 中 ⌥⇧↑ 默认无选中功能会导致 https://ld246.com/article/1716635371149
+            // On Windows, ⌥⇧↑ has no default selection function, which causes https://ld246.com/article/1716635371149
         } else if (startIndex > 0) {
-            // 选中上一个节点的处理在 toolbar/index.ts 中 `shift+方向键或三击选中`
+            // Selecting the previous node is handled in toolbar/index.ts under `shift+arrow key or triple-click select`
             if (innerText.substr(0, startIndex).indexOf("\n") === -1 &&
-                // 当第一行太长自然换行的情况
+                // The case where the first line naturally wraps because it's too long
                 options.range.getBoundingClientRect().top - nodeEditableElement.getBoundingClientRect().top - parseInt(getComputedStyle(nodeEditableElement).paddingTop) < 14) {
                 setFirstNodeRange(nodeEditableElement, options.range);
                 options.event.preventDefault();
@@ -196,16 +196,16 @@ export const downSelect = (options: {
         const innerText = nodeEditableElement.innerText;
         const isExpandDown = matchHotKey(window.siyuan.config.keymap.editor.general.expandDown.custom, options.event);
         if (!isMac() && isExpandDown) {
-            // Windows 中 ⌥⇧↓ 默认无选中功能会导致 https://ld246.com/article/1716635371149
+            // On Windows, ⌥⇧↓ has no default selection function, which causes https://ld246.com/article/1716635371149
         } else if (endIndex < innerText.length) {
-            // 选中下一个节点的处理在 toolbar/index.ts 中 `shift+方向键或三击选中`
+            // Selecting the next node is handled in toolbar/index.ts under `shift+arrow key or triple-click select`
             if (!getNextBlock(options.nodeElement) && innerText.trimRight().substr(endIndex).indexOf("\n") === -1 &&
-                // 当最后一行太长自然换行的情况
+                // The case where the last line naturally wraps because it's too long
                 nodeEditableElement.getBoundingClientRect().bottom - options.range.getBoundingClientRect().bottom - parseInt(getComputedStyle(nodeEditableElement).paddingBottom) < 14) {
-                // 当为最后一个块时应选中末尾
+                // Should select through to the end when this is the last block
                 setLastNodeRange(nodeEditableElement, options.range, false);
                 if (options.nodeElement.classList.contains("code-block") && isExpandDown) {
-                    // 代码块中 shift+alt 向下选中到末尾时，最后一个字符无法选中
+                    // In a code block, the last character can't be selected when shift+alt selects downward to the end
                     options.event.preventDefault();
                 }
             } else if (tdElement) {

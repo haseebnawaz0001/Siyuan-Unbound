@@ -37,11 +37,11 @@ var (
 	SSL       = false
 	UserAgent = "SiYuan/" + Ver
 
-	// invisibleCharsReplacer 用于 NormalizeEndpoint：去除复制粘贴易带入的零宽字符。
+	// invisibleCharsReplacer is used by NormalizeEndpoint: strips zero-width characters that are easily pulled in by copy-paste.
 	invisibleCharsReplacer = strings.NewReplacer(
-		"\u200b", "", // 零宽空格 ZWSP
-		"\u200c", "", // 零宽不连字 ZWNJ
-		"\u200d", "", // 零宽连字 ZWJ
+		"\u200b", "", // Zero-width space (ZWSP)
+		"\u200c", "", // Zero-width non-joiner (ZWNJ)
+		"\u200d", "", // Zero-width joiner (ZWJ)
 	)
 )
 
@@ -75,7 +75,7 @@ func GetServerAddrs() (ret []string) {
 	if ContainerAndroid != Container && ContainerHarmony != Container {
 		ret = GetPrivateIPv4s()
 	} else {
-		// Android/鸿蒙上用不了 net.InterfaceAddrs() https://github.com/golang/go/issues/40569，所以前面使用启动内核传入的参数 localIPs
+		// net.InterfaceAddrs() doesn't work on Android/HarmonyOS https://github.com/golang/go/issues/40569, so use the localIPs parameter passed in when the kernel was started
 		ret = LocalIPs
 	}
 
@@ -107,7 +107,7 @@ func IsRelativePath(dest string) bool {
 		return false
 	}
 
-	// 检查特定协议前缀
+	// Check for specific protocol prefixes
 	lowerDest := strings.ToLower(dest)
 	if strings.HasPrefix(lowerDest, "mailto:") ||
 		strings.HasPrefix(lowerDest, "tel:") ||
@@ -126,8 +126,9 @@ func TimeFromID(id string) (ret string) {
 	return
 }
 
-// NodeIDByTime 根据指定时间生成符合块 ID 格式的字符串，算法与 ast.NewNodeID() 一致，
-// 仅时间源不同：用于让历史输入（如移动端速记暂存文件名时间戳）回填为块 ID。
+// NodeIDByTime generates a string matching the block ID format from the given time, using the same algorithm as
+// ast.NewNodeID() but with a different time source: used to backfill historical input (e.g. a quick-note temp
+// file name timestamp on mobile) into a block ID.
 func NodeIDByTime(t time.Time) string {
 	return t.Format("20060102150405") + "-" + RandString(7)
 }
@@ -275,18 +276,18 @@ func FilterSelfChildDocs(paths []string) (ret []string) {
 	return
 }
 
-// FileURLToLocalPath 将 file:// URL 转为本地文件路径。
+// FileURLToLocalPath converts a file:// URL into a local file path.
 func FileURLToLocalPath(fileURL string) string {
 	if len(fileURL) < 7 || strings.ToLower(fileURL[:7]) != "file://" {
 		return ""
 	}
 	p := fileURL[7:]
 	if gulu.OS.IsWindows() && strings.Contains(p, ":") {
-		// Windows 支持 file:// 后跟多个斜杠 https://github.com/siyuan-note/siyuan/issues/11885
+		// Windows supports file:// followed by multiple slashes https://github.com/siyuan-note/siyuan/issues/11885
 		p = strings.TrimLeft(p, "/")
 	}
 	if strings.Contains(p, "?") {
-		// 去除查询参数 https://github.com/siyuan-note/siyuan/issues/13600
+		// Strip query parameters https://github.com/siyuan-note/siyuan/issues/13600
 		p = p[:strings.Index(p, "?")]
 	}
 	if unescaped, err := url.PathUnescape(p); err == nil && unescaped != p {
@@ -310,7 +311,7 @@ var (
 	SiYuanAssetsVideo = []string{".mov", ".weba", ".mkv", ".mp4", ".webm"}
 )
 
-// IsPossiblyImage 模糊判断指定文件链接是否可能是图片。
+// IsPossiblyImage makes a fuzzy guess at whether a given file link could be an image.
 func IsPossiblyImage(assetPath string) bool {
 	ext := strings.ToLower(filepath.Ext(assetPath))
 	if "" != ext {
@@ -318,7 +319,7 @@ func IsPossiblyImage(assetPath string) bool {
 	}
 
 	if strings.HasPrefix(assetPath, "https://") || strings.HasPrefix(assetPath, "http://") {
-		// 网络图片链接不一定有扩展名
+		// A network image link doesn't necessarily have an extension
 		return true
 	}
 
@@ -375,7 +376,7 @@ func IsAbsPathInWorkspace(absPath string) bool {
 	return gulu.File.IsSubPath(WorkspaceDir, absPath)
 }
 
-// IsWorkspaceDir 判断指定目录是否是工作空间目录。
+// IsWorkspaceDir determines whether the given directory is a workspace directory.
 func IsWorkspaceDir(dir string) bool {
 	conf := filepath.Join(dir, "conf", "conf.json")
 	data, err := os.ReadFile(conf)
@@ -404,13 +405,15 @@ func IsPartitionRootPath(path string) bool {
 	return cleanPath == "/"
 }
 
-// IsSensitivePath 对传入路径做统一的敏感性检测。
+// IsSensitivePath performs unified sensitivity detection on the given path.
 //
-// 为防止通过符号链接绕过黑名单，对工作空间外的路径会额外解析符号链接后再检查一次：这是
-// globalCopyFiles 等接受工作空间外绝对路径的接口的攻击面。工作空间内的路径不解析符号链接，
-// 一是因为工作空间内文件（如 assets 中指向外部目录的符号链接）可能合法地指向工作空间外，
-// 对其解析后执行系统目录前缀检查会误伤；二是避免在高 QPS 的伺服热路径上引入额外的 stat 开销。
-// 解析失败（如路径不存在）时回退到仅检查原始路径。
+// To prevent bypassing the blacklist via symlinks, paths outside the workspace are additionally checked again
+// after resolving symlinks: this is the attack surface for interfaces like globalCopyFiles that accept absolute
+// paths outside the workspace. Paths inside the workspace do not resolve symlinks, for two reasons: first,
+// in-workspace files (e.g. symlinks under assets pointing to external directories) may legitimately point outside
+// the workspace, and running the system directory prefix check after resolving them would cause false positives;
+// second, to avoid the extra stat overhead on the high-QPS serving hot path.
+// When resolution fails (e.g. the path doesn't exist), it falls back to checking only the original path.
 func IsSensitivePath(p string) bool {
 	if p == "" {
 		return false
@@ -418,7 +421,7 @@ func IsSensitivePath(p string) bool {
 	if isSensitivePath(p) {
 		return true
 	}
-	// 仅对工作空间外的路径解析符号链接，防止用符号链接绕过黑名单指向敏感目标。
+	// Only resolve symlinks for paths outside the workspace, to prevent using a symlink to bypass the blacklist and point at a sensitive target.
 	if gulu.File.IsSubPath(WorkspaceDir, p) {
 		return false
 	}
@@ -431,18 +434,19 @@ func IsSensitivePath(p string) bool {
 	return false
 }
 
-// isSensitivePath 执行实际的敏感性黑名单匹配，不解析符号链接。
+// isSensitivePath performs the actual sensitivity blacklist matching, without resolving symlinks.
 func isSensitivePath(p string) bool {
 	toCheckPathLower := filepath.Clean(strings.ToLower(p))
 	toCheckNameLower := filepath.Base(toCheckPathLower)
 
-	// 系统目录前缀检查仅对工作空间外的路径执行。
-	// 调用方传入的工作空间内路径（如 assets、export）都已用 IsSubPath(WorkspaceDir) 校验过，
-	// 工作空间不可能位于 /etc、/var/log 等系统敏感目录；而 iOS 等沙箱平台的合法数据路径恰好以
-	// /var 开头（/var/mobile/Containers/Data/Application/...），对工作空间内路径执行系统目录前缀
-	// 检查会把 iOS 上正常的 assets/export 文件误判为敏感路径，导致伺服返回 403。
+	// The system directory prefix check only applies to paths outside the workspace.
+	// In-workspace paths passed in by callers (e.g. assets, export) have already been validated with
+	// IsSubPath(WorkspaceDir); the workspace can never be located under system-sensitive directories like /etc or
+	// /var/log. Meanwhile, legitimate data paths on sandboxed platforms like iOS happen to start with /var
+	// (/var/mobile/Containers/Data/Application/...), so running the system directory prefix check on in-workspace
+	// paths would wrongly flag normal assets/export files on iOS as sensitive, causing the server to return 403.
 	if !gulu.File.IsSubPath(WorkspaceDir, p) {
-		// 敏感目录前缀（UNIX 风格）
+		// Sensitive directory prefixes (UNIX style)
 		prefixes := []string{
 			"/.",
 			"/etc",
@@ -467,7 +471,7 @@ func isSensitivePath(p string) bool {
 			}
 		}
 
-		// Windows 常见敏感目录（小写比较）
+		// Common sensitive directories on Windows (case-insensitive comparison)
 		winPrefixes := []string{
 			`c:\windows\system32`,
 			`c:\windows\system`,
@@ -478,7 +482,7 @@ func isSensitivePath(p string) bool {
 			}
 		}
 
-		// Windows 开始启动菜单路径（小写比较）
+		// Windows Start Menu paths (case-insensitive comparison)
 		startMenuPrefixes := []string{
 			strings.ToLower(filepath.Join(os.Getenv("APPDATA"), "Microsoft", "Windows", "Start Menu")),
 			strings.ToLower(filepath.Join(os.Getenv("ProgramData"), "Microsoft", "Windows", "Start Menu")),
@@ -490,23 +494,24 @@ func isSensitivePath(p string) bool {
 		}
 	}
 
-	// 工作空间/conf 目录（小写比较）
+	// The workspace/conf directory (case-insensitive comparison)
 	workspaceConfPrefix := strings.ToLower(filepath.Join(WorkspaceDir, "conf"))
 	if strings.HasPrefix(toCheckPathLower, workspaceConfPrefix) {
 		return true
 	}
 
-	// 只允许导出工作空间/temp/export 目录，不允许导出工作空间/temp 目录（小写比较）
+	// Only allow exporting the workspace/temp/export directory, not the workspace/temp directory (case-insensitive comparison)
 	workspaceTempExportPrefix := strings.ToLower(filepath.Join(WorkspaceDir, "temp", "export"))
 	workspaceTempPrefix := strings.ToLower(filepath.Join(WorkspaceDir, "temp"))
 	if strings.HasPrefix(toCheckPathLower, workspaceTempPrefix) && !strings.HasPrefix(toCheckPathLower, workspaceTempExportPrefix) {
 		return true
 	}
 
-	// 用户家目录下的敏感目录与凭据文件（小写比较）。
-	// 覆盖常见凭据 dotfile，防止通过 globalCopyFiles 等接受工作空间外绝对路径的接口把内核用户
-	// 家目录下的凭据复制进工作空间后外泄：Git push token、HTTP/API 凭据、Postgres 密码、
-	// K8s/Docker/容器仓库配置、GPG 私钥环、云厂商 CLI 凭据、包管理器 token 等。
+	// Sensitive directories and credential files under the user home directory (case-insensitive comparison).
+	// Covers common credential dotfiles, to prevent leaking credentials from the kernel user's home directory by
+	// copying them into the workspace via interfaces like globalCopyFiles that accept absolute paths outside the
+	// workspace: Git push tokens, HTTP/API credentials, Postgres passwords, K8s/Docker/container registry config,
+	// GPG private keyrings, cloud provider CLI credentials, package manager tokens, etc.
 	homePrefixes := []string{
 		strings.ToLower(filepath.Join(HomeDir, ".ssh")),
 		strings.ToLower(filepath.Join(HomeDir, ".config")),
@@ -530,7 +535,7 @@ func isSensitivePath(p string) bool {
 		}
 	}
 
-	// 特定的文件名前缀（小写比较）
+	// Specific file name prefixes (case-insensitive comparison)
 	namePrefixes := []string{
 		strings.ToLower("credentials"),
 		strings.ToLower("id_"),
@@ -543,10 +548,11 @@ func isSensitivePath(p string) bool {
 	return false
 }
 
-// ResolveLongestExistingParent 解析 absPath 中最长已存在部分的 symlink，拼回剩余路径。
-// 例如 absPath = /workspace/data/link/newdir/file，其中 /workspace/data/link 是指向
-// /workspace/data/<encBoxID>/ 的 symlink，newdir/file 尚不存在：
-// 返回 /workspace/data/<encBoxID>/newdir/file。
+// ResolveLongestExistingParent resolves the symlink of the longest existing portion of absPath, then rejoins the
+// remaining path.
+// For example, absPath = /workspace/data/link/newdir/file, where /workspace/data/link is a symlink pointing to
+// /workspace/data/<encBoxID>/ and newdir/file does not yet exist:
+// it returns /workspace/data/<encBoxID>/newdir/file.
 func ResolveLongestExistingParent(absPath string) string {
 	cleaned := filepath.Clean(absPath)
 	dir := cleaned

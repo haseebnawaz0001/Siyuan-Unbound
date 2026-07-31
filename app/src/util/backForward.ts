@@ -26,17 +26,17 @@ const focusStack = async (app: App, stack: IBackStack) => {
     if (!document.contains(stack.protyle.element)) {
         const response = await fetchSyncPost("/api/block/checkBlockExist", {id: stack.protyle.block.rootID});
         if (!response.data) {
-            // 页签删除
+            // Tab was deleted
             return false;
         }
         let wnd: Wnd;
-        // 获取光标所在 tab
+        // Get the tab where the cursor is located
         const element = document.querySelector(".layout__wnd--active");
         if (element) {
             wnd = getInstanceById(element.getAttribute("data-id")) as Wnd;
         }
         if (!wnd) {
-            // 中心 tab
+            // Center tab
             wnd = getWndByLayout(window.siyuan.layout.centerLayout);
         }
         if (wnd) {
@@ -72,7 +72,7 @@ const focusStack = async (app: App, stack: IBackStack) => {
             });
             if (window.siyuan.config.fileTree.openFilesUseCurrentTab) {
                 let unUpdateTab: Tab;
-                // 不能 reverse, 找到也不能提前退出循环，否则 https://github.com/siyuan-note/siyuan/issues/3271
+                // Cannot reverse, and must not exit the loop early even after finding it, otherwise https://github.com/siyuan-note/siyuan/issues/3271
                 wnd.children.forEach((item) => {
                     if (item.headElement && item.headElement.classList.contains("item--unupdate") && !item.headElement.classList.contains("item--pin")) {
                         unUpdateTab = item;
@@ -86,7 +86,7 @@ const focusStack = async (app: App, stack: IBackStack) => {
                 wnd.addTab(tab);
             }
             wnd.showHeading();
-            // 替换被关闭的 protyle
+            // Replace the closed protyle
             const protyle = (tab.model as Editor).editor.protyle;
             stack.protyle = protyle;
             forwardStack.forEach(item => {
@@ -120,7 +120,7 @@ const focusStack = async (app: App, stack: IBackStack) => {
     const currentZoomId = stack.protyle.block.showAll ? stack.protyle.block.id : undefined;
     const focusTitle = () => {
         if (stack.protyle.title.editElement.getBoundingClientRect().height === 0) {
-            // 切换 tab
+            // Switch tabs
             stack.protyle.model.parent.parent.switchTab(stack.protyle.model.parent.headElement);
             stack.protyle.toolbar.range = undefined;
         }
@@ -146,11 +146,11 @@ const focusStack = async (app: App, stack: IBackStack) => {
         }
     });
     if (blockElement &&
-        // 即使块存在，折叠的情况需要也需要 zoomOut，否则折叠块内的光标无法定位
+        // Even if the block exists, a collapsed block still needs zoomOut, otherwise the cursor inside the collapsed block cannot be located
         currentZoomId === stack.zoomId
     ) {
         if (blockElement.getBoundingClientRect().height === 0) {
-            // 切换 tab
+            // Switch tabs
             stack.protyle.model.parent.parent.switchTab(stack.protyle.model.parent.headElement);
         }
         focusByOffset(getContenteditableElement(blockElement), stack.position.start, stack.position.end);
@@ -165,13 +165,13 @@ const focusStack = async (app: App, stack: IBackStack) => {
     if (stack.protyle.element.parentElement) {
         const response = await fetchSyncPost("/api/block/checkBlockExist", {id: stack.id});
         if (!response.data) {
-            // 块被删除
+            // Block was deleted
             if (getSelection().rangeCount > 0) {
                 focusByRange(getSelection().getRangeAt(0));
             }
             return false;
         }
-        // 动态加载导致内容移除 https://github.com/siyuan-note/siyuan/issues/10692
+        // Content was removed due to dynamic loading https://github.com/siyuan-note/siyuan/issues/10692
         if (!blockElement && !stack.zoomId && !stack.protyle.scroll.element.classList.contains("fn__none")) {
             const getDocParam: IObject = {
                 id: stack.id,
@@ -208,7 +208,7 @@ const focusStack = async (app: App, stack: IBackStack) => {
             return true;
         }
 
-        // 缩放
+        // Zoom
         zoomOut({
             protyle: stack.protyle,
             id: stack.zoomId || stack.protyle.block.rootID,
@@ -245,7 +245,8 @@ export const goBack = async (app: App) => {
     }
     document.querySelector("#barForward")?.classList.remove("toolbar__item--disabled");
     if (!previousIsBack &&
-        // 页签被关闭时应优先打开该页签，页签存在时即可返回上一步，不用再重置光标到该页签上
+        // When the tab has been closed, it should be opened first; if the tab already exists,
+        // going back one step is enough, without resetting the cursor onto that tab again
         document.contains(window.siyuan.backStack[window.siyuan.backStack.length - 1].protyle.element)) {
         forwardStack.push(window.siyuan.backStack.pop());
     }

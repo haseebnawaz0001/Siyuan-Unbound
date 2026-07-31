@@ -15,20 +15,21 @@ import {Tab} from "../layout/Tab";
 /// #endif
 
 let popoverTargetElement: HTMLElement;
-// 异步获取信息后再显示 tooltip，鼠标已移走时需中断请求 https://github.com/siyuan-note/siyuan/issues/14823
+// Show the tooltip after asynchronously fetching info; the request must be aborted if the mouse has already
+// moved away https://github.com/siyuan-note/siyuan/issues/14823
 let tooltipAbortController: AbortController | null = null;
 export const initBlockPopover = (app: App) => {
     let timeout: number;
     let timeoutHide: number;
-    // 编辑器内容块引用/backlinks/tag/bookmark/套娃中使用
+    // Used for block references/backlinks/tags/bookmarks/nested content in the editor
     document.addEventListener("mouseover", (event: MouseEvent & { target: HTMLElement, path: HTMLElement[] }) => {
         if (!window.siyuan.config || !window.siyuan.menus ||
-            // 拖拽时禁止
+            // Disallow while dragging
             window.siyuan.dragElement || document.onmousemove) {
             hideTooltip();
             return;
         }
-        // 鼠标进入新元素时中断上一轮尚未完成的 tooltip 信息请求
+        // Abort the previous round's unfinished tooltip info request when the mouse enters a new element
         if (tooltipAbortController) {
             tooltipAbortController.abort();
             tooltipAbortController = null;
@@ -96,16 +97,16 @@ export const initBlockPopover = (app: App) => {
             let tooltipSpace: number | undefined;
             if (!tip && aElement.getAttribute("data-type")?.includes("inline-memo")) {
                 tip = window.DOMPurify.sanitize(aElement.getAttribute("data-inline-memo-content"));
-                tooltipClass = "memo"; // 为行级备注添加 class https://github.com/siyuan-note/siyuan/issues/6161
-                tooltipSpace = 0; // tooltip 和备注元素之间不能有空隙 https://github.com/siyuan-note/siyuan/issues/14796#issuecomment-3649757267
+                tooltipClass = "memo"; // Add a class for inline memos https://github.com/siyuan-note/siyuan/issues/6161
+                tooltipSpace = 0; // There must be no gap between the tooltip and the memo element https://github.com/siyuan-note/siyuan/issues/14796#issuecomment-3649757267
             }
             if (!tip) {
                 if (aElement.getAttribute("data-type")?.includes("a")) {
-                    tooltipClass = "href"; // 为超链接添加 class https://github.com/siyuan-note/siyuan/issues/11440#issuecomment-2119080691
+                    tooltipClass = "href"; // Add a class for hyperlinks https://github.com/siyuan-note/siyuan/issues/11440#issuecomment-2119080691
                     tooltipSpace = 0;
                 }
                 const href = aElement.getAttribute("data-href") || "";
-                // 链接地址强制换行 https://github.com/siyuan-note/siyuan/issues/11539
+                // Force the link address to wrap https://github.com/siyuan-note/siyuan/issues/11539
                 if (href) {
                     tip = `<span style="word-break: break-all">${href.substring(0, Constants.SIZE_TITLE)}</span>`;
                 }
@@ -259,7 +260,7 @@ export const initBlockPopover = (app: App) => {
 };
 
 const hidePopover = (event: MouseEvent & { path: HTMLElement[] }) => {
-    // pad 端点击后 event.target 不会更新。
+    // On pad devices, event.target isn't updated after a click.
     const target = isTouchDevice() ? document.elementFromPoint(event.clientX, event.clientY) : event.target as HTMLElement;
     if (!target) {
         return false;
@@ -269,13 +270,13 @@ const hidePopover = (event: MouseEvent & { path: HTMLElement[] }) => {
         || target.tagName === "circle"
         || target.closest('.protyle-icon[data-action="openFloat"]')
     ) {
-        // gutter & mindmap & 文件树上的数字 & 关系图节点不处理
+        // Don't handle gutter & mindmap & numbers on the file tree & relation graph nodes
         return false;
     }
 
     const avPanelElement = hasClosestByClassName(target, "av__panel") || hasClosestByClassName(target, "av__mask");
     if (avPanelElement) {
-        // 浮窗上点击 av 操作，浮窗不能消失
+        // The popover must not disappear when clicking an attribute-view action on the popover
         const blockPanel = window.siyuan.blockPanels.find((item) => {
             if (item.element.style.zIndex < avPanelElement.style.zIndex) {
                 return true;
@@ -285,7 +286,7 @@ const hidePopover = (event: MouseEvent & { path: HTMLElement[] }) => {
             return false;
         }
     } else {
-        // 浮窗上点击菜单，浮窗不能消失 https://ld246.com/article/1632668091023
+        // The popover must not disappear when clicking a menu on the popover https://ld246.com/article/1632668091023
         const menuElement = hasClosestByClassName(target, "b3-menu");
         if (menuElement && menuElement.getAttribute("data-name") !== Constants.MENU_DOC_TREE_MORE) {
             const blockPanel = window.siyuan.blockPanels.find((item) => {
@@ -311,7 +312,8 @@ const hidePopover = (event: MouseEvent & { path: HTMLElement[] }) => {
         popoverTargetElement = linkElement;
     }
     if (!popoverTargetElement || (popoverTargetElement && window.siyuan.menus.menu.data && window.siyuan.menus.menu.data === popoverTargetElement)) {
-        // 移动到弹窗的 loading 元素上，但经过 settimeout 后 loading 已经被移除了
+        // Moved onto the popover's loading element, but after the setTimeout the loading element has already
+        // been removed
         // https://ld246.com/article/1673596577519/comment/1673767749885#comments
         let targetElement = target;
         if (!targetElement.parentElement && event.path && event.path[1]) {
@@ -328,7 +330,7 @@ const hidePopover = (event: MouseEvent & { path: HTMLElement[] }) => {
                         maxEditLevels[oid] = level;
                     }
                 } else {
-                    maxEditLevels[oid] = level; // 不能为1，否则 pin 住第三层，第二层会消失
+                    maxEditLevels[oid] = level; // Can't be 1, otherwise pinning the third level would make the second level disappear
                 }
             }
         });
@@ -342,7 +344,7 @@ const hidePopover = (event: MouseEvent & { path: HTMLElement[] }) => {
                     item.element.getAttribute("data-pin") === "false" &&
                     itemLevel > parseInt(blockElement.getAttribute("data-level"))) {
                     if (menuLevel && menuLevel >= itemLevel) {
-                        // 有 gutter 菜单时不隐藏
+                        // Don't hide when a gutter menu is present
                         break;
                     } else {
                         const hasToolbar = item.editors.find(editItem => {
@@ -363,11 +365,12 @@ const hidePopover = (event: MouseEvent & { path: HTMLElement[] }) => {
                 const itemLevel = parseInt(item.element.getAttribute("data-level"));
                 if ((item.targetElement || typeof item.x === "number") && item.element.getAttribute("data-pin") === "false") {
                     if (menuLevel && menuLevel >= itemLevel) {
-                        // 有 gutter 菜单时不隐藏
+                        // Don't hide when a gutter menu is present
                         break;
                     } else if (item.targetElement && item.targetElement.classList.contains("protyle-wysiwyg__embed") &&
                         item.targetElement.contains(targetElement)) {
-                        // 点击嵌入块后浮窗消失后再快速点击嵌入块无法弹出浮窗 https://github.com/siyuan-note/siyuan/issues/12511
+                        // After clicking an embed block dismisses the popover, quickly clicking the embed block
+                        // again fails to bring up the popover https://github.com/siyuan-note/siyuan/issues/12511
                         break;
                     } else {
                         const hasToolbar = item.editors.find(editItem => {
@@ -432,7 +435,7 @@ export const showPopover = async (app: App, showRef = false) => {
     let originalRefBlockIDs: IObject;
     const dataId = popoverTargetElement.getAttribute("data-id");
     if (dataId) {
-        // backlink/util/hint 上的弹层
+        // Popover on backlink/util/hint
         if (showRef) {
             const postResponse = await fetchSyncPost("/api/block/getRefIDs", {id: dataId});
             refDefs = postResponse.data.refDefs;
@@ -452,7 +455,7 @@ export const showPopover = async (app: App, showRef = false) => {
         });
         refDefs = postResponse.data.refDefs;
     } else if (popoverTargetElement.getAttribute("data-type")?.split(" ").includes("a")) {
-        // 以思源协议开头的链接
+        // A link starting with the siyuan protocol
         const blockInfo = parseSiYuanUriInfo(popoverTargetElement.getAttribute("data-href"));
         refDefs = [{
             refID: blockInfo?.id ?? "",
@@ -461,7 +464,7 @@ export const showPopover = async (app: App, showRef = false) => {
             avGroupID: blockInfo?.avGroupID,
         }];
     } else if (popoverTargetElement.dataset.type === "url") {
-        // 在 database 的 url 列中以思源协议开头的链接
+        // A link starting with the siyuan protocol in a database's url column
         const blockInfo = parseSiYuanUriInfo(popoverTargetElement.dataset.href || popoverTargetElement.textContent.trim());
         refDefs = [{
             refID: blockInfo?.id ?? "",
@@ -470,7 +473,7 @@ export const showPopover = async (app: App, showRef = false) => {
             avGroupID: blockInfo?.avGroupID,
         }];
     } else if (popoverTargetElement.dataset.popoverUrl) {
-        // 镜像数据库
+        // Mirrored database
         const postResponse = await fetchSyncPost(popoverTargetElement.dataset.popoverUrl, {avID: popoverTargetElement.dataset.avId});
         refDefs = postResponse.data.refDefs;
     } else {
@@ -478,7 +481,7 @@ export const showPopover = async (app: App, showRef = false) => {
         let targetId;
         let url = "/api/block/getRefIDs";
         if (popoverTargetElement.classList.contains("protyle-attr--refcount")) {
-            // 编辑器中的引用数
+            // Reference count in the editor
             targetId = popoverTargetElement.parentElement.parentElement.getAttribute("data-node-id");
         } else if (popoverTargetElement.classList.contains("pdf__rect")) {
             const relationIds = popoverTargetElement.getAttribute("data-relations");
@@ -492,7 +495,7 @@ export const showPopover = async (app: App, showRef = false) => {
                 url = "/api/block/getRefIDsByFileAnnotationID";
             }
         } else if (!targetId) {
-            // 文件树中的引用数
+            // Reference count in the file tree
             targetId = popoverTargetElement.parentElement.getAttribute("data-node-id");
         }
         if (url) {
@@ -515,7 +518,7 @@ export const showPopover = async (app: App, showRef = false) => {
         }
     });
     if (!hasPin && popoverTargetElement.parentElement &&
-        popoverTargetElement.parentElement.style.opacity !== "0.38" // 反向面板图标拖拽时不应该弹层
+        popoverTargetElement.parentElement.style.opacity !== "0.38" // The popover should not appear while dragging the backlink panel icon
     ) {
         window.siyuan.blockPanels.push(new BlockPanel({
             app,
@@ -525,5 +528,5 @@ export const showPopover = async (app: App, showRef = false) => {
             originalRefBlockIDs,
         }));
     }
-    // 不能清除，否则ctrl 后 shift 就 无效 popoverTargetElement = undefined;
+    // Cannot clear this, otherwise Shift stops working after Ctrl: popoverTargetElement = undefined;
 };

@@ -4,7 +4,7 @@
   padding: 16px 16px 16px 24px;
   cursor: text;
   box-sizing: border-box;
-  // 移除三击无法选中整个 https://github.com/siyuan-note/siyuan/issues/8511
+  // Removing this broke triple-click select-all https://github.com/siyuan-note/siyuan/issues/8511
   user-select: auto;
   overflow-x: clip;
 
@@ -319,7 +319,8 @@
       position: absolute;
       right: 0;
       height: 4px;
-      // 横向插入线使用独立颜色变量，避免与 ::before 目标标记共用 --drag-base-bg 导致半透明叠加变深
+      // The horizontal insert line uses its own color variable, to avoid sharing --drag-base-bg
+      // with the ::before target marker, which would stack semi-transparent layers and darken it
       background-color: var(--drag-line-bg);
       pointer-events: none;
       left: var(--drag-line-left);
@@ -354,13 +355,16 @@
 
       &[data-sb-layout="col"] {
         flex-direction: row;
-        // nowrap：子块宽度用 calc(%) 计算时，容器缩窄通过 flex-shrink 等比收缩而非换行掉落
+        // nowrap: when child block widths use calc(%), narrowing the container shrinks them
+        // proportionally via flex-shrink instead of wrapping onto a new line
         flex-wrap: nowrap;
         justify-content: flex-start;
 
         & > div {
-          // 默认 1 1 0：未拖拽的子块均分填满超级块；容器缩窄时也可收缩
-          // 拖拽后由 inline style 覆盖为 flex:0 1 auto + calc(%)，锁定比例
+          // Default 1 1 0: child blocks that haven't been dragged split the super block evenly
+          // and can also shrink when the container narrows.
+          // After dragging, an inline style overrides this to flex:0 1 auto + calc(%) to lock
+          // the ratio.
           flex: 1 1 0;
           box-sizing: border-box;
           min-width: 0;
@@ -374,7 +378,7 @@
 
         > .sb__resize {
           align-self: stretch;
-          // 手柄不参与收缩，保持拖拽热区宽度恒定
+          // The handle doesn't shrink, so the drag hit area width stays constant
           flex: 0 0 auto;
           width: 2px;
           border-radius: var(--b3-border-radius);
@@ -383,7 +387,7 @@
           opacity: 0;
           margin-right: 16px;
           background-color: var(--b3-border-color);
-          // 透明覆盖层扩展点击热区，让 4px 的细手柄也能轻松点中
+          // Transparent overlay expands the click hit area, so the thin 4px handle is still easy to hit
           position: relative;
           z-index: 5;
 
@@ -402,7 +406,7 @@
           }
         }
 
-        // 拖拽中的百分比提示（复用 protyle-icon 样式，仅添加定位）
+        // Percentage tooltip shown while dragging (reuses the protyle-icon style, only positioning is added)
         > [data-node-id] .sb__resize-tip {
           position: absolute;
           top: 0;
@@ -431,7 +435,9 @@
       border-bottom: 1px solid;
       color: var(--b3-protyle-inline-tag-color);
       transition: var(--b3-transition);
-      cursor: pointer; // 预览导出无此元素，只读和编辑状态都需要点击 https://github.com/siyuan-note/siyuan/issues/11854
+      // This element doesn't exist in preview export; both read-only and edit states need
+      // clicking https://github.com/siyuan-note/siyuan/issues/11854
+      cursor: pointer;
     }
 
     span[data-type~="a"] {
@@ -500,7 +506,7 @@
         max-width: 100%;
         padding: 2px 4px;
 
-        /* 选中块的高亮覆盖 border */
+        /* Highlight overlay border for the selected block */
         &.protyle-wysiwyg--select::after,
         &.protyle-wysiwyg--hl::after {
           width: calc(100% + 2px);
@@ -509,7 +515,8 @@
           top: -1px;
         }
 
-        // https://github.com/siyuan-note/siyuan/issues/8715 & https://ld246.com/article/1689063197687 第一点无法进行以下设置
+        // https://github.com/siyuan-note/siyuan/issues/8715 & https://ld246.com/article/1689063197687
+        // point 1 can't have the following setting applied
         //.protyle-attr--refcount {right: 0;}
 
         & > .protyle-wysiwyg__embed {
@@ -567,7 +574,7 @@
     .img {
 
       user-select: none;
-      // 不能放在 typography 下 https://github.com/siyuan-note/siyuan/issues/9844
+      // Cannot be placed under typography https://github.com/siyuan-note/siyuan/issues/9844
       &:not([style]) {
         display: initial;
       }
@@ -788,7 +795,8 @@
     @include mixin.text-clamp(1);
     opacity: .38;
 
-    // 隐藏容器块的后续子块，避免光标移入折叠内容带来的一系列问题
+    // Hide subsequent child blocks of the container block, to avoid the series of issues caused
+    // by the cursor moving into folded content
     &.bq > [data-node-id] ~ [data-node-id],
     &.callout > .callout-content > [data-node-id] ~ [data-node-id] {
       display: none;
@@ -846,7 +854,7 @@
 }
 
 .protyle .protyle-wysiwyg {
-  // 只读情况下列表前的圆点需要可以点击进行缩放
+  // In read-only mode, the bullet before a list item needs to be clickable to zoom in
   .li[data-subtype="o"] > .protyle-action,
   .li[data-subtype="u"] > .protyle-action,
   &[data-readonly="false"] .li[data-subtype="t"] > .protyle-action {
@@ -861,18 +869,18 @@
     }
   }
 
-  // 复制粘贴序号会状态异常 https://ld246.com/article/1762691143057
+  // Copy-pasting the list number causes abnormal state https://ld246.com/article/1762691143057
   .li > .protyle-action {
     user-select: none;
   }
 }
 
-// 在思源中，不论只读模式还是预览点击图片都可以进行预览
+// In SiYuan, clicking an image opens the preview in both read-only mode and the preview view
 .protyle .img > span:nth-child(2) {
   cursor: pointer;
 }
 
-// 导出 html 不需要编辑样式
+// HTML export doesn't need the editing styles
 .protyle-wysiwyg[data-readonly="false"] {
   span[data-type~="inline-math"],
   .protyle-action__language,
@@ -984,7 +992,7 @@
   }
 }
 
-// export pdf 中需要使用 https://github.com/siyuan-note/siyuan/issues/14548
+// Needed for PDF export https://github.com/siyuan-note/siyuan/issues/14548
 .protyle-cursor {
   position: absolute;
   right: 0;

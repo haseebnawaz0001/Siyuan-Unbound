@@ -45,12 +45,12 @@ var searchCmd = &cobra.Command{
 			pageSize = 32
 		}
 
-		// --asset 切换到资源文件内容搜索模式
+		// --asset switches to asset file content search mode
 		if assetMode, _ := cmd.Flags().GetBool("asset"); assetMode {
 			return runAssetSearch(cmd, query, method, orderBy, page, pageSize)
 		}
 
-		// --get-asset 切换到按路径取单个资源文件全文模式
+		// --get-asset switches to full-text retrieval mode for a single asset file by path
 		if getAssetMode, _ := cmd.Flags().GetBool("get-asset"); getAssetMode {
 			return runGetAsset(query)
 		}

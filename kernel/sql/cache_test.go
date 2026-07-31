@@ -18,7 +18,7 @@ package sql
 
 import "testing"
 
-// TestBlockCacheIsolatedByEncryptedBox 验证加密笔记本块不会污染全局缓存，且不同加密笔记本可安全使用相同块 ID。
+// TestBlockCacheIsolatedByEncryptedBox verifies that an encrypted notebook's blocks don't pollute the global cache, and that different encrypted notebooks can safely use the same block ID.
 func TestBlockCacheIsolatedByEncryptedBox(t *testing.T) {
 	originalDisabled := cacheDisabled
 	originalIsEncryptedBoxFn := IsEncryptedBoxFn

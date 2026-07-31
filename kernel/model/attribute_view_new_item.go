@@ -33,7 +33,8 @@ import (
 	"github.com/siyuan-note/siyuan/kernel/util"
 )
 
-// NewItemTemplatePreview 描述新增条目模板在当前数据库实例中的解析结果。
+// NewItemTemplatePreview describes the resolution result of a new item template against the current
+// database instance.
 type NewItemTemplatePreview struct {
 	PrimaryKey string   `json:"primaryKey"`
 	BoxID      string   `json:"boxID,omitempty"`
@@ -43,7 +44,7 @@ type NewItemTemplatePreview struct {
 	parentID string
 }
 
-// CreateAttributeViewItemResult 描述按模板创建数据库条目的结果。
+// CreateAttributeViewItemResult describes the result of creating a database item from a template.
 type CreateAttributeViewItemResult struct {
 	ItemID      string       `json:"itemID"`
 	BlockID     string       `json:"blockID"`
@@ -53,7 +54,8 @@ type CreateAttributeViewItemResult struct {
 	Transaction *Transaction `json:"-"`
 }
 
-// CreateAttributeViewItem 按指定模板创建一个数据库条目。templateID 为空时创建空白游离条目。
+// CreateAttributeViewItem creates a database item from the specified template. If templateID is empty,
+// a blank detached item is created.
 func CreateAttributeViewItem(avID, blockID, viewID, templateID, previousID, groupID string) (*CreateAttributeViewItemResult, error) {
 	attrView, err := av.ParseAttributeView(avID)
 	if nil != err {

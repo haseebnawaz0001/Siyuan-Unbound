@@ -108,12 +108,12 @@ export const openFile = async (options: IOpenFileOptions) => {
     document.querySelectorAll(".av__panel, .av__mask").forEach(item => {
         item.remove();
     });
-    // 打开 PDF 时移除文档光标
+    // Remove the document cursor when opening a PDF
     if (document.activeElement instanceof HTMLElement) {
         document.activeElement.blur();
     }
     const allModels = getAllModels();
-    // 文档已打开
+    // The document is already open
     if (options.assetPath) {
         clearOBG();
         const asset = allModels.asset.find((item) => {
@@ -199,7 +199,7 @@ export const openFile = async (options: IOpenFileOptions) => {
             }
             return editor.parent;
         }
-        // 没有初始化的页签无法检测到
+        // A not-yet-initialized tab cannot be detected
         const hasEditor = getUnInitTab(options);
         if (hasEditor) {
             if (options.afterOpen) {
@@ -234,13 +234,13 @@ export const openFile = async (options: IOpenFileOptions) => {
     /// #endif
 
     let wnd: Wnd = undefined;
-    // 获取光标所在 tab
+    // Get the tab the cursor is in
     const element = document.querySelector(".layout__wnd--active");
     if (element) {
         wnd = getInstanceById(element.getAttribute("data-id")) as Wnd;
     }
     if (!wnd) {
-        // 中心 tab
+        // Center tab
         wnd = getWndByLayout(window.siyuan.layout.centerLayout);
     }
     if (wnd) {
@@ -253,7 +253,7 @@ export const openFile = async (options: IOpenFileOptions) => {
                     if (item.id === wnd.id) {
                         let nextWnd = wnd.parent.children[index + 1];
                         if (!nextWnd) {
-                            // wnd 为右侧时，应设置其为目标
+                            // When wnd is on the right, it should be set as the target
                             nextWnd = wnd;
                         }
                         while (nextWnd instanceof Layout) {
@@ -271,7 +271,7 @@ export const openFile = async (options: IOpenFileOptions) => {
                     }
                     return;
                 }
-                // 在右侧/下侧打开已有页签将进行页签切换 https://github.com/siyuan-note/siyuan/issues/5366
+                // Opening an existing tab on the right/bottom will switch to that tab https://github.com/siyuan-note/siyuan/issues/5366
                 let hasEditor = !options.openNewTab && targetWnd.children.find(item => {
                     if (item.model && item.model instanceof Editor && item.model.editor.protyle.block.rootID === options.rootID) {
                         switchEditor(item.model, options, allModels);
@@ -308,7 +308,7 @@ export const openFile = async (options: IOpenFileOptions) => {
             wnd.addTab(createdTab, options.keepCursor);
         } else if (window.siyuan.config.fileTree.openFilesUseCurrentTab) {
             let unUpdateTab: Tab;
-            // 不能 reverse, 找到也不能提前退出循环，否则 https://github.com/siyuan-note/siyuan/issues/3271
+            // Cannot reverse, and cannot exit the loop early even after finding a match, otherwise https://github.com/siyuan-note/siyuan/issues/3271
             wnd.children.find((item) => {
                 if (item.headElement && item.headElement.classList.contains("item--unupdate") && !item.headElement.classList.contains("item--pin")) {
                     unUpdateTab = item;
@@ -335,7 +335,7 @@ export const openFile = async (options: IOpenFileOptions) => {
     }
 };
 
-// 没有初始化的页签无法检测到
+// A not-yet-initialized tab cannot be detected
 const getUnInitTab = (options: IOpenFileOptions) => {
     return getAllTabs().find(item => {
         const initData = item.headElement?.getAttribute("data-initdata");
@@ -399,11 +399,12 @@ const switchEditor = (editor: Editor, options: IOpenFileOptions, allModels: IMod
                 action: options.action,
                 scrollPosition: options.scrollPosition
             });
-            // 大纲点击折叠标题下的内容时，需更新反链面板
+            // The backlink panel needs updating when the outline is clicked on content under a collapsed heading
             updateBacklinkGraph(allModels, editor.editor.protyle);
         });
     } else {
-        // 点击大纲产生滚动时会动态加载内容，最终导致定位不准确
+        // Scrolling triggered by an outline click dynamically loads content, which can end up making the
+        // positioning inaccurate
         preventScroll(editor.editor.protyle);
         editor.editor.protyle.observerLoad?.disconnect();
         if (options.action?.includes(Constants.CB_GET_HL)) {
@@ -441,7 +442,7 @@ const switchEditor = (editor: Editor, options: IOpenFileOptions, allModels: IMod
                 }, 1000 * 3);
                 editor.editor.protyle.observerLoad.observe(editor.editor.protyle.wysiwyg.element);
             } else if (editor.editor.protyle.block.rootID === options.id) {
-                // 由于 https://github.com/siyuan-note/siyuan/issues/5420，移除定位
+                // Positioning removed due to https://github.com/siyuan-note/siyuan/issues/5420
             } else if (editor.editor.protyle.toolbar.range) {
                 nodeElement = hasClosestBlock(editor.editor.protyle.toolbar.range.startContainer) as Element;
                 focusByRange(editor.editor.protyle.toolbar.range);
@@ -498,8 +499,8 @@ const newTab = (options: IOpenFileOptions) => {
                         tab.addModel(model);
                     }
                 } else {
-                    // plugin 0.8.3 历史兼容
-                    console.warn("0.8.3 将移除 custom.fn 参数，请参照 https://github.com/siyuan-note/plugin-sample/blob/91a716358941791b4269241f21db25fd22ae5ff5/src/index.ts 将其修改为 custom.id");
+                    // Historical compatibility with plugin 0.8.3
+                    console.warn("0.8.3 will remove the custom.fn parameter, please refer to https://github.com/siyuan-note/plugin-sample/blob/91a716358941791b4269241f21db25fd22ae5ff5/src/index.ts to change it to custom.id");
                     tab.addModel(options.custom.fn({
                         tab,
                         data: options.custom.data
@@ -601,7 +602,7 @@ export const updatePanelByEditor = (options: {
             item.eventBus.emit("switch-protyle", {protyle: options.protyle});
         });
     }
-    // 切换页签或关闭所有页签时，需更新对应的面板
+    // The corresponding panels need updating when switching tabs or closing all tabs
     const models = getAllModels();
     updateOutline(models, options.protyle, options.reload);
     updateBacklinkGraph(models, options.protyle);
@@ -613,7 +614,7 @@ export const isCurrentEditor = (blockId: string) => {
         const tab = getInstanceById(activeElement.getAttribute("data-id"));
         if (tab instanceof Tab && tab.model instanceof Editor) {
             if (tab.model.editor.protyle.block.rootID === blockId ||
-                tab.model.editor.protyle.block.parentID === blockId ||  // updateBacklinkGraph 时会传入 parentID
+                tab.model.editor.protyle.block.parentID === blockId ||  // parentID is passed in when calling updateBacklinkGraph
                 tab.model.editor.protyle.block.id === blockId) {
                 return true;
             }
@@ -746,20 +747,21 @@ export const openBy = (url: string, type: "folder" | "app") => {
     }
     let address = "";
     if ("windows" === window.siyuan.config.system.os) {
-        // `file://` 协议兼容 Window 平台使用 `/` 作为目录分割线 https://github.com/siyuan-note/siyuan/issues/5681
+        // The `file://` protocol is made compatible with Windows using `/` as a directory separator https://github.com/siyuan-note/siyuan/issues/5681
         address = url.replace("file:///", "").replace("file://\\", "").replace("file://", "").replace(/\//g, "\\");
     } else {
         address = url.replace("file://", "");
     }
 
-    // 拖入文件名包含 `)` 、`(` 的文件以 `file://` 插入后链接解析错误 https://github.com/siyuan-note/siyuan/issues/5786
+    // Dragging in a file whose name contains `)` or `(` and inserting it as `file://` results in incorrect link
+    // parsing https://github.com/siyuan-note/siyuan/issues/5786
     address = address.replace(/\\\)/g, ")").replace(/\\\(/g, "(");
     if (type === "app") {
         useShell("openPath", address);
     } else if (type === "folder") {
         if ("windows" === window.siyuan.config.system.os) {
-            if (!address.startsWith("\\\\")) { // \\ 开头的路径是 Windows 网络共享路径 https://github.com/siyuan-note/siyuan/issues/5980
-                // Windows 端打开本地文件所在位置失效 https://github.com/siyuan-note/siyuan/issues/5808
+            if (!address.startsWith("\\\\")) { // A path starting with \\ is a Windows network share path https://github.com/siyuan-note/siyuan/issues/5980
+                // Opening the local file's location fails on Windows https://github.com/siyuan-note/siyuan/issues/5808
                 address = address.replace(/\\\\/g, "\\");
             }
         }

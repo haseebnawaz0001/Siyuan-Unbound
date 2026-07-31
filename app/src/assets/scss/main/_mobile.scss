@@ -162,7 +162,8 @@
     transform: translateY(-200vh);
   }
 
-  // 窄屏下 dock 图标过多时左侧可横向滚动，关闭按钮固定在右侧始终可触达
+  // On narrow screens, when there are too many dock icons the left side can scroll horizontally,
+  // while the close button stays fixed on the right so it's always reachable
   & > .toolbar--border > .toolbar__scroll {
     flex: 1;
     min-width: 0;
@@ -421,14 +422,14 @@
     font-size: 14px;
   }
 
-  // iPhone 右上角属性中对不齐
+  // Misaligned in the top-right attribute area on iPhone
   &-wysiwyg--attr .protyle-attr > div:not(.protyle-attr--memo):not(.protyle-attr--refcount) {
     max-width: 26vw;
     white-space: nowrap;
     display: block;
   }
 
-  // 移动端键盘弹起和点击加号需保持滚动高度一致
+  // Scroll height must stay consistent between the mobile keyboard popping up and tapping the plus button
   &-background__img img {
     height: 200px;
   }
@@ -454,7 +455,8 @@
 
     & > div {
       margin-right: 0;
-      // 桌面端拖拽后子块带内联 calc(%) 宽度，移动端垂直堆叠时需重置以铺满
+      // After dragging on desktop, child blocks get an inline calc(%) width; reset it to fill
+      // the width when stacked vertically on mobile
       width: auto !important;
       flex: 0 1 auto;
     }

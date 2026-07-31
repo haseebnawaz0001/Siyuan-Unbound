@@ -318,7 +318,7 @@ func getRecentDocs(c *gin.Context) {
 
 	var sortBy string
 	arg := map[string]any{}
-	// 兼容旧版接口，不能直接使用 util.JsonArg()
+	// For backward compatibility with the old API, util.JsonArg() cannot be used directly here
 	if err := c.ShouldBindJSON(&arg); err == nil {
 		if !util.ParseJsonArgs(arg, ret, util.BindJsonArg("sortBy", &sortBy, false, false)) {
 			return

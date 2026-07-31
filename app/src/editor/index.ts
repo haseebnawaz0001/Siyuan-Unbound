@@ -35,7 +35,7 @@ export class Editor extends Model {
         this.headElement = options.tab.headElement;
         this.element = options.tab.panelElement;
         this.initProtyle(options);
-        // 当文档第一次加载到页签时更新 openAt 时间
+        // Update openAt time the first time the document is loaded into a tab
         fetchPost("/api/storage/updateRecentDocOpenTime", {rootID: options.rootId});
     }
 
@@ -76,7 +76,7 @@ export class Editor extends Model {
                 }
             },
         });
-        // 需在 after 回调之前，否则不会聚焦 https://github.com/siyuan-note/siyuan/issues/5303
+        // This must come before the after callback, otherwise it won't focus https://github.com/siyuan-note/siyuan/issues/5303
         this.editor.protyle.model = this;
     }
 }

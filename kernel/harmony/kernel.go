@@ -175,7 +175,8 @@ func GetExportFilePath(exportPath *C.char) *C.char {
 			logging.LogWarnf("get export file path [%s] blocked: path traversal attempt [%s]", pathStr, fileName)
 			return nil
 		}
-		// 加密导出受控路径（<boxID>/<kind>/<file>）：必须经注册表校验且 box 已解锁，否则 fail-closed
+		// Encrypted export controlled path (<boxID>/<kind>/<file>): must be validated against the registry and
+		// the box must be unlocked, otherwise fail closed
 		if model.IsManagedEncryptedExportPath(fileName) {
 			artifact, ok := model.ResolveManagedExportForMobile(fileName)
 			if !ok {

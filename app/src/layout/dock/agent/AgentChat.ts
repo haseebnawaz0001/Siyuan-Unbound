@@ -38,8 +38,8 @@ import {
     renderWelcomeHTML
 } from "./AgentMessageRenderer";
 
-// 限制注入用户轮次上下文的可见块 ID 数量，以控制 token 开销。
-// 与 kernel/agent/agent.go 中的 maxVisibleBlockIDs 保持一致。
+// Limit the number of visible block IDs injected into the user turn context to control token cost.
+// Kept in sync with maxVisibleBlockIDs in kernel/agent/agent.go.
 const maxVisibleBlockIDs = 50;
 
 type EntryBase = { id?: string };
@@ -123,15 +123,17 @@ export class AgentChat extends Model {
     private currentThinkingReasoningContent = "";
     private editingUserEntryID = "";
     private pendingEditDraft: { entryID: string; content: string } | null = null;
-    // thinking step 只保留工具名列表（去重：arguments/result 仅在 assistant entry 存一份），
-    // 不再保存 text（"已思考：Xs" 由 i18n 在渲染时从 duration 生成）。
+    // A thinking step only keeps the tool name list (deduped: arguments/result are stored once,
+    // in the assistant entry); it no longer stores text ("Thought for Xs" is generated from
+    // duration via i18n at render time).
     private currentThinkingSteps: Array<{
         reasoning: string;
         reasoningContent: string;
         toolNames?: string[];
         content?: string
     }> = [];
-    // 当前请求的思考耗时（秒）。持久化为 entry.duration，"已思考"文本不落盘。
+    // Thinking duration of the current request, in seconds. Persisted as entry.duration; the
+    // "Thought for" text itself is not persisted.
     private currentThinkingDuration = 0;
     private currentThinkingStepContent = "";
     private pendingConfirms: SessionEntry[] = [];
@@ -140,31 +142,39 @@ export class AgentChat extends Model {
     private modelSelect: HTMLSelectElement;
     private selectedModel: string;
     private modelOptions: Array<{ id: string; name: string }> = [];
-    // 推理努力度（iconBrain + 原生 select），仅实例记忆，刷新后回到默认。
+    // Reasoning effort (iconBrain + native select), remembered only for this instance; resets to
+    // default after a refresh.
     private reasoningEffortSelect: HTMLSelectElement;
     private selectedReasoningEffort = "";
     private userScrolledUp = false;
     private programmaticScroll = false;
     private stickResizeObserver: ResizeObserver | null = null;
-    // 按会话保存的距底部距离（scrollHeight - scrollTop），用于切换会话与开关 dock 面板后恢复滚动位置。
-    // 用距底距离而非绝对 scrollTop：dock 展开/折叠有宽高过渡，期间 scrollHeight 变化，
-    // 距底距离与之无关，恢复后能定位到同样的相对位置。
+    // Distance from the bottom (scrollHeight - scrollTop), saved per session, used to restore the
+    // scroll position after switching sessions or toggling the dock panel.
+    // We use the distance from the bottom rather than the absolute scrollTop: the dock has a
+    // width/height transition while expanding/collapsing, during which scrollHeight changes, but
+    // the distance from the bottom is unaffected, so restoring it lands at the same relative spot.
     private scrollBottomBySession: Map<string, number> = new Map();
-    // 面板可见性：dock 关闭时容器尺寸归零、浏览器把 scrollTop 钳制到 0，折叠期间不记录滚动位置。
+    // Panel visibility: when the dock is closed the container size collapses to zero and the
+    // browser clamps scrollTop to 0, so the scroll position is not recorded while collapsed.
     private layoutVisible = true;
     private layoutResizeObserver: ResizeObserver | null = null;
     private settingDialogObserver: MutationObserver | null = null;
     private scrollBottomBtn: HTMLElement;
     private navRail: HTMLElement;
     private navExpandTimer = 0;
-    // 镜像态：当前会话正由其他实例流式对话，本实例处于只读占位锁定，期间不重绘当前视图。
-    // 由 ws 的 streamStart/streamEnd 事件驱动，与发起者的 isStreaming 互斥（发起者走 SSE）。
+    // Mirror state: the current session is being streamed by another instance, and this instance
+    // is locked into a read-only placeholder and does not redraw the current view meanwhile.
+    // Driven by the ws streamStart/streamEnd events, mutually exclusive with the initiator's
+    // isStreaming (the initiator uses SSE).
     private mirrorLocked = false;
     private mirrorPlaceholderEl: HTMLElement | null = null;
-    // 思考计时器：流式进行时每 100ms 刷新未完成思考卡片的标题为「思考中... X.Xs」。
+    // Thinking timer: while streaming, refreshes the title of unfinished thinking cards to
+    // "Thinking... X.Xs" every 100ms.
     private thinkingTimerId = 0;
-    // 上一个 thinking step 快照时 currentToolCalls 的长度基准，
-    // 用于计算本轮新增的工具（避免 step.toolNames 累积重复历史工具）。
+    // Baseline length of currentToolCalls at the time of the previous thinking step snapshot,
+    // used to compute the tools newly added this round (avoids step.toolNames accumulating
+    // duplicate historical tools).
     private lastStepToolCount = 0;
 
     constructor(app: App, tab: Tab) {
@@ -178,18 +188,23 @@ export class AgentChat extends Model {
         this.sessionTitle = this.defaultTitle;
         this.initUI();
         this.bindEvents();
-        // 接入 ws 以接收跨实例的会话变更通知（agentSessionChanged）。
-        // AgentChat dock 是单例常驻，ws 随之常驻，与 Backlink/Bookmark 等现有 dock 一致。
+        // Connect to ws to receive cross-instance session change notifications (agentSessionChanged).
+        // The AgentChat dock is a persistent singleton, so its ws connection persists along with it,
+        // consistent with existing docks like Backlink/Bookmark.
         this.connect({
             id: genUUID(),
             type: "agentChat",
             msgCallback: (data) => this.onWsMessage(data),
         });
-        // AI 配置保存走本地 patch（aiRuntime.ts 写 window.siyuan.config.ai）不广播 ws，
-        // 故用两种方式兜底：window focus（跨窗口）+ MutationObserver 监听设置对话框关闭（同窗口即时）。
+        // Saving the AI config goes through a local patch (aiRuntime.ts writes
+        // window.siyuan.config.ai) which does not broadcast over ws, so we fall back to two
+        // mechanisms: window focus (cross-window) + a MutationObserver watching for the settings
+        // dialog closing (immediate, same-window).
         window.addEventListener("focus", this.checkConfigChangedHandler);
-        // 设置对话框是 SiYuan 内部模态，关闭时 window 不失焦，focus 事件不触发。
-        // 监听 body 子节点变化，当含 .config__panel 的设置 dialog 被移除时即时刷新。
+        // The settings dialog is an internal SiYuan modal; closing it does not blur the window, so
+        // the focus event never fires.
+        // Watch for changes to body's children, and refresh immediately when the settings dialog
+        // containing .config__panel is removed.
         this.settingDialogObserver = new MutationObserver(() => {
             if (!document.querySelector(".config__panel")) {
                 this.checkConfigChanged();
@@ -202,9 +217,11 @@ export class AgentChat extends Model {
         this.checkConfigChanged();
     };
 
-    // 比较 window.siyuan.config.ai 实际可用模型数与缓存 modelOptions，不一致则刷新。
-    // 仅当处于欢迎页（无会话内容）时重渲染，以便从无模型提示块切回示例或反之；
-    // 有会话内容时不重绘（避免破坏对话），refreshModelOptions 内已刷新 trigger 显示。
+    // Compare the actual number of usable models in window.siyuan.config.ai against the cached
+    // modelOptions, and refresh if they differ.
+    // Only re-render when on the welcome page (no session content), so it can switch between the
+    // no-model prompt block and the examples; when there is session content, do not redraw (to
+    // avoid disrupting the conversation) — refreshModelOptions already refreshes the trigger display.
     private checkConfigChanged() {
         const actualCount = AgentChat.countUsableModels(window.siyuan.config.ai);
         if (actualCount === this.modelOptions.length) {
@@ -216,7 +233,7 @@ export class AgentChat extends Model {
         }
     }
 
-    // 与 refreshModelOptions / 后端 HasAnyProvider() 一致的"可用模型"计数。
+    // Count of "usable models", consistent with refreshModelOptions / the backend HasAnyProvider().
     private static countUsableModels(aiConfig: Config.IAI): number {
         let count = 0;
         for (const prov of aiConfig.providers || []) {
@@ -290,10 +307,13 @@ export class AgentChat extends Model {
         this.scrollBottomBtn = panel.querySelector(".agent-chat__scroll-bottom") as HTMLElement;
         this.messagesContainer.addEventListener("scroll", () => {
             const {scrollTop, scrollHeight, clientHeight} = this.messagesContainer;
-            // 仅在面板有效展开时记录滚动位置：dock 折叠过渡期间容器尺寸归零、浏览器把 scrollTop
-            // 钳制到 0，该过程会触发 scroll 事件；若不据尺寸排除，会污染保存的距底距离。
-            // 用 clientHeight 判定（折叠时为 0），比 layoutVisible 标志更可靠——后者由
-            // ResizeObserver 异步设置，可能与本事件交错。
+            // Only record the scroll position while the panel is actually expanded: during the
+            // dock's collapse transition the container size drops to zero and the browser clamps
+            // scrollTop to 0, which fires a scroll event; without excluding this by size, it would
+            // pollute the saved distance from the bottom.
+            // Use clientHeight to decide (0 while collapsed), which is more reliable than the
+            // layoutVisible flag — the latter is set asynchronously by the ResizeObserver and can
+            // race with this event.
             if (this.layoutVisible && clientHeight > 0 && this.sessionId) {
                 this.scrollBottomBySession.set(this.sessionId, scrollHeight - scrollTop);
             }
@@ -322,10 +342,12 @@ export class AgentChat extends Model {
         this.composer = mountComposer(this.composerHost, () => {
             this.sendMessage();
         }, () => {
-            // 内容变化时刷新发送按钮可用性（含用户输入、IME、程序化 clear 等所有 doc 变更）。
+            // Refresh the send button's enabled state whenever content changes (covers all doc
+            // changes: user input, IME, programmatic clear, etc.).
             this.updateSendButtonState();
         });
-        // 块拖拽由 protyle 统一处理（复制块/引用/嵌入块→引用），无需自定义 drop handler。
+        // Block drag-and-drop is handled uniformly by protyle (copy block/ref/embed block ->
+        // reference), so no custom drop handler is needed here.
         this.sessionPanel = new AgentSessionPanel(
             this.sessionMenuBtn,
             this.parent.panelElement,
@@ -338,8 +360,10 @@ export class AgentChat extends Model {
                     if (id === this.sessionId) {
                         this.sessionTitle = title;
                         this.titleElement.textContent = title;
-                        // 当前轮次开始前后都依赖同一个内容修订号。流式中只更新本地标题，
-                        // 由终止提交一并落盘，避免元数据保存抢先递增修订号。
+                        // The content revision number must stay the same before and after this turn
+                        // starts. While streaming, only update the local title; it gets persisted
+                        // together with the final commit, to avoid a metadata save prematurely
+                        // bumping the revision number.
                         if (this.isStreaming || this.currentTurnID) {
                             this.pendingSessionTitle = title;
                             return;
@@ -349,17 +373,20 @@ export class AgentChat extends Model {
                 },
             }
         );
-        // 监听滚动容器尺寸：dock 面板折叠时容器尺寸归零、浏览器把 scrollTop 钳制到 0；
-        // 这里在面板重新展开后恢复当前会话的滚动位置。dock 展开/折叠有 CSS 宽高过渡（约 0.2s），
-        // 过渡期间 scrollHeight 随尺寸变化，故在折叠→展开转换后用 rAF 循环持续校正约 320ms，
-        // 覆盖过渡动画直到布局稳定。
+        // Watch the scroll container's size: when the dock panel collapses the container size
+        // drops to zero and the browser clamps scrollTop to 0; here we restore the current
+        // session's scroll position once the panel expands again. The dock's expand/collapse has a
+        // CSS width/height transition (~0.2s), during which scrollHeight changes with the size, so
+        // after a collapse -> expand transition we keep correcting via an rAF loop for about 320ms,
+        // covering the transition animation until the layout settles.
         this.layoutResizeObserver = new ResizeObserver(() => {
             const collapsed = this.messagesContainer.clientWidth === 0 || this.messagesContainer.clientHeight === 0;
             if (collapsed) {
                 this.layoutVisible = false;
                 return;
             }
-            // 仅在「刚从折叠恢复」时启动一次校正循环，避免干扰正常滚动 / 流式输出。
+            // Only start a correction loop right when recovering from collapsed, to avoid
+            // interfering with normal scrolling / streaming output.
             if (!this.layoutVisible) {
                 this.layoutVisible = true;
                 const saved = this.scrollBottomBySession.get(this.sessionId) ?? 0;
@@ -373,11 +400,12 @@ export class AgentChat extends Model {
 
     private initModelSelect() {
         this.refreshModelOptions();
-        // 选中模型变更：原生 select 的 change 事件，无需自定义菜单逻辑。
+        // Selected model change: the native select's change event, no custom menu logic needed.
         this.modelSelect.addEventListener("change", () => {
             this.selectedModel = this.modelSelect.value;
         });
-        // 无模型时拦截下拉展开，改为打开设置-人工智能面板（动态 import 避免循环依赖）。
+        // When there are no models, intercept the dropdown from opening and open the AI settings
+        // panel instead (dynamic import avoids a circular dependency).
         this.modelSelect.addEventListener("mousedown", (e: MouseEvent) => {
             if (this.modelOptions.length > 0) {
                 return;
@@ -387,26 +415,32 @@ export class AgentChat extends Model {
         });
     }
 
-    // 打开设置面板并切换到「人工智能」tab。动态 import config 模块避免与 AgentChat 的循环依赖。
+    // Open the settings panel and switch to the "AI" tab. Dynamically import the config module to
+    // avoid a circular dependency with AgentChat.
     private async openAiSetting() {
         const {openSetting} = await import("../../../config");
-        // openSetting 若已有设置对话框会先销毁重建，先检测复用避免闪烁。
+        // openSetting destroys and rebuilds an existing settings dialog, so check for an existing
+        // one first and reuse it to avoid a flicker.
         const existing = window.siyuan.dialogs.find(d => d.element.querySelector(".config__tab-container"));
         if (!existing) {
             openSetting(this.app, "ai");
         }
     }
 
-    // 将外部块引用以 mention chip 形式追加到发送框末尾，等价于拖拽块到发送框或在框内 @ 搜索选块。
+    // Append external block references to the end of the composer as mention chips, equivalent to
+    // dragging a block into the composer or picking one via @ search inside it.
     public insertBlockMentions(mentions: Array<{ id: string; label: string }>) {
         if (this.composer && mentions.length > 0) {
             this.composer.insertMentions(mentions);
         }
     }
 
-    // 从 window.siyuan.config.ai 重新计算可用模型列表，幂等可重复调用。
-    // 与后端 HasAnyProvider()/GetModel() 判定一致：provider 和 model 均需 enabled。
-    // 零模型时显式置空 selectedModel（避免 undefined 透传到后端），失效选择自动重置。
+    // Recompute the list of usable models from window.siyuan.config.ai; idempotent, safe to call
+    // repeatedly.
+    // Consistent with the backend HasAnyProvider()/GetModel() logic: both provider and model must
+    // be enabled.
+    // With zero models, explicitly clear selectedModel (to avoid passing undefined through to the
+    // backend); a stale selection is reset automatically.
     refreshModelOptions() {
         const aiConfig = window.siyuan.config.ai;
         const newOptions: Array<{ id: string; name: string }> = [];
@@ -426,7 +460,8 @@ export class AgentChat extends Model {
             }
         }
         this.modelOptions = newOptions;
-        // 若当前选择已失效（不在新列表中），则重置：有模型取第一个，无模型显式置空。
+        // If the current selection is no longer valid (not in the new list), reset it: pick the
+        // first model if any exist, otherwise explicitly clear it.
         const stillValid = this.selectedModel && newOptions.some(o => o.id === this.selectedModel);
         if (!stillValid) {
             this.selectedModel = newOptions.length > 0 ? newOptions[0].id : "";
@@ -436,7 +471,8 @@ export class AgentChat extends Model {
     }
 
     private updateModelLabel() {
-        // 重建 <option> 列表。无可用模型时插入一个占位项，点击 select 打开设置-人工智能。
+        // Rebuild the <option> list. When there are no usable models, insert a placeholder item;
+        // clicking the select opens the AI settings.
         let html = "";
         if (this.modelOptions.length === 0) {
             const placeholder = window.siyuan.languages.noModelConfigured || "No model configured";
@@ -457,8 +493,9 @@ export class AgentChat extends Model {
         return this.selectedModel;
     }
 
-    // 根据当前选中值刷新按钮上的文字（默认/低/中/高）。
-    // 初始化思考强度原生 select：填充 4 个选项并绑定 change，模式与 initModelSelect 一致。
+    // Refresh the button's text (Default/Low/Medium/High) based on the current selection.
+    // Initialize the native reasoning-effort select: populate the 4 options and bind change,
+    // following the same pattern as initModelSelect.
     private initReasoningEffortSelect() {
         const L = window.siyuan.languages;
         const options: Array<{ value: string; label: string }> = [
@@ -476,8 +513,10 @@ export class AgentChat extends Model {
         });
     }
 
-    // 校验会话持久化的 model ID 是否仍存在于当前配置中。有效则赋值并刷新 label，无效则保持当前选择。
-    // 避免加载旧会话时把已删除模型的 stale ID 透传给后端导致静默失败。
+    // Validate whether the model ID persisted with the session still exists in the current config.
+    // Assign and refresh the label if valid, otherwise keep the current selection.
+    // This avoids passing a stale ID of a deleted model through to the backend when loading an old
+    // session, which would otherwise fail silently.
     private applySessionModelIfValid(modelId?: string) {
         if (modelId && this.modelOptions.some(o => o.id === modelId)) {
             this.selectedModel = modelId;
@@ -490,7 +529,7 @@ export class AgentChat extends Model {
         const hasModel = this.modelOptions.length > 0;
         this.messagesContainer.innerHTML = renderWelcomeHTML(hasModel);
         if (!hasModel) {
-            // 无模型：绑定「去配置」按钮，点击打开设置-人工智能面板。
+            // No models: bind the "Go configure" button, clicking it opens the AI settings panel.
             const goBtn = this.messagesContainer.querySelector(".agent-welcome__go-setting");
             if (goBtn) {
                 goBtn.addEventListener("click", () => {
@@ -641,9 +680,10 @@ export class AgentChat extends Model {
     }
 
     private bindEvents() {
-        // hover 底部 tokens 数字弹出分类明细面板。
-        // 仅在支持 hover 的设备绑定 mouseenter/mouseleave（移动端 tap 会合成 mouse 事件导致闪烁）；
-        // 不支持 hover 的设备（移动端）用 click 切换。
+        // Hovering the tokens number at the bottom pops up the breakdown panel.
+        // Only bind mouseenter/mouseleave on devices that support hover (on mobile, a tap
+        // synthesizes mouse events, causing a flicker); on devices without hover support (mobile),
+        // toggle with click instead.
         const supportsHover = window.matchMedia("(hover: hover)").matches;
         if (supportsHover) {
             this.tokenDisplayEl.addEventListener("mouseenter", () => {
@@ -659,8 +699,9 @@ export class AgentChat extends Model {
                 }, 300);
             });
         }
-        // 所有设备：点击 toggle 浮层。hover 设备上 stopPropagation 阻止冒泡到 document 的 outside click handler，
-        // 避免悬浮显示后点击反而关闭（反直觉）。
+        // All devices: clicking toggles the popup. On hover-capable devices, stopPropagation
+        // prevents the click from bubbling to document's outside-click handler, avoiding the
+        // counter-intuitive case where clicking right after a hover reveal immediately closes it.
         this.tokenDisplayEl.addEventListener("click", (e: MouseEvent) => {
             e.stopPropagation();
             if (this.tokenPopup) {
@@ -729,8 +770,9 @@ export class AgentChat extends Model {
     }
 
     private async initSessions() {
-        // 启动时始终进入新会话界面（欢迎页），不自动加载上次会话内容。
-        // 历史会话仍可通过会话面板点击切换查看。
+        // Always land on a new-session view (welcome page) at startup; do not auto-load the last
+        // session's content.
+        // Past sessions can still be viewed by switching to them from the session panel.
         await SessionStore.init();
         this.sessionId = SessionStore.newSessionId();
         this.sessionCreatedAt = Date.now();
@@ -788,14 +830,19 @@ export class AgentChat extends Model {
         return result.session ?? null;
     }
 
-    // 处理 ws 推送的跨实例会话变更通知。核心时序控制：
-    // - streamStart：其他实例开始流式。立即从磁盘拉取一次（发起者发消息时已把 user 消息落盘），
-    //   让本轮用户新消息尽快可见，然后进入占位锁定显示"AI 回复生成中"。
-    // - update：会话保存或未提交运行时进入可恢复状态。每次都读取后端权威视图；流式中途的保存
-    //   只包含已完成历史和交互卡片，不会把半截 assistant 文本当成最终结果。
-    // - streamEnd：后端 eventCh 关闭（流结束），只解除占位锁定；已提交内容由 saveSession 的 update
-    //   同步，未提交内容由后端紧随其后的恢复 update 同步。
-    // - delete：当前会话被删除则清空视图。
+    // Handle cross-instance session change notifications pushed over ws. Core sequencing:
+    // - streamStart: another instance started streaming. Immediately pull once from disk (the
+    //   initiator already persisted the user message when sending), so this round's new user
+    //   message becomes visible as soon as possible, then lock into a placeholder showing "AI
+    //   reply generating".
+    // - update: the session was saved, or an uncommitted runtime entered a recoverable state.
+    //   Always read the backend's authoritative view each time; a save mid-stream only contains
+    //   completed history and interaction cards, never treating a half-finished assistant text as
+    //   the final result.
+    // - streamEnd: the backend's eventCh closed (stream ended); only releases the placeholder lock.
+    //   Committed content is synced by the update from saveSession, and uncommitted content is
+    //   synced by the recovery update the backend sends right after.
+    // - delete: clear the view if the current session was deleted.
     private onWsMessage(data: IWebSocketData) {
         if (!data || data.cmd !== "agentSessionChanged") {
             return;
@@ -804,25 +851,30 @@ export class AgentChat extends Model {
         if (!payload) {
             return;
         }
-        // 所有变更都刷新会话列表（标题/时间/增删）。
+        // Every change refreshes the session list (title/time/additions/removals).
         this.sessionPanel?.refresh();
-        // 只处理当前会话；其他会话的变化仅体现在列表刷新里。
+        // Only handle the current session; changes to other sessions only show up in the list
+        // refresh.
         if (payload.sessionID !== this.sessionId) {
             return;
         }
-        // 发起者自身流式中忽略（它走 SSE 自渲染）。
+        // Ignore while the initiator itself is streaming (it renders itself via SSE).
         if (this.isStreaming) {
             return;
         }
         switch (payload.action) {
             case "streamStart":
-                // 标记处于其他实例流式中，reloadFromDisk 重绘后会据此保留占位条。
+                // Mark that another instance is streaming; reloadFromDisk keeps the placeholder bar
+                // based on this after redrawing.
                 this.mirrorLocked = true;
-                // 立即拉取一次：发起者发消息时已 saveSession 写入 user 消息，让本轮新消息尽快可见。
+                // Pull once immediately: the initiator already called saveSession to write the user
+                // message when sending, so this round's new message becomes visible as soon as
+                // possible.
                 void this.reloadFromDisk();
                 break;
             case "streamEnd":
-                // 流结束，解除占位锁定并移除占位条。不重绘——完整内容由随后的 update 广播驱动。
+                // Stream ended: release the placeholder lock and remove the placeholder bar. Do not
+                // redraw here — the full content is driven by the subsequent update broadcast.
                 this.mirrorLocked = false;
                 this.removeMirrorPlaceholder();
                 this.restorePendingEditDraft();
@@ -844,7 +896,8 @@ export class AgentChat extends Model {
         }
     }
 
-    // 显示"其他实例正在对话中…"只读占位条。不进入 setStreaming 态（不切换 stop 按钮、不置灰 composer）。
+    // Show a read-only "another instance is chatting..." placeholder bar. Does not enter the
+    // setStreaming state (does not toggle the stop button or gray out the composer).
     private showMirrorPlaceholder() {
         if (this.mirrorPlaceholderEl) {
             return;
@@ -869,11 +922,12 @@ export class AgentChat extends Model {
         }
     }
 
-    // 镜像端从磁盘拉取整条会话权威数据重绘。仅 entries 变化时清空重绘，避免无谓跳变。
+    // On the mirror side, pull the whole session's authoritative data from disk and redraw. Only
+    // clear and redraw when entries actually changed, to avoid pointless jumps.
     private async reloadFromDisk(forceRender = false) {
         const targetSessionId = this.sessionId;
         const session = await SessionStore.load(targetSessionId);
-        // await 期间用户可能已切换会话，丢弃过期结果。
+        // The user may have switched sessions during the await; discard stale results.
         if (targetSessionId !== this.sessionId) {
             return;
         }
@@ -882,7 +936,7 @@ export class AgentChat extends Model {
         }
         const newEntries = this.buildEntriesFromSession(session);
         if (!forceRender && this.entriesEqual(newEntries, this.entries)) {
-            // 内容未变，仅更新元数据（标题等）。
+            // Content unchanged, only update metadata (title, etc.).
             this.updateMetaFromSession(session);
             return;
         }
@@ -917,7 +971,8 @@ export class AgentChat extends Model {
         } else {
             this.messagesContainer.scrollTop = savedScroll;
         }
-        // 重绘会清空 DOM（含占位条）；若仍处于其他实例的流式中，重新显示占位条。
+        // Redrawing clears the DOM (including the placeholder bar); if still in another instance's
+        // streaming state, show the placeholder bar again.
         if (this.mirrorLocked) {
             this.showMirrorPlaceholder();
         } else {
@@ -999,7 +1054,8 @@ export class AgentChat extends Model {
         }
     }
 
-    // 从 session 更新标题/时间戳/token 计数/model 等元数据，不动 entries 与 DOM。
+    // Update metadata such as title/timestamp/token counts/model from the session, without
+    // touching entries or the DOM.
     private updateMetaFromSession(session: AgentSession) {
         this.sessionTitle = this.pendingSessionTitle || session.title || this.defaultTitle;
         this.hasTitled = session.titled !== false;
@@ -1020,7 +1076,8 @@ export class AgentChat extends Model {
         this.updateTokenDisplay();
     }
 
-    // 浅比较两个 entries 数组是否等价（用于判断是否需要重绘）。用 JSON 序列化比较，简单可靠。
+    // Shallow-compare whether two entries arrays are equal (used to decide whether a redraw is
+    // needed). Compares via JSON serialization, simple and reliable.
     private entriesEqual(a: SessionEntry[], b: SessionEntry[]): boolean {
         if (a === b) {
             return true;
@@ -1036,7 +1093,8 @@ export class AgentChat extends Model {
         return scrollHeight - scrollTop - clientHeight <= 60;
     }
 
-    // 当前会话被其他实例删除时，清空到欢迎页。不调 saveSession（会话已不存在于磁盘）。
+    // When the current session is deleted by another instance, clear it back to the welcome page.
+    // Does not call saveSession (the session no longer exists on disk).
     private handleCurrentSessionDeleted() {
         this.pendingEditDraft = null;
         const deletedSessionID = this.sessionId;
@@ -1121,7 +1179,8 @@ export class AgentChat extends Model {
             this.titleElement.textContent = session.title;
             this.renderLoadedSession(session);
             this.rebuildNavMarkers();
-            // 恢复该会话上次的滚动位置；新会话（无记录）默认贴底。
+            // Restore this session's last scroll position; a new session (no record) defaults to
+            // the bottom.
             if (this.scrollBottomBySession.has(session.id)) {
                 this.restoreScrollToBottom(this.scrollBottomBySession.get(session.id) ?? 0);
             } else {
@@ -1160,8 +1219,9 @@ export class AgentChat extends Model {
             if (tc.result && tc.name === "todo_write") {
                 const rel = document.createElement("div");
                 rel.className = "agent-chat__msg agent-chat__msg--tool";
-                // todo 卡片是 assistant entry 的附属展示，不单独持有 entryId
-                // （entryId 属于后续的 AI 消息元素），避免多个 todo 共享同一 id。
+                // The todo card is a supplementary display for the assistant entry and does not
+                // hold its own entryId (entryId belongs to the subsequent AI message element),
+                // avoiding multiple todos sharing the same id.
                 rel.innerHTML = renderTodoList(tc.result);
                 this.messagesContainer.appendChild(rel);
                 hasRendered = true;
@@ -1200,8 +1260,9 @@ export class AgentChat extends Model {
         } else if (entry.status === "always") {
             statusLabel = L.agentConfirmAlways || "Session Allow";
         } else {
-            // pending（用户未操作就切换/出错而落盘）：重载后无法再交互，
-            // 至少显示一个状态提示，避免变成无按钮无文本的死卡片。
+            // pending (persisted because the user switched away or an error occurred before
+            // acting): no longer interactive after a reload, so at least show a status hint to
+            // avoid ending up as a dead card with no button and no text.
             statusLabel = L.agentConfirmPending || "Pending";
         }
         el.innerHTML = '<div class="agent-chat__confirm-card">' +
@@ -1213,8 +1274,9 @@ export class AgentChat extends Model {
         this.messagesContainer.appendChild(el);
     }
 
-    // 持久化前精简 toolCalls：question 工具的完整 questions 参数已由独立的 question entry 存储，
-    // assistant entry 的 toolCalls 里只需保留工具名和结果（供 LLM 上下文恢复），避免重复存储。
+    // Slim down toolCalls before persisting: the question tool's full questions argument is already
+    // stored by a separate question entry, so the toolCalls in the assistant entry only need to
+    // keep the tool name and result (for restoring LLM context), avoiding duplicate storage.
     private slimToolCallsForPersistence(toolCalls: Array<{
         name: string;
         arguments: Record<string, unknown>;
@@ -1241,13 +1303,15 @@ export class AgentChat extends Model {
     }) {
         const L = window.siyuan.languages;
         const el = document.createElement("div");
-        // 重载后 question 不可再交互（后端已超时或会话已切换），统一显示为已确认态。
+        // A question is no longer interactive after a reload (the backend has timed out or the
+        // session has switched), so uniformly display it as confirmed.
         el.className = "agent-chat__msg agent-chat__msg--question agent-chat__msg--confirmed";
         if (entry.id) {
             el.setAttribute("data-message-id", entry.id);
         }
         el.innerHTML = renderQuestionCardHTML(entry.questions, entry.questionID);
-        // 用状态文本替换提交按钮区域，对齐实时提交后的呈现。
+        // Replace the submit button area with status text, matching the appearance after a live
+        // submission.
         const submit = el.querySelector(".agent-chat__question-submit") as HTMLElement;
         if (submit) {
             const submitted = entry.status === "submitted";
@@ -1255,11 +1319,11 @@ export class AgentChat extends Model {
                 (submitted ? (L.agentQuestionSubmitted || "Submitted") : (L.agentQuestionPending || "Awaiting answer")) +
                 "</span>";
         }
-        // 禁用所有输入，避免用户误以为还能提交。
+        // Disable all inputs so the user does not mistakenly think they can still submit.
         el.querySelectorAll("input").forEach((inp) => {
             (inp as HTMLInputElement).disabled = true;
         });
-        // 恢复已提交的选中状态（answers 中存的是选项 value）。
+        // Restore the previously submitted selection state (answers stores option values).
         if (entry.answers && entry.answers.length > 0) {
             el.querySelectorAll("input[type=radio], input[type=checkbox]").forEach((inp) => {
                 (inp as HTMLInputElement).checked = entry.answers!.includes((inp as HTMLInputElement).value);
@@ -1287,8 +1351,9 @@ export class AgentChat extends Model {
                     break;
                 case "thinking":
                     if (entry.steps && entry.steps.length > 0) {
-                        // 老数据兼容：旧 step 可能含 text（"已思考：Xs"）和 toolCalls（{name,result}），
-                        // 这里归一化为新格式（toolNames + entry.duration）。
+                        // Compatibility with old data: an old step may contain text ("Thought for
+                        // Xs") and toolCalls ({name, result}); normalize it here into the new format
+                        // (toolNames + entry.duration).
                         const rawEntry = entry as {
                             steps: Array<{
                                 reasoning: string;
@@ -1308,7 +1373,8 @@ export class AgentChat extends Model {
                                 : (s.toolCalls ? s.toolCalls.map(t => t.name) : undefined),
                             content: s.content,
                         }));
-                        // entry.duration 优先；否则尝试从最后一个 step.text 提取（老格式）。
+                        // entry.duration takes priority; otherwise try to extract it from the last
+                        // step.text (old format).
                         let dur: number | undefined = rawEntry.duration;
                         if (dur === undefined) {
                             const lastText = rawEntry.steps[rawEntry.steps.length - 1]?.text;
@@ -1449,7 +1515,8 @@ export class AgentChat extends Model {
         if (this.composer) {
             this.composer.focus();
         }
-        // clear() 是程序化清空，不触发原生 input 事件，需显式刷新发送按钮（空输入 → 禁用）。
+        // clear() is a programmatic clear that does not trigger the native input event, so the
+        // send button must be refreshed explicitly (empty input -> disabled).
         this.updateSendButtonState();
         this.showWelcome();
         this.scrollToBottom(true);
@@ -1554,7 +1621,8 @@ export class AgentChat extends Model {
                 if (this.sessionId !== requestSessionId) {
                     return;
                 }
-                // 409：该会话正在其他实例对话中（实例级互斥）。重载磁盘权威状态，不进入流式。
+                // 409: this session is being chatted in by another instance (instance-level mutual
+                // exclusion). Reload the authoritative disk state instead of entering streaming.
                 if (err instanceof AgentHttpError && err.status === 409) {
                     this.handleConflictReject();
                     return;
@@ -1573,8 +1641,10 @@ export class AgentChat extends Model {
         );
     }
 
-    // 实例级互斥被拒（409）说明另一实例已在本轮保存之后抢先启动。此时磁盘可能已有对方的新消息，
-    // 不能再用本地快照回滚；直接重载权威会话，避免覆盖另一实例的数据。
+    // Being rejected by instance-level mutual exclusion (409) means another instance started first
+    // right after this round's save. Disk may already have the other instance's new message by
+    // now, so we can no longer roll back with the local snapshot; reload the authoritative session
+    // directly, to avoid overwriting the other instance's data.
     private async handleConflictReject() {
         this.requestStartTime = 0;
         this.setStreaming(false);
@@ -1596,9 +1666,12 @@ export class AgentChat extends Model {
         }
     }
 
-    // 捕获发送消息时的只读编辑器快照，并注入对应的用户轮次上下文。
-    // 扫描全部编辑器，优先选择可见且包含选中块的编辑器，以匹配用户所指的“这里选中的块”。
-    // 若未找到，则依次使用 DOM 选区所在编辑器和最近激活的页签。
+    // Capture a read-only editor snapshot at the time of sending, and inject the corresponding user
+    // turn context.
+    // Scan all editors, preferring one that is visible and contains selected blocks, to match what
+    // the user means by "the blocks selected here".
+    // If none is found, fall back in order to the editor holding the DOM selection, then the
+    // most-recently-activated tab.
     private captureEditorContext(): IEditorContext | undefined {
         /// #if MOBILE
         const mobEditor = window.siyuan.mobile.editor || window.siyuan.mobile.popEditor;
@@ -1813,12 +1886,15 @@ export class AgentChat extends Model {
                     this.flushTokenUpdate();
                     this.requestStartTime = 0;
                     if (this.currentTurnID) {
-                        // 服务端 error 是终止事件：此前已完成运行时检查点和所有工具结果发送，
-                        // 因此可复用正常收尾，把部分回复与工具调用写入 entries 后提交该 turn。
+                        // A server-side error is a terminal event: the runtime checkpoint and all
+                        // tool result sends have already completed by this point, so the normal
+                        // finish-up path can be reused — write the partial reply and tool calls into
+                        // entries and commit this turn.
                         await this.finishResponse(false);
                         this.appendError(event.message);
                     } else {
-                        // turn 建立前的错误没有可提交的运行时，直接恢复磁盘权威状态。
+                        // An error before the turn is established has no runtime to commit, so
+                        // restore the authoritative disk state directly.
                         await this.handleError(new Error(event.message));
                     }
                     break;
@@ -1885,14 +1961,18 @@ export class AgentChat extends Model {
                 this.restorePendingEditDraft();
             }
             this.appendError(err.message);
-            // 网络断流不等于服务端 turn 已终止，不能提交并清除 runtime。待后端释放运行实例后
-            // 再合并 runtime，避免重复执行结果未知的外部调用。turn 事件也可能在断流前尚未来得及送达。
+            // A network disconnect does not mean the server-side turn has ended, so we must not
+            // commit and clear the runtime. Merge the runtime only after the backend releases the
+            // running instance, to avoid re-executing external calls whose results are unknown. The
+            // turn event may also not have arrived yet before the disconnect.
             void this.recoverInterruptedTurn(sessionID, turnID);
         }
     }
 
-    // 统一处理 fetchAgentSSE 的 onError：若为"未配置模型/提供商"则渲染可操作错误卡，
-    // 否则回退到普通错误卡。userEntryId 用于在"未配置"时回滚刚追加的 user 消息（避免留下空对话）。
+    // Uniformly handle fetchAgentSSE's onError: if it is a "model/provider not configured" error,
+    // render an actionable error card; otherwise fall back to a plain error card. userEntryId is
+    // used to roll back the just-appended user message on "not configured" (to avoid leaving an
+    // empty conversation).
     private async handleConfigError(err: Error, userEntryId?: string, restoreSession = false) {
         this.flushTokenUpdate();
         if (this.currentContent) {
@@ -1903,8 +1983,9 @@ export class AgentChat extends Model {
         const isConfigError = !!configMsg && err.message === configMsg;
         if (isConfigError) {
             if (restoreSession) {
-                // 重新生成在 Agent 建立 runtime 前只截断了前端视图；配置错误时应恢复原回答，
-                // 不能把这个临时截断状态保存到 session.json。
+                // Regeneration only truncates the frontend view before the agent establishes a
+                // runtime; on a config error the original answer should be restored, and this
+                // temporary truncated state must not be saved to session.json.
                 await this.reloadFromDisk(true);
             } else {
                 if (userEntryId) {
@@ -1932,7 +2013,8 @@ export class AgentChat extends Model {
         }
     }
 
-    // 回滚刚追加的 user entry 与 DOM 元素（用于"未配置"错误时避免留下空对话）。
+    // Roll back the just-appended user entry and its DOM element (used to avoid leaving an empty
+    // conversation on a "not configured" error).
     private rollbackUserEntry(userEntryId: string) {
         const idx = this.entries.findIndex(e => e.id === userEntryId);
         if (idx >= 0) {
@@ -2121,8 +2203,10 @@ export class AgentChat extends Model {
             }
             if (!this.pendingTokenUpdate) {
                 this.pendingTokenUpdate = true;
-                // 用 RAF 合并更新（与普通 AI 消息一致），减少重建频率。
-                // 流式期间用 textContent 写纯文本，富渲染推迟到完成时，避免每帧重解析整段 markdown。
+                // Batch updates with RAF (consistent with regular AI messages), reducing rebuild
+                // frequency.
+                // Write plain text via textContent while streaming, deferring rich rendering until
+                // completion, to avoid re-parsing the whole markdown blob every frame.
                 this.rafId = requestAnimationFrame(() => {
                     this.pendingTokenUpdate = false;
                     chatEl.textContent = this.currentContent;
@@ -2142,8 +2226,10 @@ export class AgentChat extends Model {
 
         if (!this.pendingTokenUpdate) {
             this.pendingTokenUpdate = true;
-            // 流式期间只用 textContent 写入纯文本，跳过 Lute 解析与 postRender 富渲染。
-            // 富渲染（高亮/公式/图表）推迟到 finishResponse 一次性完成，避免每帧 O(n²) 重建。
+            // While streaming, only write plain text via textContent, skipping Lute parsing and
+            // postRender rich rendering.
+            // Rich rendering (highlighting/formulas/charts) is deferred to a single pass in
+            // finishResponse, to avoid an O(n^2) rebuild every frame.
             this.rafId = requestAnimationFrame(() => {
                 this.pendingTokenUpdate = false;
                 const bodyEl = this.currentAIElement?.querySelector(".agent-chat__body") as HTMLElement;
@@ -2159,8 +2245,10 @@ export class AgentChat extends Model {
         if (this.pendingTokenUpdate) {
             this.pendingTokenUpdate = false;
             cancelAnimationFrame(this.rafId);
-            // 思考卡片流式：更新 chatEl 并滚到底部（与 appendToken 思考分支一致）。
-            // 与 appendToken 一致用 textContent，富渲染由 finishResponse 完成时统一处理。
+            // Thinking card streaming: update chatEl and scroll to the bottom (consistent with
+            // appendToken's thinking branch).
+            // Uses textContent just like appendToken; rich rendering is handled uniformly once
+            // finishResponse completes.
             const thinkChat = this.messagesContainer.querySelector(".agent-chat__msg--thinking:not(.agent-chat__msg--thinking-done) .agent-chat__thinking-chat--streaming") as HTMLElement;
             if (thinkChat) {
                 thinkChat.textContent = this.currentContent;
@@ -2254,9 +2342,10 @@ export class AgentChat extends Model {
     private appendThinking(reasoning: string) {
         const L = window.siyuan.languages;
         if (this.currentThinkingText) {
-            // step 不保存 text（渲染时由 duration 经 i18n 生成）。
-            // toolNames 只取本轮新增的工具（lastStepToolCount 之后的），
-            // 避免累积重复历史工具——完整的 arguments/result 在 assistant entry 存一份。
+            // A step does not store text (it is generated from duration via i18n at render time).
+            // toolNames only takes the tools newly added this round (those after
+            // lastStepToolCount), avoiding accumulating duplicate historical tools — the full
+            // arguments/result are stored once in the assistant entry.
             const toolNames = this.currentToolCalls.slice(this.lastStepToolCount).map(function (t) {
                 return t.name;
             });
@@ -2318,8 +2407,9 @@ export class AgentChat extends Model {
 
         if (reasoning === "processing" && this.hasInterveningCard) {
             const L = window.siyuan.languages;
-            // 与 finishActiveThinking 对齐：先把本张思考卡片的耗时算出来，
-            // 既用于 DOM 显示「已思考 Xs」，也用于落盘 entry.duration（重载后仍能显示正确耗时）。
+            // Aligned with finishActiveThinking: compute this thinking card's duration first, used
+            // both for the DOM display "Thought for Xs" and for persisting entry.duration (so the
+            // correct duration still shows after a reload).
             const durSec = this.currentThinkingDuration ||
                 (this.requestStartTime ? (Date.now() - this.requestStartTime) / 1000 : 0);
             this.currentThinkingDuration = durSec;
@@ -2349,8 +2439,9 @@ export class AgentChat extends Model {
                 this.currentThinkingSteps = [];
                 this.currentThinkingEntryId = "";
             }
-            // 卡片边界：一张思考卡片已落盘，重置工具名去重表，使下一张卡片独立显示本轮工具
-            // （与重载路径 renderMergedThinkingCard 的单卡片局部去重 seenTools 对齐）。
+            // Card boundary: one thinking card has been persisted, so reset the tool-name dedup
+            // table so the next card independently shows its own round's tools (aligned with the
+            // per-card local dedup seenTools used by renderMergedThinkingCard on the reload path).
             this.renderedToolNames = {};
             // Flush tool calls as assistant entry
             if (this.currentToolCalls.length > 0) {
@@ -2369,7 +2460,8 @@ export class AgentChat extends Model {
                 }
                 this.pendingConfirms = [];
             }
-            // 确认、提问等交互卡片会中断思考，新卡片应从交互完成后重新计时。
+            // Interaction cards such as confirm/question interrupt thinking; the new card's timer
+            // should restart after the interaction completes.
             this.currentThinkingDuration = 0;
             this.requestStartTime = Date.now();
             this.hasInterveningCard = false;
@@ -2429,7 +2521,8 @@ export class AgentChat extends Model {
             return;
         }
         const thinking = thinkingElems[thinkingElems.length - 1];
-        // 新轮次立即创建 reasoning 元素（保证多轮顺序），文本内容用 RAF 合并追加（减少 reflow）。
+        // Create the reasoning element immediately for a new round (to guarantee ordering across
+        // rounds); text content is appended via batched RAF updates (reducing reflow).
         if (isNewRound) {
             const reasoningEl = document.createElement("div");
             reasoningEl.className = "agent-chat__thinking-reasoning-text";
@@ -2443,7 +2536,8 @@ export class AgentChat extends Model {
                 const reasoningEl = allReasoning[allReasoning.length - 1] as HTMLElement;
                 if (reasoningEl) {
                     reasoningEl.textContent = this.currentThinkingReasoningContent;
-                    // 预览态固定高度，滚到底部让最新 reasoning 内容可见。
+                    // The preview state has a fixed height, so scroll to the bottom to keep the
+                    // latest reasoning content visible.
                     const body = reasoningEl.closest(".agent-chat__thinking-body") as HTMLElement | null;
                     if (body) {
                         body.scrollTop = body.scrollHeight;
@@ -2630,7 +2724,8 @@ export class AgentChat extends Model {
                 if (this.sessionId !== requestSessionId) {
                     return;
                 }
-                // 409：该会话正在其他实例对话中（实例级互斥），不进入流式。
+                // 409: this session is being chatted in by another instance (instance-level mutual
+                // exclusion); do not enter streaming.
                 if (err instanceof AgentHttpError && err.status === 409) {
                     return this.handleConflictReject();
                 }
@@ -2648,8 +2743,10 @@ export class AgentChat extends Model {
         );
     }
 
-    // 流式结束时把 currentAIElement 的 body 从纯文本一次性转为富渲染（Lute + postRender）。
-    // 由 finishResponse（正常结束）与 error 路径（中断）共用，保证流式期轻渲染后仍得到完整富文本。
+    // When streaming ends, convert currentAIElement's body from plain text to rich rendering
+    // (Lute + postRender) in one pass.
+    // Shared by finishResponse (normal completion) and the error path (interruption), ensuring the
+    // lightly-rendered content from streaming still ends up fully rich-rendered.
     private finalizeStreamingBody(content: string, ts: number) {
         if (!this.currentAIElement) {
             return;
@@ -2660,7 +2757,8 @@ export class AgentChat extends Model {
         }
         bodyEl.classList.remove("agent-chat__body--streaming");
         if (content) {
-            // 富渲染只在此处执行一次，避免流式期间每帧 O(n²) 重建带来的卡顿。
+            // Rich rendering runs only once here, avoiding the stutter from an O(n^2) rebuild every
+            // frame during streaming.
             bodyEl.innerHTML = this.lute.ProtylePreviewStr("", content) || escapeHtml(content);
             postRender(bodyEl, this.app);
             this.addCopyButton(this.currentAIElement, undefined, ts);
@@ -2669,7 +2767,8 @@ export class AgentChat extends Model {
     }
 
     private async finishResponse(notify = true) {
-        // 思考结束前先记录最后一张未完成的思考卡片，折叠后用于定位滚动锚点。
+        // Before thinking ends, record the last unfinished thinking card first, used to locate the
+        // scroll anchor after it collapses.
         const activeThinkCard = this.messagesContainer.querySelector(
             ".agent-chat__msg--thinking:not(.agent-chat__msg--thinking-done)"
         ) as HTMLElement | null;
@@ -2677,8 +2776,10 @@ export class AgentChat extends Model {
         const savedContent = this.currentContent;
         const savedFullContent = this.fullContent;
         const ts = Date.now();
-        // 流式结束：把 body 从流式期的纯文本转为一次性完整富渲染（Lute + postRender）。
-        // 场景一：内容在流式期间落到了思考卡片里（currentAIElement 仍为空），需新建普通 AI 消息承载。
+        // Streaming ended: convert the body from streaming's plain text to a single, complete rich
+        // rendering pass (Lute + postRender).
+        // Scenario one: the content landed inside a thinking card during streaming (currentAIElement
+        // is still empty), so a new regular AI message must be created to hold it.
         if (!this.currentAIElement && savedContent) {
             const thinkBody = this.messagesContainer.querySelector(".agent-chat__msg--thinking:not(.agent-chat__msg--thinking-done) .agent-chat__thinking-body");
             if (thinkBody) {
@@ -2698,14 +2799,16 @@ export class AgentChat extends Model {
             this.currentContent = savedContent;
             this.fullContent = savedFullContent;
             this.addCopyButton(el, undefined, ts);
-            // 思考结束场景：定位到思考卡片下方（卡片贴顶、正文向下展开），而非直接滚到对话最底部。
+            // Thinking-ended scenario: scroll to just below the thinking card (card pinned to the
+            // top, body expanding downward), rather than straight to the bottom of the conversation.
             if (activeThinkCard) {
                 this.scrollToThinkingCardBelow(activeThinkCard);
             } else {
                 this.scrollToBottom(true);
             }
         } else if (this.currentAIElement) {
-            // 场景二：普通流式元素（createAIMessagePlaceholder 创建，body 仍是纯文本），一次性富渲染。
+            // Scenario two: a regular streaming element (created by createAIMessagePlaceholder,
+            // body still plain text), rich-rendered in one pass.
             this.finalizeStreamingBody(savedContent, ts);
         }
         this.flushThinkingStep();
@@ -2746,8 +2849,10 @@ export class AgentChat extends Model {
         const canonicalSession = await this.saveSession(this.currentTurnID);
         this.pendingEditDraft = null;
         if (this.sessionId === sessionID) {
-            // 提交时后端会用 runtime 重建本轮 assistant/tool 结果。直接采用提交响应中的权威会话，
-            // 避免下一轮普通保存又用前端流式快照覆盖，也避免额外 GET 的失败/乱序窗口。
+            // On commit, the backend rebuilds this round's assistant/tool results from the runtime.
+            // Use the authoritative session from the commit response directly, to avoid the next
+            // regular save overwriting it with the frontend's streaming snapshot again, and to avoid
+            // the failure/ordering window of an extra GET.
             if (canonicalSession) {
                 const atBottom = this.isScrolledToBottom();
                 const savedScroll = this.messagesContainer.scrollTop;
@@ -2775,9 +2880,10 @@ export class AgentChat extends Model {
         }
     }
 
-    // 把上一轮在思考卡片内显示过的 content 归属到刚 push 的最后一个 step，
-    // 并清空 currentThinkingStepContent。这样每个 step 的 content 都能正确归属到自己的轮次，
-    // 而不会被 flushThinkingStep 错挂到下一轮的 step（导致重载后 content 位置错位）。
+    // Attribute the content that was displayed inside the thinking card in the previous round to
+    // the last step just pushed, and clear currentThinkingStepContent. This way each step's content
+    // is correctly attributed to its own round, instead of being mistakenly attached by
+    // flushThinkingStep to the next round's step (which would misplace content after a reload).
     private attachStepContent(content: string) {
         if (content && this.currentThinkingSteps.length > 0) {
             this.currentThinkingSteps[this.currentThinkingSteps.length - 1].content = content;
@@ -2809,7 +2915,8 @@ export class AgentChat extends Model {
             });
             this.currentThinkingSteps = [];
             this.currentThinkingEntryId = "";
-            // 卡片边界：与 appendThinking 的 hasInterveningCard 分支一致，重置工具名去重表。
+            // Card boundary: consistent with appendThinking's hasInterveningCard branch, reset the
+            // tool-name dedup table.
             this.renderedToolNames = {};
         }
     }
@@ -2835,8 +2942,9 @@ export class AgentChat extends Model {
                 this.sessionTitle = data.data;
                 this.pendingSessionTitle = data.data;
                 this.titleElement.textContent = data.data;
-                // 流式结束时的统一提交会包含最新标题；流式中单独保存会改变内容修订号，
-                // 使尚未创建的 runtime turn 被误判为旧请求。
+                // The unified commit when streaming ends will include the latest title; saving it
+                // separately mid-stream would change the content revision number, causing the
+                // not-yet-created runtime turn to be mistaken for a stale request.
                 if (!this.isStreaming && !this.currentTurnID) {
                     void this.saveSession();
                 }
@@ -2893,7 +3001,8 @@ export class AgentChat extends Model {
             const confirmText = (L.rollbackConfirm || "Rollback cannot be undone").replace("${name}", L.dataSnapshot || "Snapshot").replace("${time}", shortID);
             confirmDialog("⚠️ " + (L.rollback || "Rollback"), confirmText, () => {
                 fetchPost("/api/repo/checkoutRepo", {id: snapshotID, sessionID: this.sessionId}, () => {
-                    // 记录回滚操作，使重载会话后仍可见「已回滚」提示（激活 appendRollbackInfo 渲染分支）。
+                    // Record the rollback operation, so the "rolled back" hint remains visible after
+                    // reloading the session (activates the appendRollbackInfo render branch).
                     const rollbackEntryId = SessionStore.newSessionId();
                     this.entries.push({id: rollbackEntryId, type: "rollback", snapshotID: snapshotID});
                     this.appendRollbackInfo(snapshotID, rollbackEntryId);
@@ -2901,7 +3010,8 @@ export class AgentChat extends Model {
                 });
             });
         });
-        // 快照应在执行区域之前：有确认卡片时插到确认卡片前，否则查找活跃的思考卡片
+        // The snapshot should come before the execution area: insert before the confirm card if one
+        // exists, otherwise look for an active thinking card
         const confirmCards = this.messagesContainer.querySelectorAll(".agent-chat__msg--confirm");
         if (confirmCards.length > 0) {
             this.messagesContainer.insertBefore(el, confirmCards[confirmCards.length - 1]);
@@ -2991,8 +3101,10 @@ export class AgentChat extends Model {
         this.setStreaming(false);
         const sessionID = this.sessionId;
         const turnID = this.currentTurnID;
-        // abort 只中断前端连接；外部工具可能仍在返回途中。不能在这里直接保存并清除 runtime，
-        // 等后端写完 interrupted 检查点后再恢复并提交。turn 事件可能尚未到达，因此空 ID 也要轮询。
+        // abort only interrupts the frontend connection; an external tool may still be in flight.
+        // We must not save and clear the runtime directly here — wait until the backend has written
+        // the interrupted checkpoint, then recover and commit. The turn event may not have arrived
+        // yet, so we poll even with an empty ID.
         try {
             await this.reloadFromDisk(true);
         } catch (e) {
@@ -3336,8 +3448,9 @@ export class AgentChat extends Model {
             if (step.reasoningContent) {
                 detail += '<div class="agent-chat__thinking-reasoning-text">' + escapeHtml(step.reasoningContent) + "</div>";
             }
-            // 工具行放在该步 reasoning 之后，对齐实时流式渲染中
-            // 「reasoning/content 先到、工具行在下一轮 thinking 时补到末尾」的实际呈现。
+            // Place the tool-calls line after this step's reasoning, matching how live streaming
+            // renders it in practice: "reasoning/content arrive first, and the tool-calls line is
+            // appended at the end when the next thinking round comes in".
             const names = step.toolNames && step.toolNames.length > 0
                 ? step.toolNames
                 : undefined;
@@ -3379,7 +3492,8 @@ export class AgentChat extends Model {
         postRender(el, this.app);
     }
 
-    // 由 duration 经 i18n 生成"已思考：Xs"标题文本；无 duration 时回退到"思考中..."。
+    // Generate the "Thought for Xs" title text from duration via i18n; fall back to "Thinking..."
+    // when there is no duration.
     private formatThinkingHeader(duration?: number): string {
         const L = window.siyuan.languages;
         if (duration && duration > 0) {
@@ -3388,7 +3502,8 @@ export class AgentChat extends Model {
         return L.agentThinking || "Thinking";
     }
 
-    // 刷新底部 token 圆环显示。contextTokens 为 0 时隐藏（含切换到无统计的旧会话场景）。
+    // Refresh the token ring display at the bottom. Hide it when contextTokens is 0 (including when
+    // switching to an old session with no stats).
     private updateTokenDisplay() {
         if (!this.tokenDisplayEl) {
             return;
@@ -3405,14 +3520,16 @@ export class AgentChat extends Model {
         const circumference = 2 * Math.PI * 9; // r=9 → ≈56.55
         const tokens = this.contextTokens;
         const limit = this.contextLimit;
-        // 弧长：已知上限按真实占用率；未知上限（limit=0）不画弧（只留灰色轨道圈）。
-        // 颜色统一主色，不再按占用率分档。
+        // Arc length: with a known limit, use the actual usage ratio; with an unknown limit
+        // (limit=0), draw no arc (only the gray track ring remains).
+        // The color is always the primary color; it is no longer tiered by usage ratio.
         const ratio = limit > 0 ? Math.min(tokens / limit, 1) : 0;
         const filled = circumference * ratio;
         arc.setAttribute("stroke-dasharray", filled.toFixed(2) + " " + circumference.toFixed(2));
     }
 
-    // 记录最近一轮的 prompt tokens（= 当前上下文已用）+ 分类明细 + 缓存命中 + 模型上限，覆盖式更新而非累加。
+    // Record the most recent round's prompt tokens (= current context usage) plus the category
+    // breakdown, cache hits, and model limit; this is an overwrite update, not accumulation.
     private appendUsage(lastPromptTokens: number, tokenBreakdown: Record<string, number>, cachedTokens: number, contextLimit: number) {
         this.contextTokens = lastPromptTokens;
         this.contextTokenBreakdown = tokenBreakdown;
@@ -3421,7 +3538,8 @@ export class AgentChat extends Model {
         this.updateTokenDisplay();
     }
 
-    // 弹出 token 分类明细面板。breakdown 全 0 时不弹（无内容可显示）。
+    // Pop up the token breakdown panel. Do not pop it up when the breakdown is all zero (nothing to
+    // show).
     private showTokenBreakdownPopup() {
         if (!this.formatTokenBreakdown().length && this.contextCachedTokens === 0) {
             return;
@@ -3431,7 +3549,7 @@ export class AgentChat extends Model {
         const popup = document.createElement("div");
         popup.className = "agent-token-popup b3-menu";
         let html = '<div class="b3-menu__items">';
-        // 第一行：已用 / 上限 · 占用百分比；未知上限时仅显示已用。
+        // First row: used / limit - usage percentage; only show used when the limit is unknown.
         const limitLine = this.contextLimit > 0
             ? this.formatTokenCount(this.contextTokens) + " / " + this.formatTokenCount(this.contextLimit) + " · " + Math.round(this.contextTokens / this.contextLimit * 100) + "%"
             : this.formatTokenCount(this.contextTokens);
@@ -3439,8 +3557,9 @@ export class AgentChat extends Model {
             '<span class="agent-token-popup__label">' + (L.tokenUsage || "Context Usage") + "</span>" +
             '<span class="agent-token-popup__value">' + limitLine + "</span>" +
             "</div>";
-        // 第一行下方的占用横条：总长=上限，填充=已用占比，颜色统一主色。
-        // 未知上限（contextLimit=0）时不画横条（无总长基线）。
+        // The usage bar below the first row: total length = limit, fill = used ratio, color always
+        // the primary color.
+        // With an unknown limit (contextLimit=0), draw no bar (there is no total-length baseline).
         if (this.contextLimit > 0) {
             const ratio = Math.min(this.contextTokens / this.contextLimit, 1);
             html += '<div class="agent-token-popup__bar">' +
@@ -3449,14 +3568,15 @@ export class AgentChat extends Model {
         } else {
             html += '<div class="agent-token-popup__divider"></div>';
         }
-        // 各分类（0 值跳过），百分比格式。
+        // Each category (zero values skipped), formatted as a percentage.
         for (const row of this.formatTokenBreakdown()) {
             html += '<div class="agent-token-popup__row">' +
                 '<span class="agent-token-popup__label">' + escapeHtml(row.label) + "</span>" +
                 '<span class="agent-token-popup__value">' + row.percent + "</span>" +
                 "</div>";
         }
-        // 缓存命中（独立维度，分隔线隔开，为 0 不显示——不返回缓存字段的模型整行不出现）。
+        // Cache hits (an independent dimension, separated by a divider; hidden when 0 — for models
+        // that do not return cache fields, the whole row is omitted).
         if (this.contextCachedTokens > 0 && this.contextTokens > 0) {
             html += '<div class="agent-token-popup__divider"></div>';
             const cachedPercent = Math.round(this.contextCachedTokens / this.contextTokens * 1000) / 10;
@@ -3469,10 +3589,12 @@ export class AgentChat extends Model {
         popup.innerHTML = html;
         document.body.appendChild(popup);
         popup.style.zIndex = (++window.siyuan.zIndex).toString();
-        // 定位：与模型选择弹出一致——右对齐 trigger 右边缘（width 280px 固定），垂直在 trigger 下方。
+        // Positioning: consistent with the model-select popup — right-aligned to the trigger's
+        // right edge (fixed width 280px), vertically below the trigger.
         const rect = this.tokenDisplayEl.getBoundingClientRect();
         setPosition(popup, rect.right - 280, rect.bottom, rect.height, rect.width);
-        // popup 自身 hover 保持显示（鼠标移入时取消关闭计时，移出时关闭）。
+        // Hovering the popup itself keeps it shown (cancel the close timer on mouse enter, close on
+        // mouse leave).
         popup.addEventListener("mouseenter", () => {
             window.clearTimeout(this.tokenPopupHideTimer);
         });
@@ -3481,11 +3603,12 @@ export class AgentChat extends Model {
                 this.closeTokenBreakdownPopup();
             }, 300);
         });
-        // 点击外部/resize/ESC 关闭。
+        // Closed by clicking outside / resize / ESC.
         popup.addEventListener("click", (e: MouseEvent) => {
             e.stopPropagation();
         });
-        // 点击外部/resize 关闭。监听器存为字段，closeTokenBreakdownPopup 统一清理，避免泄漏。
+        // Closed by clicking outside / resize. Listeners are stored as fields so
+        // closeTokenBreakdownPopup can clean them up uniformly, avoiding leaks.
         this.tokenPopupOutsideClickHandler = () => {
             this.closeTokenBreakdownPopup();
         };
@@ -3502,7 +3625,8 @@ export class AgentChat extends Model {
     }
 
     private closeTokenBreakdownPopup() {
-        // 统一清理外部监听器，避免多次开合 popup 累积监听器导致内存泄漏。
+        // Uniformly clean up outside listeners, to avoid listeners accumulating across repeated
+        // popup opens/closes and causing a memory leak.
         if (this.tokenPopupOutsideClickHandler) {
             document.removeEventListener("click", this.tokenPopupOutsideClickHandler);
             this.tokenPopupOutsideClickHandler = null;
@@ -3517,11 +3641,12 @@ export class AgentChat extends Model {
         }
     }
 
-    // 把 contextTokenBreakdown（后端估算的 9 类 + other）格式化为 [{label, percent}]，跳过 0 值。
-    // percent = 各类 token / contextTokens * 100（contextTokens 为 0 时显示 "-")。
+    // Format contextTokenBreakdown (the backend's estimated 9 categories + other) into
+    // [{label, percent}], skipping zero values.
+    // percent = category tokens / contextTokens * 100 (shows "-" when contextTokens is 0).
     private formatTokenBreakdown(): Array<{ label: string; percent: string }> {
         const L = window.siyuan.languages;
-        // 固定顺序展示（与后端 key 对应）。
+        // Displayed in a fixed order (matching the backend keys).
         const order: Array<{ key: string; labelKey: string }> = [
             {key: "system", labelKey: "tokenCatSystem"},
             {key: "skills", labelKey: "tokenCatSkills"},
@@ -3540,7 +3665,8 @@ export class AgentChat extends Model {
             if (tokens <= 0) {
                 continue;
             }
-            // 占比保留 1 位小数；四舍五入为 0 的类（占比极小）跳过不显示，避免无意义的 0%。
+            // Keep the percentage to 1 decimal place; skip categories that round to 0 (negligible
+            // share) to avoid showing a meaningless 0%.
             const rounded = this.contextTokens > 0
                 ? Math.round(tokens / this.contextTokens * 1000) / 10
                 : 0;
@@ -3553,14 +3679,17 @@ export class AgentChat extends Model {
         return result;
     }
 
-    // token 数格式化：1024 进制值（2^N，如 131072=128×1024）转成业界惯称（128k、1M），
-    // 仅当「能整除 1024 且商在白名单」时才用 1024 进制，避免 256000 这种 1000 进制值被误判为 250k。
-    // 其余按 1000 进制（200000→200k、1048576→1.0M）。
+    // Token count formatting: convert base-1024 values (2^N, e.g. 131072 = 128*1024) into the
+    // industry-conventional names (128k, 1M).
+    // Only use base 1024 when the value "divides evenly by 1024 and the quotient is on the
+    // whitelist", to avoid a base-1000 value like 256000 being misread as 250k.
+    // Everything else uses base 1000 (200000 -> 200k, 1048576 -> 1.0M).
     private formatTokenCount(n: number): string {
         if (n <= 0) {
             return String(n);
         }
-        // 白名单：业界常见的 2^N 商（8k/16k/32k/64k/128k/256k/512k/1M）+ 200（200k=204800 少见但存在）。
+        // Whitelist: common 2^N quotients in the industry (8k/16k/32k/64k/128k/256k/512k/1M) + 200
+        // (200k = 204800, uncommon but exists).
         const niceMultiples = new Set([8, 16, 32, 64, 128, 200, 256, 512, 1024]);
         if (n >= 1024 && n % 1024 === 0 && niceMultiples.has(n / 1024)) {
             const quotient = n / 1024;
@@ -3569,7 +3698,8 @@ export class AgentChat extends Model {
             }
             return quotient + "k";
         }
-        // 1000 进制或其他：除以 1000 / 1000000，整除时省略小数（200000→200k，3500→3.5k）。
+        // Base 1000 or otherwise: divide by 1000 / 1000000, omitting the decimal when it divides
+        // evenly (200000 -> 200k, 3500 -> 3.5k).
         if (n >= 1000000) {
             return (n / 1000000).toFixed(n % 1000000 === 0 ? 0 : 1) + "M";
         }
@@ -3588,7 +3718,8 @@ export class AgentChat extends Model {
         }
     }
 
-    // 启动思考计时器，每 100ms 刷新所有未完成思考卡片的标题文本为「思考中... X.Xs」。
+    // Start the thinking timer, refreshing the title text of all unfinished thinking cards to
+    // "Thinking... X.Xs" every 100ms.
     private startThinkingTimer() {
         this.stopThinkingTimer();
         if (!this.requestStartTime) {
@@ -3609,7 +3740,8 @@ export class AgentChat extends Model {
         this.thinkingTimerId = window.setInterval(tick, 100);
     }
 
-    // 停止思考计时器（思考结束/切换会话/停止生成时调用，避免泄漏）。
+    // Stop the thinking timer (called when thinking ends / switching sessions / stopping
+    // generation, to avoid leaks).
     private stopThinkingTimer() {
         if (this.thinkingTimerId) {
             clearInterval(this.thinkingTimerId);
@@ -3620,7 +3752,8 @@ export class AgentChat extends Model {
     private finishActiveThinking() {
         this.stopThinkingTimer();
         const L = window.siyuan.languages;
-        // 耗时存为数值（用于持久化 entry.duration），"已思考：Xs" 文本只在 DOM 显示、不落盘。
+        // The duration is stored as a number (used to persist entry.duration); the "Thought for Xs"
+        // text is only shown in the DOM and is not persisted.
         const durSec = this.requestStartTime ? (Date.now() - this.requestStartTime) / 1000 : 0;
         this.currentThinkingDuration = durSec;
         const doneText = durSec > 0
@@ -3638,7 +3771,9 @@ export class AgentChat extends Model {
                     streamingChat.remove();
                 }
             }
-            // 用户未手动操作且仍在预览态 → 思考完成后自动折叠（尊重用户已展开/折叠的最终状态）。
+            // If the user has not manually interacted and it is still in preview state -> auto-
+            // collapse once thinking completes (respecting whatever expand/collapse state the user
+            // already set).
             if (!el.hasAttribute("data-user-interacted")) {
                 const body = el.querySelector(".agent-chat__thinking-body");
                 body?.classList.remove("agent-chat__thinking-body--preview");
@@ -3660,8 +3795,10 @@ export class AgentChat extends Model {
         this.updateSendButtonState();
     }
 
-    // 根据"是否流式中"、"是否有可用模型"、"输入框是否有内容"综合决定发送按钮与输入框可用性。
-    // 无模型时一并禁用发送按钮与输入框（attr disabled + 灰样式 + composer-host 禁用态），从源头阻止无效请求。
+    // Decide the enabled state of the send button and input box based on a combination of "is
+    // streaming", "are there usable models", and "does the input box have content".
+    // With no models, also disable both the send button and the input box (disabled attribute +
+    // grayed-out style + composer-host disabled state), blocking invalid requests at the source.
     private updateSendButtonState() {
         const disabled = this.isStreaming || this.modelOptions.length === 0 || !this.hasComposerInput();
         if (disabled) {
@@ -3670,14 +3807,17 @@ export class AgentChat extends Model {
             this.sendBtn.removeAttribute("disabled");
         }
         if (this.composerHost) {
-            // 复用流式时已有的禁用态样式（灰显 + 阻止交互）。
-            // 注意：仅流式 / 无模型时禁用 composer；输入为空不禁用 composer（用户仍可正常编辑）。
+            // Reuse the existing disabled-state style from streaming (grayed out + blocks
+            // interaction).
+            // Note: the composer is disabled only while streaming / with no models; an empty input
+            // does not disable the composer (the user can still edit normally).
             const composerDisabled = this.isStreaming || this.modelOptions.length === 0;
             this.composerHost.classList.toggle("agent-chat__composer-host--disabled", composerDisabled);
         }
     }
 
-    // 输入框当前是否有可发送内容（含 @引用也算）。无 composer 时返回 false。
+    // Whether the input box currently has sendable content (an @ reference also counts). Returns
+    // false when there is no composer.
     private hasComposerInput(): boolean {
         if (!this.composer) {
             return false;
@@ -3685,15 +3825,18 @@ export class AgentChat extends Model {
         return this.composer.getSendData().text.length > 0;
     }
 
-    // 持续校正滚动位置约 duration ms（覆盖 dock 宽高过渡 / 异步富渲染期间 scrollHeight 变化），
-    // 使 scrollTop 落到距底部 scrollBottom 的位置。scrollBottom 为 0 即贴底。
-    // 供开关面板（layoutVisible 恢复）与切换会话（renderLoadedSession 后）共用。
+    // Keep correcting the scroll position for about duration ms (covering scrollHeight changes
+    // during the dock's width/height transition / asynchronous rich rendering), so scrollTop lands
+    // at a distance of scrollBottom from the bottom. scrollBottom of 0 means pinned to the bottom.
+    // Shared by toggling the panel (layoutVisible recovery) and switching sessions (after
+    // renderLoadedSession).
     private restoreScrollToBottom(scrollBottom: number, duration = 320) {
         if (scrollBottom < 0) {
             return;
         }
         const startedAt = Date.now();
-        // 标记为程序化滚动，避免恢复期间触发 scroll 事件里的 userScrolledUp 翻转。
+        // Mark this as a programmatic scroll, to prevent the scroll event fired during restoration
+        // from flipping userScrolledUp.
         this.programmaticScroll = true;
         const tick = () => {
             if (!this.layoutVisible) {
@@ -3701,13 +3844,15 @@ export class AgentChat extends Model {
                 return;
             }
             const {scrollHeight} = this.messagesContainer;
-            // 距底部同样的距离；距底为 0（贴底）时 target = scrollHeight。
+            // The same distance from the bottom; when the distance is 0 (pinned to the bottom),
+            // target = scrollHeight.
             const target = Math.max(0, scrollHeight - scrollBottom);
             this.messagesContainer.scrollTop = target;
             if (Date.now() - startedAt < duration) {
                 requestAnimationFrame(tick);
             } else {
-                // 多留一帧再清标志，确保最后一次 scroll 事件已被吞掉。
+                // Wait one more frame before clearing the flag, to make sure the last scroll event
+                // has been swallowed.
                 requestAnimationFrame(() => {
                     this.programmaticScroll = false;
                 });
@@ -3716,18 +3861,22 @@ export class AgentChat extends Model {
         requestAnimationFrame(tick);
     }
 
-    // 思考结束后定位到思考卡片下方：让折叠后的思考卡片底部贴近容器视口顶部，
-    // 其下方留出空间承载即将/已开始流式的正文。delay 用于等待卡片折叠的 max-height 过渡（约 0.2s）完成。
+    // After thinking ends, scroll to just below the thinking card: bring the collapsed card's
+    // bottom close to the top of the container's viewport, leaving room below it for the
+    // about-to-start/already-streaming body. delay waits for the card's collapse max-height
+    // transition (~0.2s) to finish.
     private scrollToThinkingCardBelow(card: HTMLElement, delay = 220) {
         const align = () => {
             if (!card.isConnected) {
                 return;
             }
-            // 用 getBoundingClientRect 计算卡片底部相对滚动容器的偏移，
-            // 避免依赖 offsetParent 是否为滚动容器（定位祖先可能不是 messagesContainer）。
+            // Use getBoundingClientRect to compute the card bottom's offset relative to the scroll
+            // container, avoiding a dependency on whether offsetParent is the scroll container
+            // (the positioned ancestor may not be messagesContainer).
             const containerRect = this.messagesContainer.getBoundingClientRect();
             const cardRect = card.getBoundingClientRect();
-            // 卡片底部在文档中的位置 - 容器顶部在文档中的位置 + 当前已滚动量 = 卡片底部的 scrollTop 目标值。
+            // (card bottom's position in the document) - (container top's position in the document)
+            // + (current scroll amount) = the target scrollTop for the card's bottom.
             const target = this.messagesContainer.scrollTop + (cardRect.bottom - containerRect.top) + 8;
             const max = this.messagesContainer.scrollHeight - this.messagesContainer.clientHeight;
             this.programmaticScroll = true;

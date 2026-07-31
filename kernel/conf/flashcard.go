@@ -24,14 +24,14 @@ import (
 )
 
 type Flashcard struct {
-	NewCardLimit    int  `json:"newCardLimit"`    // 新卡上限 https://github.com/siyuan-note/siyuan/issues/7695
-	ReviewCardLimit int  `json:"reviewCardLimit"` // 复习卡上限 https://github.com/siyuan-note/siyuan/issues/7703
-	Mark            bool `json:"mark"`            // 是否启用标记制卡 https://github.com/siyuan-note/siyuan/issues/7794
-	List            bool `json:"list"`            // 是否启用列表块制卡 https://github.com/siyuan-note/siyuan/issues/7701
-	SuperBlock      bool `json:"superBlock"`      // 是否启用超级块制卡 https://github.com/siyuan-note/siyuan/issues/7702
-	Heading         bool `json:"heading"`         // 是否启用标题块制卡 https://github.com/siyuan-note/siyuan/issues/9005
-	Deck            bool `json:"deck"`            // 是否启用卡包制卡 https://github.com/siyuan-note/siyuan/issues/7724
-	ReviewMode      int  `json:"reviewMode"`      // 复习模式，0：新旧混合，1：新卡优先，2：旧卡优先 https://github.com/siyuan-note/siyuan/issues/10303
+	NewCardLimit    int  `json:"newCardLimit"`    // New card limit https://github.com/siyuan-note/siyuan/issues/7695
+	ReviewCardLimit int  `json:"reviewCardLimit"` // Review card limit https://github.com/siyuan-note/siyuan/issues/7703
+	Mark            bool `json:"mark"`            // Whether to enable making cards from marks https://github.com/siyuan-note/siyuan/issues/7794
+	List            bool `json:"list"`            // Whether to enable making cards from list blocks https://github.com/siyuan-note/siyuan/issues/7701
+	SuperBlock      bool `json:"superBlock"`      // Whether to enable making cards from super blocks https://github.com/siyuan-note/siyuan/issues/7702
+	Heading         bool `json:"heading"`         // Whether to enable making cards from heading blocks https://github.com/siyuan-note/siyuan/issues/9005
+	Deck            bool `json:"deck"`            // Whether to enable making cards from decks https://github.com/siyuan-note/siyuan/issues/7724
+	ReviewMode      int  `json:"reviewMode"`      // Review mode, 0: mix new and old, 1: new cards first, 2: old cards first https://github.com/siyuan-note/siyuan/issues/10303
 
 	// Apply result optimized by FSRS optimizer https://github.com/siyuan-note/siyuan/issues/9309
 	RequestRetention float64 `json:"requestRetention"`

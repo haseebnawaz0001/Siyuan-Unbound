@@ -25,21 +25,27 @@ import (
 	"github.com/siyuan-note/siyuan/kernel/util"
 )
 
-// DEKProvider 由 model 层在 init 时注入，用于查询 boxID 对应的 DEK。
-// 返回 (nil, nil) 表示该 box 非加密——加解密函数原样返回 data，对普通笔记本透明。
-// 返回 (nil, error) 表示加密但未解锁——加解密函数拒绝读写，避免未解锁时静默落盘明文。
-// filesys 不能直接 import model（会形成 model → filesys → model 循环依赖），故采用回调注入。
+// DEKProvider is injected by the model layer at init time, used to look up the DEK for a boxID.
+// Returning (nil, nil) means the box is not encrypted -- the encrypt/decrypt functions return data as-is,
+// transparent to ordinary notebooks.
+// Returning (nil, error) means it's encrypted but not unlocked -- the encrypt/decrypt functions refuse to
+// read/write, to avoid silently writing plaintext to disk while unlocked.
+// filesys cannot import model directly (that would form a model -> filesys -> model circular dependency), so
+// callback injection is used instead.
 var DEKProvider func(boxID string) ([]byte, error)
 
-// DEKLockAcquire / DEKLockRelease 由 model 层注入，在获取 DEK 前后持 box 读锁，
-// 防止 LockBox 在加解密期间清除缓存。非加密 box 的注入为空时不影响行为。
+// DEKLockAcquire / DEKLockRelease are injected by the model layer, holding the box's read lock before and
+// after obtaining the DEK, to prevent LockBox from clearing the cache during encryption/decryption. When the
+// injection is nil for a non-encrypted box, behavior is unaffected.
 var DEKLockAcquire func(boxID string)
 var DEKLockRelease func(boxID string)
 
-// SyObjectBase 从 box 内相对路径提取稳定文件基名并校验合法性。
-// 接受形如 <rootID>.sy 的基名：扩展名必须是 .sy，且 stem 是合法节点 ID。
-// 非法扩展名或非节点 ID 模式返回错误，避免把任意路径当 AAD 绑定物产生不可解密的数据。
-// 由 filesys、model 历史查看/回滚、import 等所有 .sy 加解密路径共同使用，保证 AAD 一致。
+// SyObjectBase extracts the stable file basename from a box-relative path and validates it.
+// It accepts a basename of the form <rootID>.sy: the extension must be .sy, and the stem must be a valid node ID.
+// An invalid extension or a stem that doesn't match the node ID pattern returns an error, to avoid treating an
+// arbitrary path as the AAD binding and producing data that cannot be decrypted.
+// Used together by filesys, model's history view/rollback, import, and all other .sy encrypt/decrypt paths, to
+// keep the AAD consistent.
 func SyObjectBase(relativePath string) (string, error) {
 	p := filepath.ToSlash(relativePath)
 	p = strings.TrimPrefix(p, "/")
@@ -57,8 +63,9 @@ func SyObjectBase(relativePath string) (string, error) {
 	return base, nil
 }
 
-// SyAAD 构造 .sy 密文的 AAD：siyuan:v1:file:<boxID>:<稳定文件基名>。
-// 父目录不进 AAD——同 box 内文件名不变的移动允许原样 Rename 密文，内容/box/类型/对象 ID 仍受认证。
+// SyAAD constructs the AAD for .sy ciphertext: siyuan:v1:file:<boxID>:<stable file basename>.
+// The parent directory does not go into the AAD -- a move within the same box that keeps the filename
+// unchanged is allowed to Rename the ciphertext as-is, while content/box/type/object ID are still authenticated.
 func SyAAD(boxID, relativePath string) (string, error) {
 	base, err := SyObjectBase(relativePath)
 	if err != nil {
@@ -67,8 +74,9 @@ func SyAAD(boxID, relativePath string) (string, error) {
 	return "siyuan:v1:file:" + boxID + ":" + base, nil
 }
 
-// encryptedBox 判断 boxID 是否为已解锁的加密 box，供 filesys 内部分流（如静默修正禁用）。
-// 通过 DEKProvider 探测：返回非 nil dek 即加密且已解锁。
+// encryptedBox determines whether boxID is an already-unlocked encrypted box, for filesys's internal branching
+// (such as disabling silent repair).
+// Detected via DEKProvider: a non-nil dek means it's encrypted and unlocked.
 func encryptedBox(boxID string) bool {
 	if DEKProvider == nil {
 		return false
@@ -81,8 +89,10 @@ func encryptedBox(boxID string) bool {
 	return err == nil && dek != nil
 }
 
-// encryptData 若 boxID 是已解锁的加密 box，用 fileKey（DEK 派生子密钥）加密 data，
-// AAD 绑定 boxID + 稳定文件基名（不含父目录）；非加密笔记本原样返回；加密但未解锁时返回 error，拒绝写盘（防止明文泄漏）。
+// encryptData encrypts data with fileKey (a subkey derived from the DEK) if boxID is an already-unlocked
+// encrypted box, with the AAD bound to boxID + the stable file basename (excluding the parent directory);
+// a non-encrypted notebook is returned as-is; when encrypted but not unlocked, returns an error and refuses to
+// write to disk (to prevent plaintext leaks).
 func encryptData(boxID, relativePath string, data []byte) ([]byte, error) {
 	if DEKProvider == nil {
 		return data, nil
@@ -96,7 +106,7 @@ func encryptData(boxID, relativePath string, data []byte) ([]byte, error) {
 		return nil, err
 	}
 	if dek == nil {
-		return data, nil // 非加密 box
+		return data, nil // not an encrypted box
 	}
 	fileKey := util.DeriveSubKey(dek, "siyuan/file")
 	aad, err := SyAAD(boxID, relativePath)
@@ -106,7 +116,7 @@ func encryptData(boxID, relativePath string, data []byte) ([]byte, error) {
 	return util.EncryptWithAAD(fileKey, data, []byte(aad))
 }
 
-// decryptData 对应解密。非加密笔记本原样返回；加密但未解锁时返回 error，拒绝读盘。
+// decryptData is the corresponding decryption. A non-encrypted notebook is returned as-is; when encrypted but not unlocked, returns an error and refuses to read from disk.
 func decryptData(boxID, relativePath string, data []byte) ([]byte, error) {
 	if DEKProvider == nil {
 		return data, nil
@@ -120,7 +130,7 @@ func decryptData(boxID, relativePath string, data []byte) ([]byte, error) {
 		return nil, err
 	}
 	if dek == nil {
-		return data, nil // 非加密 box
+		return data, nil // not an encrypted box
 	}
 	fileKey := util.DeriveSubKey(dek, "siyuan/file")
 	aad, err := SyAAD(boxID, relativePath)
@@ -130,8 +140,8 @@ func decryptData(boxID, relativePath string, data []byte) ([]byte, error) {
 	return util.DecryptWithAAD(fileKey, data, []byte(aad))
 }
 
-// docIALBoxID 从 .sy 绝对路径反推 boxID，供 DocIAL 判断是否需整体解密。
-// 路径形如 <DataDir>/<boxID>/...；若不在 DataDir 下或 boxID 非合法 ID 模式，返回空串。
+// docIALBoxID infers the boxID from a .sy absolute path, for DocIAL to determine whether full decryption is needed.
+// The path is of the form <DataDir>/<boxID>/...; returns an empty string if it's not under DataDir or boxID doesn't match a valid ID pattern.
 func docIALBoxID(absPath string) string {
 	absPath = filepath.ToSlash(absPath)
 	dataDir := filepath.ToSlash(util.DataDir)

@@ -146,7 +146,8 @@
       &--hl {
         position: relative;
 
-        // 扩展点击命中范围到 li 的左侧和上下边缘，视觉 hover 高亮区域保持不变
+        // Extend the click hit area to the left and top/bottom edges of the li, while keeping the
+        // visual hover highlight area unchanged
         &::before {
           content: "";
           position: absolute;
@@ -163,7 +164,7 @@
       }
     }
 
-    // 大纲中有图片 https://github.com/siyuan-note/siyuan/issues/12993
+    // Images in the outline https://github.com/siyuan-note/siyuan/issues/12993
     .img img {
       height: 24px;
       vertical-align: top;
@@ -251,7 +252,7 @@
       color: var(--b3-theme-on-background);
       @include mixin.text-clamp(1);
 
-      // 搜索列表中自定义图标
+      // Custom icons in the search list
       & > img:not(.emoji),
       & > .custom-icon {
         height: 14px;

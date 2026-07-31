@@ -80,7 +80,7 @@ export class Preview {
                 if (target.tagName === "A") {
                     const linkAddress = target.getAttribute("href");
                     if (linkAddress.startsWith("#")) {
-                        // 导出预览模式点击块引转换后的脚注跳转不正确 https://github.com/siyuan-note/siyuan/issues/5700
+                        // In export preview mode, clicking a footnote converted from a block ref jumps incorrectly https://github.com/siyuan-note/siyuan/issues/5700
                         const hash = linkAddress.substring(1);
                         previewElement.querySelector('[data-node-id="' + hash + '"], [id="' + hash + '"]').scrollIntoView();
                         event.stopPropagation();
@@ -154,7 +154,7 @@ export class Preview {
             }
             const nodeElement = hasTopClosestByAttribute(event.target as HTMLElement, "id", undefined);
             if (nodeElement) {
-                // 用于点击后大纲定位
+                // Used to locate the position in the outline after clicking
                 this.element.querySelectorAll(".protyle-wysiwyg--select").forEach(item => {
                     item.classList.remove("selected");
                 });
@@ -242,7 +242,7 @@ export class Preview {
             copyElement.querySelectorAll("mjx-container > svg").forEach((item) => {
                 item.setAttribute("width", (parseInt(item.getAttribute("width")) * 8) + "px");
             });
-            // 列表嵌套 https://github.com/siyuan-note/siyuan/issues/11276
+            // Nested lists https://github.com/siyuan-note/siyuan/issues/11276
             copyElement.querySelectorAll("ul, ol").forEach((listItem: HTMLOListElement) => {
                 if (typeof listItem.start === "number") {
                     listItem.classList.add("list-paddingleft-" + Math.min(listItem.start.toString().length, 3));
@@ -255,7 +255,7 @@ export class Preview {
                     }
                 });
             });
-            // 处理任务列表（微信公众号不能显示input[type="checkbox"]）
+            // Handle task lists (WeChat Official Accounts cannot display input[type="checkbox"])
             copyElement.querySelectorAll("li.protyle-task").forEach((taskItem: HTMLElement) => {
                 const checkbox = taskItem.querySelector('input[type="checkbox"]') as HTMLInputElement;
                 if (checkbox) {
@@ -309,15 +309,15 @@ export class Preview {
             return;
         }
 
-        // 防止背景色被粘贴到公众号中
+        // Prevent the background color from being pasted into WeChat Official Accounts
         copyElement.style.backgroundColor = "#fff";
-        // 代码背景
+        // Code background
         copyElement.querySelectorAll("code").forEach((item) => {
             item.style.backgroundImage = "none";
         });
         const copyEditElement = copyElement.querySelector(".b3-typography") as HTMLElement;
         if (copyEditElement.firstElementChild.tagName === "DIV") {
-            // 最后/第一个块是公式块时无法复制下来
+            // Cannot be copied when the last/first block is a formula block
             copyElement.insertAdjacentHTML("afterbegin", "<p>&zwj;</p>");
         }
         if (copyEditElement.lastElementChild.tagName === "DIV") {

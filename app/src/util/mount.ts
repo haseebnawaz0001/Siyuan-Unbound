@@ -209,7 +209,7 @@ export const newNotebook = () => {
 };
 
 export const newEncryptedNotebook = () => {
-    // 先检查加密功能是否已启用；未启用则提示去设置页启用
+    // First check whether the encryption feature is enabled; if not, prompt to enable it in settings
     fetchPost("/api/notebook/getEncryptedNotebookStatus", {}, (response) => {
         if (!response.data.enabled) {
             showMessage(window.siyuan.languages.encryptedNotebookTip, 6000);
@@ -254,7 +254,7 @@ export const newEncryptedNotebook = () => {
                 password
             });
             if (response.code === 0) {
-                // createEncryptedNotebook 内核已原子完成创建+挂载，无需再单独 openNotebook
+                // The kernel's createEncryptedNotebook atomically completes both creation and mounting, so a separate openNotebook call is not needed
                 dialog.destroy();
             } else {
                 btnsElement[1].disabled = false;
@@ -291,7 +291,7 @@ export const openEncryptedNotebook = (app: App, notebookId: string, name: string
             return false;
         }
         btnsElement[1].disabled = true;
-        // 原子化解锁并挂载：UnlockBox 成功后立即 Mount，Mount 失败则后端自动 LockBox 回滚，避免 DEK 残留
+        // Atomically unlock and mount: Mount is called immediately after UnlockBox succeeds; if Mount fails, the backend automatically rolls back with LockBox to avoid leaving the DEK behind
         const response = await fetchSyncPost("/api/notebook/unlockAndOpenNotebook", {
             notebook: notebookId,
             password

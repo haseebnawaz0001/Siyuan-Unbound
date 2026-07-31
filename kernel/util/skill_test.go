@@ -24,7 +24,7 @@ import (
 	"testing"
 )
 
-// touchSkillMd 在 root 下创建一个含 SKILL.md 的 skill 目录。
+// touchSkillMd creates a skill directory containing SKILL.md under root.
 func touchSkillMd(t *testing.T, parts ...string) {
 	t.Helper()
 	p := filepath.Join(parts...)
@@ -37,14 +37,14 @@ func touchSkillMd(t *testing.T, parts ...string) {
 	}
 }
 
-// sorted 把 findSkillDirs 的返回结果排序后比较，避免遍历顺序影响断言。
+// sorted sorts findSkillDirs' return value before comparison, so traversal order doesn't affect assertions.
 func sorted(ss []string) []string {
 	out := append([]string(nil), ss...)
 	sort.Strings(out)
 	return out
 }
 
-// toSlashSet 把路径分隔符统一为 /，便于跨平台断言。
+// toSlashSet normalizes path separators to /, to make assertions portable across platforms.
 func toSlashSet(ss []string) []string {
 	out := make([]string, len(ss))
 	for i, s := range ss {
@@ -54,7 +54,8 @@ func toSlashSet(ss []string) []string {
 	return out
 }
 
-// TestFindSkillDirsRootSkill 验证 SKILL.md 直接在解压根时识别为单个 skill（相对路径 "."）。
+// TestFindSkillDirsRootSkill verifies that SKILL.md directly at the unzip root is recognized as a single skill
+// (relative path ".").
 func TestFindSkillDirsRootSkill(t *testing.T) {
 	root := t.TempDir()
 	touchSkillMd(t, root)
@@ -65,8 +66,9 @@ func TestFindSkillDirsRootSkill(t *testing.T) {
 	}
 }
 
-// TestFindSkillDirsWrappedSingle 验证 codeload 包裹的单 skill（<repo-name>/SKILL.md）。
-// 这是 owner/repo 简写最常见的场景，修复前会因"只在根找 skills/ 容器"而漏掉。
+// TestFindSkillDirsWrappedSingle verifies a single skill wrapped by codeload (<repo-name>/SKILL.md).
+// This is the most common scenario for the owner/repo shorthand; before the fix it was missed because the code
+// only looked for a skills/ container at the root.
 func TestFindSkillDirsWrappedSingle(t *testing.T) {
 	root := t.TempDir()
 	touchSkillMd(t, root, "WeChatReading")
@@ -77,8 +79,9 @@ func TestFindSkillDirsWrappedSingle(t *testing.T) {
 	}
 }
 
-// TestFindSkillDirsWrappedCollection 验证 codeload 包裹的集合仓库（<repo>/skills/<name>/SKILL.md）。
-// 修复前会完全找不到（根只有 repo 目录，其下才有 skills/）。
+// TestFindSkillDirsWrappedCollection verifies a collection repo wrapped by codeload
+// (<repo>/skills/<name>/SKILL.md).
+// Before the fix, this would not be found at all (root only has the repo directory, with skills/ underneath it).
 func TestFindSkillDirsWrappedCollection(t *testing.T) {
 	root := t.TempDir()
 	touchSkillMd(t, root, "myrepo", "skills", "foo")
@@ -90,7 +93,7 @@ func TestFindSkillDirsWrappedCollection(t *testing.T) {
 	}
 }
 
-// TestFindSkillDirsCollectionNoWrap 验证无包裹的集合仓库（skills/<name>/SKILL.md）。
+// TestFindSkillDirsCollectionNoWrap verifies an unwrapped collection repo (skills/<name>/SKILL.md).
 func TestFindSkillDirsCollectionNoWrap(t *testing.T) {
 	root := t.TempDir()
 	touchSkillMd(t, root, "skills", "baz")
@@ -101,11 +104,11 @@ func TestFindSkillDirsCollectionNoWrap(t *testing.T) {
 	}
 }
 
-// TestFindSkillDirsDoesNotDescendIntoSkillInternals 验证识别到 skill 后停止下钻，
-// 不会把 skill 内部的 references/、scripts/ 子目录误判为 skill。
+// TestFindSkillDirsDoesNotDescendIntoSkillInternals verifies that recursion stops once a skill is recognized, so
+// the internal references/ and scripts/ subdirectories of a skill are not mistaken for skills.
 func TestFindSkillDirsDoesNotDescendIntoSkillInternals(t *testing.T) {
 	root := t.TempDir()
-	// skill5 自身有 SKILL.md，同时含 references/a.md、scripts/b.py
+	// skill5 itself has SKILL.md, and also contains references/a.md, scripts/b.py
 	skillDir := filepath.Join(root, "skill5", "SKILL.md")
 	if err := os.MkdirAll(filepath.Join(root, "skill5", "references"), 0755); err != nil {
 		t.Fatal(err)
@@ -129,7 +132,7 @@ func TestFindSkillDirsDoesNotDescendIntoSkillInternals(t *testing.T) {
 	}
 }
 
-// TestFindSkillDirsNoneFound 验证没有 SKILL.md 时返回空切片。
+// TestFindSkillDirsNoneFound verifies an empty slice is returned when there is no SKILL.md.
 func TestFindSkillDirsNoneFound(t *testing.T) {
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, "some", "dir"), 0755); err != nil {
@@ -140,11 +143,12 @@ func TestFindSkillDirsNoneFound(t *testing.T) {
 	}
 }
 
-// TestFindSkillDirsSkipsVCSDirs 验证跳过 .git/.github 等元数据目录，不做无意义下钻。
+// TestFindSkillDirsSkipsVCSDirs verifies that metadata directories like .git/.github are skipped, avoiding
+// pointless recursion.
 func TestFindSkillDirsSkipsVCSDirs(t *testing.T) {
 	root := t.TempDir()
 	touchSkillMd(t, root, "real-skill")
-	// 构造 .github 目录（无 SKILL.md），确认不会因下钻它而出错或误判
+	// Create a .github directory (no SKILL.md) to confirm recursing into it doesn't error out or misidentify
 	if err := os.MkdirAll(filepath.Join(root, ".github", "workflows"), 0755); err != nil {
 		t.Fatal(err)
 	}
@@ -155,41 +159,41 @@ func TestFindSkillDirsSkipsVCSDirs(t *testing.T) {
 	}
 }
 
-// urlCase 是 normalizeSkillURL 的表驱动用例。
+// urlCase is a table-driven test case for normalizeSkillURL.
 type urlCase struct {
 	name       string
 	in         string
-	wantURL    string // 期望的 downloadURL；空表示不校验精确值，改校验 isZip/branch
+	wantURL    string // Expected downloadURL; empty means don't check the exact value, check isZip/branch instead
 	wantIsZip  bool
 	wantBranch string
 }
 
-// TestNormalizeSkillURL 验证各种输入形态归一化为正确的下载源。
+// TestNormalizeSkillURL verifies that various input shapes are normalized into the correct download source.
 func TestNormalizeSkillURL(t *testing.T) {
 	cases := []urlCase{
-		// owner/repo 简写 → codeload main，失败回退 master
+		// owner/repo shorthand -> codeload main, falls back to master on failure
 		{name: "shorthand", in: "Tencent/WeChatReading", wantURL: "https://codeload.github.com/Tencent/WeChatReading/zip/refs/heads/main", wantIsZip: true, wantBranch: "main"},
-		// 整条 npx skills add 命令 → 提取出 owner/repo
+		// A full npx skills add command -> extract owner/repo
 		{name: "npx command", in: "npx skills add Tencent/WeChatReading -g", wantURL: "https://codeload.github.com/Tencent/WeChatReading/zip/refs/heads/main", wantIsZip: true, wantBranch: "main"},
-		// 带 @ 版本的 skills 包名
+		// skills package name with an @ version
 		{name: "npx scoped", in: "npx skills@latest add foo/bar", wantURL: "https://codeload.github.com/foo/bar/zip/refs/heads/main", wantIsZip: true, wantBranch: "main"},
-		// 完整 GitHub 仓库 URL → codeload main
+		// Full GitHub repo URL -> codeload main
 		{name: "full repo", in: "https://github.com/Tencent/WeChatReading", wantURL: "https://codeload.github.com/Tencent/WeChatReading/zip/refs/heads/main", wantIsZip: true, wantBranch: "main"},
-		// tree/<branch> → codeload 指定分支
+		// tree/<branch> -> codeload with the specified branch
 		{name: "tree branch", in: "https://github.com/foo/bar/tree/dev", wantURL: "https://codeload.github.com/foo/bar/zip/refs/heads/dev", wantIsZip: true, wantBranch: "dev"},
-		// tree/<branch>/<path> → 仍按整个仓库的该分支拉 zip
+		// tree/<branch>/<path> -> still pulls the zip for that branch of the whole repo
 		{name: "tree branch path", in: "https://github.com/foo/bar/tree/dev/skills/x", wantURL: "https://codeload.github.com/foo/bar/zip/refs/heads/dev", wantIsZip: true, wantBranch: "dev"},
-		// commit/<sha> → codeload zip/<sha>
+		// commit/<sha> -> codeload zip/<sha>
 		{name: "commit sha", in: "https://github.com/foo/bar/commit/abc123", wantURL: "https://codeload.github.com/foo/bar/zip/abc123", wantIsZip: true},
-		// blob/<branch>/<path> → raw 直链（单文件）
+		// blob/<branch>/<path> -> raw direct link (single file)
 		{name: "blob file", in: "https://github.com/foo/bar/blob/main/SKILL.md", wantURL: "https://raw.githubusercontent.com/foo/bar/main/SKILL.md", wantIsZip: false},
-		// raw 直链 → 原样
+		// raw direct link -> unchanged
 		{name: "raw direct", in: "https://raw.githubusercontent.com/foo/bar/main/skills/x/SKILL.md", wantURL: "https://raw.githubusercontent.com/foo/bar/main/skills/x/SKILL.md", wantIsZip: false},
-		// releases/download/<tag>/<asset>.zip → 原样，预判 zip
+		// releases/download/<tag>/<asset>.zip -> unchanged, pre-guessed as zip
 		{name: "release zip", in: "https://github.com/foo/bar/releases/download/v1.0/skill.zip", wantURL: "https://github.com/foo/bar/releases/download/v1.0/skill.zip", wantIsZip: true},
-		// releases/download 但 asset 非 zip → 原样，不预判 zip（交由 Content-Type 判定）
+		// releases/download but asset is not zip -> unchanged, not pre-guessed as zip (decided by Content-Type)
 		{name: "release non-zip", in: "https://github.com/foo/bar/releases/download/v1.0/skill.tar.gz", wantURL: "https://github.com/foo/bar/releases/download/v1.0/skill.tar.gz", wantIsZip: false},
-		// 第三方直链 → 原样
+		// Third-party direct link -> unchanged
 		{name: "third-party", in: "https://example.com/skill.zip", wantURL: "https://example.com/skill.zip"},
 	}
 	for _, c := range cases {
@@ -211,29 +215,31 @@ func TestNormalizeSkillURL(t *testing.T) {
 	}
 }
 
-// TestNormalizeSkillURLOwnerRepoBoundary 验证 owner/repo 简写判定不会误伤普通文本。
-// 含点（域名）、含冒号、带 scheme 的都不应走简写分支。
+// TestNormalizeSkillURLOwnerRepoBoundary verifies that owner/repo shorthand detection doesn't misfire on plain
+// text.
+// Inputs containing a dot (domain), a colon, or a scheme should never go through the shorthand branch.
 func TestNormalizeSkillURLOwnerRepoBoundary(t *testing.T) {
 	bad := []string{
-		"example.com",     // 不是 owner/repo
-		"a/b/c",           // 多于一个斜杠
-		"https://foo/bar", // 含 scheme（应走 URL 分支，但属于合法 URL 不报错）
-		"/abs/path",       // 绝对路径
+		"example.com",     // Not owner/repo
+		"a/b/c",           // More than one slash
+		"https://foo/bar", // Has a scheme (should go through the URL branch, but is a valid URL so no error)
+		"/abs/path",       // Absolute path
 	}
 	for _, in := range bad {
-		// 这些输入要么报错，要么走 URL 分支；只要不 panic、不误判为 codeload 即可
+		// These inputs either error out or go through the URL branch; as long as it doesn't panic or get
+		// misidentified as codeload, that's fine
 		got, err := normalizeSkillURL(in)
 		if err != nil {
-			continue // 报错是可接受的
+			continue // An error is acceptable
 		}
-		// 不应被误判为 codeload.github.com（只有 owner/repo 简写和 github.com URL 才会）
+		// Should not be misidentified as codeload.github.com (only owner/repo shorthand and github.com URLs would be)
 		if in == "example.com" && strings.HasPrefix(got.downloadURL, "https://codeload.github.com/") {
 			t.Errorf("input %q should not map to codeload, got %s", in, got.downloadURL)
 		}
 	}
 }
 
-// TestNormalizeSkillURLOwnerRepoValid 确认合法 owner/repo 走 codeload 分支。
+// TestNormalizeSkillURLOwnerRepoValid confirms that a valid owner/repo goes through the codeload branch.
 func TestNormalizeSkillURLOwnerRepoValid(t *testing.T) {
 	good := []string{"a/b", "Tencent/WeChatReading", "user-1/my.repo.v2"}
 	for _, in := range good {
@@ -248,7 +254,8 @@ func TestNormalizeSkillURLOwnerRepoValid(t *testing.T) {
 	}
 }
 
-// TestParseSkillFrontmatter 验证 frontmatter 解析提取 name/description，正文正确剥离。
+// TestParseSkillFrontmatter verifies that frontmatter parsing extracts name/description and correctly strips the
+// body.
 func TestParseSkillFrontmatter(t *testing.T) {
 	cases := []struct {
 		name     string
@@ -301,7 +308,7 @@ func TestParseSkillFrontmatter(t *testing.T) {
 	}
 }
 
-// TestFirstLine 验证描述兜底提取首行并截断。
+// TestFirstLine verifies the description fallback extracts the first line and truncates it.
 func TestFirstLine(t *testing.T) {
 	cases := []struct{ in, want string }{
 		{"", ""},
@@ -317,7 +324,7 @@ func TestFirstLine(t *testing.T) {
 	}
 }
 
-// TestFirstLineTruncation 验证超长首行被截断为 200 字符 + "..."。
+// TestFirstLineTruncation verifies that an overly long first line is truncated to 200 characters + "...".
 func TestFirstLineTruncation(t *testing.T) {
 	long := make([]rune, 300)
 	for i := range long {

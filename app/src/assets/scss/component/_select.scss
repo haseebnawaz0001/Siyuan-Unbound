@@ -32,7 +32,7 @@
     }
   }
 
-  // 仅 Windows 桌面端与浏览器启用 base-select 统一样式
+  // Only enable the unified base-select style on Windows desktop and browser
   .body--win32 &, .body--win32-browser & {
     @supports (appearance: base-select) {
       appearance: base-select;

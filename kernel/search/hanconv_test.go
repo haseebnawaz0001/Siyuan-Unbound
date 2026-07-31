@@ -37,7 +37,7 @@ func TestHanInsensitiveRegexp(t *testing.T) {
 		t.Errorf("hanInsensitiveRegexp(诗经) 不应匹配 诗书")
 	}
 
-	// 繁体关键字同样展开
+	// Traditional keywords are expanded the same way
 	re2 := regexp.MustCompile("^" + hanInsensitiveRegexp("髮") + "$")
 	for _, s := range []string{"髮", "发", "發"} {
 		if !re2.MatchString(s) {
@@ -45,7 +45,7 @@ func TestHanInsensitiveRegexp(t *testing.T) {
 		}
 	}
 
-	// 无繁简变体的字符保持原样
+	// Characters with no traditional/simplified variant remain unchanged
 	if got := hanInsensitiveRegexp("中a1"); "中a1" != got {
 		t.Errorf("hanInsensitiveRegexp(中a1) = %q，应为原样", got)
 	}
@@ -61,7 +61,7 @@ func TestEncloseHighlightingHanInsensitive(t *testing.T) {
 		t.Errorf("繁简不敏感高亮 = %q, want %q", got, want)
 	}
 
-	// 大小写折叠与繁简折叠互不干扰
+	// Case folding and traditional/simplified folding do not interfere with each other
 	got = EncloseHighlighting("ABC 詩經", []string{"abc"}, "<mark>", "</mark>", false, false)
 	if want := "<mark>ABC</mark> 詩經"; want != got {
 		t.Errorf("大小写+繁简 = %q, want %q", got, want)

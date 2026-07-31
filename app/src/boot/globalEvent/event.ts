@@ -58,10 +58,10 @@ export const initWindowEvent = (app: App) => {
         windowMouseMove(event, mouseIsEnter);
     });
 
-    // 横向滚动表格时重新定位表格列宽调整手柄 https://github.com/siyuan-note/siyuan/issues/13828
+    // Reposition the table column-width resize handle when the table is scrolled horizontally https://github.com/siyuan-note/siyuan/issues/13828
     window.addEventListener("scroll", (event: Event) => {
         const scrollElement = event.target as HTMLElement;
-        // 仅处理表格内容容器（.table 块的 firstElementChild）的滚动
+        // Only handle scrolling of the table content container (a .table block's firstElementChild)
         if (!scrollElement.parentElement || !scrollElement.parentElement.classList.contains("table")) {
             return;
         }
@@ -89,12 +89,13 @@ export const initWindowEvent = (app: App) => {
         if (event.dataTransfer.types.includes("text/plain")) {
             return;
         }
-        // 拖拽标题/列表项块标时，按浮窗模型控制文档树所在浮动 dock 的显隐：
-        // 鼠标在边缘触发区或面板内则展开，离开则收起 https://github.com/siyuan-note/siyuan/issues/18043
+        // When dragging a heading/list item block handle, control the visibility of the floating dock holding the
+        // file tree using the floating-panel model: expand when the mouse is in the edge trigger zone or inside
+        // the panel, collapse when it leaves https://github.com/siyuan-note/siyuan/issues/18043
         if (!isWindow() &&
             (!window.siyuan.layout.leftDock.pin || !window.siyuan.layout.rightDock.pin || !window.siyuan.layout.bottomDock.pin)) {
             const fileDock = getDockByType("file");
-            // 文档树所在 dock 为浮动且文档树图标激活时才处理
+            // Only handle this when the dock holding the file tree is floating and the file tree icon is active
             if (fileDock && !fileDock.pin &&
                 document.querySelector('.dock__items > .dock__item--active[data-type="file"]')) {
                 let gutterBlockType = "";
@@ -108,7 +109,8 @@ export const initWindowEvent = (app: App) => {
                     const statusHeight = document.getElementById("status")?.clientHeight || 0;
                     const toolbarHeight = document.getElementById("toolbar")?.clientHeight || 0;
                     const inYRange = event.clientY > toolbarHeight && event.clientY < window.innerHeight - statusHeight;
-                    // 通过 dock 容器类名判断位置，避免访问私有属性 position
+                    // Determine the position via the dock container's class name, avoiding access to the private
+                    // "position" property
                     const dockElement = fileDock.layout.element;
                     let onEdge = false;
                     if (dockElement.classList.contains("layout__dockl")) {
@@ -132,7 +134,8 @@ export const initWindowEvent = (app: App) => {
         }
         const fileElement = hasClosestByClassName(event.target, "sy__file");
         const protyleElement = hasClosestByClassName(event.target, "protyle", true);
-        // 光标不在编辑器也不在文档树内时，隐藏拖拽提示（避免卡在无效区域）
+        // Hide the drag tip when the cursor is neither in the editor nor in the file tree (avoids getting stuck
+        // over an invalid area)
         if (!fileElement && !protyleElement) {
             document.querySelector(".drag-tip")?.remove();
             stopScrollAnimation();
@@ -190,7 +193,7 @@ export const initWindowEvent = (app: App) => {
     });
 
     window.addEventListener("mousedown", (event) => {
-        // protyle.toolbar 点击空白处时进行隐藏
+        // Hide protyle.toolbar when clicking on empty space
         if (!hasClosestByClassName(event.target as Element, "protyle-toolbar")) {
             hideAllElements(["toolbar"]);
         }
@@ -240,7 +243,8 @@ export const initWindowEvent = (app: App) => {
     }, false);
 
     document.addEventListener("touchend", (event) => {
-        // 无条件前置取消手动桥接：触发各组件（如 Outline.bindSort）注册的 mouseup 清理回调，复位 document.onmousemove 等状态
+        // Unconditionally cancel the manual touch bridge up front: this triggers the mouseup cleanup callbacks
+        // registered by various components (e.g. Outline.bindSort), resetting state such as document.onmousemove
         cancelManualTouch();
         if (window.siyuan.touchDragActive) {
             return;
@@ -248,7 +252,8 @@ export const initWindowEvent = (app: App) => {
         if (Math.abs(startX - event.changedTouches[0].clientX) < Constants.SIZE_DRAG_THRESHOLD &&
             Math.abs(startY - event.changedTouches[0].clientY) < Constants.SIZE_DRAG_THRESHOLD &&
             Date.now() - time > Constants.TIMEOUT_LONGPRESS &&
-            // 鼠标长按不应合成右键菜单：触屏长按出菜单是手指专属手势，鼠标菜单由右键触发
+            // A mouse long-press should not synthesize a context menu: a long press bringing up a menu is a
+            // touch-only gesture, while the mouse's menu is triggered by right-click
             !isLastPointerMouse()) {
             event.target.dispatchEvent(new MouseEvent("contextmenu", {
                 bubbles: true,

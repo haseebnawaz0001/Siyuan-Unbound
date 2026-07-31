@@ -96,10 +96,10 @@ func RemoveWorkspaceSession(session *SessionData) {
 	delete(session.Workspaces, WorkspaceDir)
 }
 
-// IsBrowserRequest 判断请求是否来自浏览器（非 SiYuan 原生客户端）。
-// 原生客户端（桌面 Electron、Android/iOS/Harmony）的 User-Agent 均以 "SiYuan/" 开头，
-// 其余视为浏览器。该口径与前端 getFrontend()、electron/main.js 设置的 UA 前缀、
-// 以及 session 鉴权中既有的 HasPrefix(ua, "SiYuan/") 判断保持一致。
+// IsBrowserRequest determines whether the request comes from a browser (as opposed to a native SiYuan client).
+// Native clients (desktop Electron, Android/iOS/HarmonyOS) all have a User-Agent starting with "SiYuan/";
+// everything else is treated as a browser. This criterion stays consistent with the frontend's getFrontend(), the
+// UA prefix set in electron/main.js, and the existing HasPrefix(ua, "SiYuan/") check in session authentication.
 func IsBrowserRequest(c *gin.Context) bool {
 	return !strings.HasPrefix(c.GetHeader("User-Agent"), "SiYuan/")
 }

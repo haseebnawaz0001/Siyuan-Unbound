@@ -21,7 +21,7 @@ export const encodeBase64 = (text: string): string => {
         const encoder = new TextEncoder();
         const bytes = encoder.encode(text);
         let binary = "";
-        const chunkSize = 0x8000; // 避免栈溢出
+        const chunkSize = 0x8000; // avoid stack overflow
 
         for (let i = 0; i < bytes.length; i += chunkSize) {
             const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
@@ -35,7 +35,7 @@ export const encodeBase64 = (text: string): string => {
 export const getTextSiyuanFromTextHTML = (html: string) => {
     if (html.trimStart().startsWith("<html") &&
         html.substring(0, html.indexOf(">")).includes('xmlns:x="urn:schemas-microsoft-com:office:excel"')) {
-        // 移除 Microsoft Excel 中的 data-siyuan https://github.com/siyuan-note/siyuan/pull/16338
+        // Remove data-siyuan from Microsoft Excel content https://github.com/siyuan-note/siyuan/pull/16338
         return {
             textSiyuan: "",
             textHtml: html.replace(/<!--data-siyuan='[^']+'-->/g, "")
@@ -54,7 +54,7 @@ export const getTextSiyuanFromTextHTML = (html: string) => {
                 const bytes = Uint8Array.from(atob(siyuanMatch[1]), char => char.charCodeAt(0));
                 textSiyuan = decoder.decode(bytes);
             }
-            // 移除注释节点，保持原有的 text/html 内容
+            // Remove the comment node, keeping the original text/html content
             textHtml = html.replace(/<!--data-siyuan='[^']+'-->/g, "");
         } catch (e) {
             console.log("Failed to decode siyuan data from HTML comment:", e);
@@ -171,7 +171,7 @@ export const readText = () => {
 
 /// #if !BROWSER
 export const getLocalFiles = async () => {
-    // 不再支持 PC 浏览器 https://github.com/siyuan-note/siyuan/issues/7206
+    // Desktop browsers are no longer supported https://github.com/siyuan-note/siyuan/issues/7206
     let localFiles: ILocalFiles[] = [];
     if ("darwin" === window.siyuan.config.system.os) {
         const xmlString = await ipcRenderer.invoke(Constants.SIYUAN_GET, {
@@ -264,7 +264,7 @@ export const writeText = (text: string) => {
         range = getSelection().getRangeAt(0).cloneRange();
     }
     try {
-        // navigator.clipboard.writeText 抛出异常不进入 catch，这里需要先处理移动端复制
+        // navigator.clipboard.writeText throwing doesn't fall into catch, so mobile copy must be handled here first
         if (isInAndroid()) {
             window.JSAndroid.writeClipboard(text);
             return;
@@ -302,11 +302,11 @@ export const writeText = (text: string) => {
 };
 
 export const copyPlainText = (text: string) => {
-    text = text.replace(new RegExp(Constants.ZWSP, "g"), ""); // `复制纯文本` 时移除所有零宽空格 https://github.com/siyuan-note/siyuan/issues/6674
+    text = text.replace(new RegExp(Constants.ZWSP, "g"), ""); // Remove all zero-width spaces for "copy plain text" https://github.com/siyuan-note/siyuan/issues/6674
     writeText(text);
 };
 
-// 用户 iPhone 点击延迟/需要双击的处理
+// Handling for iPhone's click delay / need for a double-tap
 export const getEventName = () => {
     if (isIPhone()) {
         return "touchstart";
@@ -423,13 +423,14 @@ export function isChromeBrowser(): boolean {
     };
     if (nav.userAgentData && Array.isArray(nav.userAgentData.brands)) {
         const brands = nav.userAgentData.brands.map((b) => b.brand);
-        // Edge、Opera 等 Chromium 内核浏览器 brands 中同样包含 Chromium，需与 userAgent 回退逻辑一致排除
+        // Chromium-based browsers such as Edge and Opera also include Chromium in their brands, so they must be
+        // excluded here to stay consistent with the userAgent fallback logic
         if (brands.some((brand) => /Edge|Opera|OPR/i.test(brand))) {
             return false;
         }
         return brands.some((brand) => /Chrome|Chromium/i.test(brand));
     }
-    // 回退到 userAgent
+    // Fall back to userAgent
     const ua = nav.userAgent || "";
     const isChromium = /\bChrome\/\d+/i.test(ua) || /\bChromium\/\d+/i.test(ua);
     const isEdge = /\bEdg(e|A|iOS)?\/\d+/i.test(ua); // Edge Chromium
@@ -445,7 +446,7 @@ export const updateHotkeyAfterTip = (hotkey: string, split = " ") => {
     return "";
 };
 
-// Mac，Windows 快捷键展示
+// Hotkey display for Mac vs Windows
 export const updateHotkeyTip = (hotkey: string) => {
     if (!hotkey || isMac()) {
         return hotkey;
@@ -455,7 +456,7 @@ export const updateHotkeyTip = (hotkey: string) => {
     if (hotkey.indexOf("⇧") > -1) keys.push("Shift");
     if (hotkey.indexOf("⌥") > -1) keys.push("Alt");
 
-    // 不能去最后一个，需匹配 F2
+    // Can't strip just the last character, needs to match things like F2
     const lastKey = hotkey.replace(/[⌘⇧⌥⌃]/g, "");
     if (lastKey) {
         keys.push({
@@ -471,7 +472,7 @@ export const updateHotkeyTip = (hotkey: string) => {
 export const getLocalStorage = (cb: () => void) => {
     fetchPost("/api/storage/getLocalStorage", undefined, (response) => {
         window.siyuan.storage = response.data;
-        // 历史数据迁移
+        // Legacy data migration
         const defaultStorage: any = {};
         defaultStorage[Constants.LOCAL_SEARCHASSET] = {
             keys: [],
@@ -591,7 +592,7 @@ export const getLocalStorage = (cb: () => void) => {
                 try {
                     const parseData = JSON.parse(response.data[key]);
                     if (typeof parseData === "number") {
-                        // https://github.com/siyuan-note/siyuan/issues/8852 Object.assign 会导致 number to Number
+                        // https://github.com/siyuan-note/siyuan/issues/8852 Object.assign would turn a number into a Number wrapper
                         window.siyuan.storage[key] = parseData;
                     } else {
                         window.siyuan.storage[key] = Object.assign(defaultStorage[key], parseData);
@@ -603,7 +604,7 @@ export const getLocalStorage = (cb: () => void) => {
                 window.siyuan.storage[key] = defaultStorage[key];
             }
         });
-        // 搜索数据添加 replaceTypes 兼容
+        // Backward compatibility: add replaceTypes to search data
         if (!window.siyuan.storage[Constants.LOCAL_SEARCHDATA].replaceTypes ||
             Object.keys(window.siyuan.storage[Constants.LOCAL_SEARCHDATA].replaceTypes).length === 0) {
             window.siyuan.storage[Constants.LOCAL_SEARCHDATA].replaceTypes = Object.assign({}, Constants.SIYUAN_DEFAULT_REPLACETYPES);
@@ -644,7 +645,7 @@ export const initWindowOpenOverride = (app: App, openExternal?: (url: string) =>
             openExternal(urlStr);
             return null;
         }
-        // 浏览器可通过 window.open("siyuan://blocks/20221031001313-rk7sd0e", "_blank") 打开本地客户端
+        // A browser can open the local client via window.open("siyuan://blocks/20221031001313-rk7sd0e", "_blank")
         return originalOpen.call(window, url, target, features);
     };
 };

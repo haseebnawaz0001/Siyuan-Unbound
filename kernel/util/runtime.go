@@ -41,8 +41,9 @@ import (
 
 var DisabledFeatures []string
 
-// CLILogLevel 在 CLI 子命令通过 --log-level 显式指定日志级别时被设置，model.InitConf 末尾据此跳过对
-// logging.SetLogLevel 的覆盖，使命令行参数优先于 conf.json 的 system.logLevel。
+// CLILogLevel is set when a CLI subcommand explicitly specifies the log level via --log-level; based on this,
+// the end of model.InitConf skips overriding logging.SetLogLevel, so the command-line argument takes priority
+// over system.logLevel in conf.json.
 var CLILogLevel string
 
 func DisableFeature(feature string) {
@@ -51,15 +52,15 @@ func DisableFeature(feature string) {
 }
 
 var (
-	UseSingleLineSave    = true // UseSingleLineSave 是否使用单行保存 .sy 和数据库 .json 文件。
-	LargeFileWarningSize = 8    // LargeFileWarningSize 大文件警告大小，单位：MB
+	UseSingleLineSave    = true // UseSingleLineSave whether to save .sy and database .json files as a single line.
+	LargeFileWarningSize = 8    // LargeFileWarningSize large file warning size, in MB
 )
 
 func ExceedLargeFileWarningSize(fileSize int) bool {
 	return fileSize > LargeFileWarningSize*1024*1024
 }
 
-// IsUILoaded 是否已经加载了 UI。
+// IsUILoaded whether the UI has already been loaded.
 var IsUILoaded = false
 
 func WaitForUILoaded() {
@@ -83,15 +84,16 @@ func HookUILoaded() {
 	}
 }
 
-// IsExiting 是否正在退出程序。
+// IsExiting whether the program is currently exiting.
 var IsExiting = atomic.Bool{}
 
-// MobileOSVer 移动端操作系统版本。
+// MobileOSVer the mobile client's operating system version.
 var MobileOSVer string
 
-// DatabaseVer 数据库版本。
-// 格式：yyyyMMddHHmm。修改表结构时需要更新此值，启动时会检测版本变化，
-// 若不一致则自动移除旧数据库文件并重建表结构，同时触发全量重建索引。
+// DatabaseVer the database version.
+// Format: yyyyMMddHHmm. This value must be updated when the table schema changes; on boot, a version change is
+// detected, and if it doesn't match, the old database file is automatically removed and the table schema is
+// rebuilt, which also triggers a full index rebuild.
 const DatabaseVer = "202607031200"
 
 func logBootInfo() {
@@ -175,7 +177,7 @@ func getWorkspaceDriveType() string {
 					continue
 				}
 
-				// 选路径最长的挂载点（如 /home/data 优于 /）
+				// Pick the mount point with the longest path (e.g. /home/data over /)
 				if len(mountPath) >= maxMountPathLen {
 					maxMountPathLen = len(mountPath)
 					matchedDriveType = partition.Disk.DriveType.String()
@@ -192,7 +194,8 @@ func RandomSleep(minMills, maxMills int) {
 }
 
 func GetDeviceID() string {
-	// 使用随机标识而非机器硬件标识，避免设备指纹外泄；该值首次生成后会持久化在 conf.json 中，因此每个安装保持稳定
+	// Use a random identifier instead of a hardware-derived one, to avoid leaking a device fingerprint; this
+	// value is persisted in conf.json after it's first generated, so it stays stable for each installation
 	return gulu.Rand.String(12)
 }
 
@@ -222,7 +225,7 @@ func SetNetworkProxy(proxyURL string) {
 }
 
 const (
-	// SQLFlushInterval 为数据库事务队列写入间隔。
+	// SQLFlushInterval is the write interval for the database transaction queue.
 	SQLFlushInterval = 3000 * time.Millisecond
 )
 
@@ -394,7 +397,7 @@ func isICloudPath(workspaceAbsPath string) (ret bool) {
 
 	workspaceAbsPathLower := strings.ToLower(workspaceAbsPath)
 
-	// macOS 端对工作空间放置在 iCloud 路径下做检查 https://github.com/siyuan-note/siyuan/issues/7747
+	// On macOS, check whether the workspace is placed under an iCloud path https://github.com/siyuan-note/siyuan/issues/7747
 	iCloudRoot := filepath.Join(HomeDir, "Library", "Mobile Documents")
 	WalkWithSymlinks(iCloudRoot, func(path string, d fs.DirEntry, err error) error {
 		if !d.IsDir() {
@@ -420,7 +423,7 @@ func existAvailabilityStatus(workspaceAbsPath string) bool {
 		return false
 	}
 
-	// 改进 Windows 端第三方同步盘检测 https://github.com/siyuan-note/siyuan/issues/7777
+	// Improve detection of third-party sync drives on Windows https://github.com/siyuan-note/siyuan/issues/7777
 
 	defer logging.Recover()
 
@@ -503,5 +506,5 @@ const (
 
 var SearchCaseSensitive bool
 
-// SearchHanSensitive 是否区分繁简，由 sql.SetHanSensitive 维护；默认 true 与既往行为一致
+// SearchHanSensitive whether to distinguish traditional/simplified Chinese; maintained by sql.SetHanSensitive, defaults to true to match past behavior
 var SearchHanSensitive = true

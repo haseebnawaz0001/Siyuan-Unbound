@@ -19,7 +19,7 @@
     margin: 0 auto;
   }
 
-  // 需显示 p 的使用范围 https://github.com/siyuan-note/siyuan/issues/11670
+  // Need to show the scope where p is used https://github.com/siyuan-note/siyuan/issues/11670
   li > p,
   & > p,
   blockquote > p,
@@ -543,7 +543,7 @@
   [data-subtype="flowchart"] > [spin="1"],
   [data-subtype="plantuml"] > [spin="1"],
   [data-subtype="mermaid"] > [spin="1"] {
-    // 不能加到上一级，否则属性会跟随滚动
+    // Must stay on this selector, not the parent, otherwise the property would follow scrolling
     overflow: auto;
     line-height: initial;
   }
@@ -559,8 +559,8 @@
   }
 
   .img {
-    // inline-block 会导致 https://ld246.com/article/1677809509055
-    // initial 会导致 https://ld246.com/article/1678257197581?r=88250
+    // inline-block causes https://ld246.com/article/1677809509055
+    // initial causes https://ld246.com/article/1678257197581?r=88250
     display: inline-block;
     text-align: center;
     vertical-align: top; // https://ld246.com/article/1647522074722
@@ -827,5 +827,5 @@
   width: 1.25em;
   cursor: auto;
   max-width: none;
-  vertical-align: sub; // text-top windows 不兼容
+  vertical-align: sub; // text-top is not compatible with Windows
 }

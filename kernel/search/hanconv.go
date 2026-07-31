@@ -22,7 +22,7 @@ import (
 	"strings"
 )
 
-// hanSimpToTrads 是 hanTradToSimp 的反向索引：简体字 -> 折叠到该简体的全部繁体字。
+// hanSimpToTrads is the reverse index of hanTradToSimp: simplified character -> all traditional characters that fold to that simplified character.
 var hanSimpToTrads = map[rune][]rune{}
 
 func init() {
@@ -34,7 +34,8 @@ func init() {
 	}
 }
 
-// hanCharClass 返回与 r 繁简等价的所有字符（含 r 自身对应的简体），用于构造高亮正则。
+// hanCharClass returns all characters equivalent to r under traditional/simplified folding (including the
+// simplified character corresponding to r itself), used to construct the highlight regexp.
 func hanCharClass(r rune) (ret []rune) {
 	canon := r
 	if s, ok := hanTradToSimp[r]; ok {
@@ -45,9 +46,11 @@ func hanCharClass(r rune) (ret []rune) {
 	return
 }
 
-// hanInsensitiveRegexp 将关键字逐字符展开为繁简等价字符类，例如 "诗经" -> "[诗詩][经經]"。
-// 仅用于搜索结果高亮；等价关系与 go-sqlite3 中 siyuan 分词器 han_insensitive 的映射表
-// 来自同一份 OpenCC TSCharacters 数据，必须保持一致。
+// hanInsensitiveRegexp expands a keyword character by character into traditional/simplified equivalence
+// character classes, e.g. "诗经" -> "[诗詩][经經]".
+// Used only for search result highlighting; the equivalence relation must stay consistent with the
+// han_insensitive mapping table of the siyuan tokenizer in go-sqlite3, since both come from the same OpenCC
+// TSCharacters data.
 func hanInsensitiveRegexp(k string) string {
 	var b strings.Builder
 	for _, r := range k {

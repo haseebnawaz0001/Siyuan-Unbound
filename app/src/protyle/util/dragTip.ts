@@ -1,5 +1,6 @@
-// 拖拽时跟随鼠标的自定义双区提示框：上半=操作对象名称，下半=操作文案
-// 通过 .drag-tip 类做全局单例，在编辑器和文档树两处 dragover 共用
+// A custom two-zone tooltip that follows the mouse during drag: top half = name of the operation's target,
+// bottom half = operation text
+// Implemented as a global singleton via the .drag-tip class, shared by dragover handlers in both the editor and the file tree
 
 export const transparentImgSrc = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
 
@@ -12,18 +13,18 @@ const dragTipState = {
 const renderDragTip = () => {
     dragTipState.rafId = 0;
     if (!dragTipState.element || !dragTipState.element.isConnected) {
-        // 优先复用已有的 .drag-tip（跨编辑器/文档树区域时避免重复创建）
+        // Prefer reusing an existing .drag-tip (avoids recreating it when crossing editor/file-tree areas)
         dragTipState.element = (document.querySelector(".drag-tip") as HTMLElement) || null;
         if (!dragTipState.element) {
             dragTipState.element = document.createElement("div");
             dragTipState.element.className = "tooltip drag-tip";
-            // 拖拽提示需即时显示，覆盖 .tooltip 默认的 300ms 出现动画
+            // The drag tooltip must appear immediately, overriding .tooltip's default 300ms fade-in animation
             dragTipState.element.style.animation = "none";
             dragTipState.element.style.pointerEvents = "none";
             dragTipState.element.style.zIndex = "1000000";
             dragTipState.element.style.fontSize = "14px";
             dragTipState.element.style.lineHeight = "20px";
-            // 锚定到视口原点，再由 transform 定位（transform 走 GPU 合成，不触发 layout）
+            // Anchor to the viewport origin, then position via transform (transform is GPU-composited and doesn't trigger layout)
             dragTipState.element.style.top = "0";
             dragTipState.element.style.left = "0";
             dragTipState.titleElement = document.createElement("div");
@@ -41,37 +42,38 @@ const renderDragTip = () => {
         dragTipState.lastTitle = "";
         dragTipState.lastAction = "";
     }
-    // 名称/文案变化才写 textContent，减少 DOM 写入
+    // Only write textContent when the name/text actually changes, to reduce DOM writes
     if (dragTipState.lastTitle !== dragTipState.title) {
         dragTipState.titleElement.textContent = dragTipState.title;
         dragTipState.lastTitle = dragTipState.title;
-        // 名称为空时隐藏上半行
+        // Hide the top row when the name is empty
         dragTipState.titleElement.style.display = dragTipState.title ? "" : "none";
     }
     if (dragTipState.lastAction !== dragTipState.action) {
         dragTipState.actionElement.textContent = dragTipState.action;
         dragTipState.lastAction = dragTipState.action;
     }
-    // 固定偏移到光标右下方，不读取 offsetHeight 以免触发同步布局造成卡顿
+    // Fixed offset to the bottom-right of the cursor; offsetHeight is not read, to avoid triggering synchronous
+    // layout and causing jank
     dragTipState.element.style.transform = `translate(${dragTipState.x + 16}px, ${dragTipState.y + 16}px)`;
 };
 
 export const showDragTip = (title: string, action: string, x: number, y: number) => {
     /// #if MOBILE
-    // 移动端不显示拖拽提示
+    // The drag tooltip is not shown on mobile
     return;
     /// #endif
     dragTipState.title = title;
     dragTipState.action = action;
     dragTipState.x = x;
     dragTipState.y = y;
-    // 合并到下一帧渲染，避免高频 dragover 下逐次写 DOM 造成卡顿
+    // Coalesce into the next frame's render, to avoid jank from writing to the DOM on every high-frequency dragover
     if (!dragTipState.rafId) {
         dragTipState.rafId = requestAnimationFrame(renderDragTip);
     }
 };
 
-// Alt 拖拽插入引用时的行级竖线指示
+// The line-level vertical indicator shown when Alt-dragging to insert a reference
 let caretLineElement: HTMLElement | null = null;
 
 export const showCaretLine = (left: number, top: number, height: number) => {

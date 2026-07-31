@@ -44,7 +44,7 @@ func checkWorkspaceDir(c *gin.Context) {
 	}
 
 	path := arg["path"].(string)
-	// 检查路径是否是分区根路径
+	// Check whether the path is a partition root path
 	if util.IsPartitionRootPath(path) {
 		ret.Code = -1
 		ret.Msg = model.Conf.Language(273)
@@ -52,7 +52,7 @@ func checkWorkspaceDir(c *gin.Context) {
 		return
 	}
 
-	// 检查路径是否包含其他文件
+	// Check whether the path contains other files
 	if !util.IsWorkspaceDir(path) {
 		entries, err := os.ReadDir(path)
 		if err != nil {
@@ -173,7 +173,7 @@ func removeWorkspaceDirPhysically(c *gin.Context) {
 
 	path := arg["path"].(string)
 
-	// 硬边界：只允许删除已登记的工作空间目录，禁止删除当前工作空间和任意路径
+	// Hard boundary: only registered workspace directories can be removed; removing the current workspace or an arbitrary path is forbidden
 	cleanPath, absErr := filepath.Abs(path)
 	if absErr != nil {
 		ret.Code = -1
@@ -315,7 +315,7 @@ func setWorkspaceDir(c *gin.Context) {
 	}
 
 	if gulu.OS.IsWindows() {
-		// 改进判断工作空间路径实现 https://github.com/siyuan-note/siyuan/issues/7569
+		// Improve the workspace path detection implementation https://github.com/siyuan-note/siyuan/issues/7569
 		installDirLower := strings.ToLower(filepath.Dir(util.WorkingDir))
 		pathLower := strings.ToLower(path)
 		if strings.HasPrefix(pathLower, installDirLower) && (gulu.File.IsSubPath(installDirLower, pathLower) || filepath.Clean(installDirLower) == filepath.Clean(pathLower)) {
@@ -326,7 +326,7 @@ func setWorkspaceDir(c *gin.Context) {
 		}
 	}
 
-	// 检查路径是否在已有的工作空间路径中
+	// Check whether the path is within an existing workspace path
 	pathIsWorkspace := util.IsWorkspaceDir(path)
 	if !pathIsWorkspace {
 		for p := filepath.Dir(path); !util.IsPartitionRootPath(p); p = filepath.Dir(p) {
@@ -349,7 +349,7 @@ func setWorkspaceDir(c *gin.Context) {
 	workspacePaths = append(workspacePaths, path)
 	workspacePaths = util.DeduplicateWorkspacePaths(workspacePaths)
 	workspacePaths = util.RemoveWorkspacePath(workspacePaths, path)
-	workspacePaths = append(workspacePaths, path) // 切换的工作空间固定放在最后一个
+	workspacePaths = append(workspacePaths, path) // The workspace being switched to is always placed last
 
 	if err = util.WriteWorkspacePaths(workspacePaths); err != nil {
 		ret.Code = -1

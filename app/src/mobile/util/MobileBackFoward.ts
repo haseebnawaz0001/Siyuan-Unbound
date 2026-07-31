@@ -33,7 +33,7 @@ export const clearMobileBackForward = (notebookId?: string) => {
 
 const focusStack = (backStack: IBackStack) => {
     const protyle = getCurrentEditor().protyle;
-    // 前进后快速后退会导致滚动错位 https://ld246.com/article/1734018624070
+    // Quickly going back after going forward causes scroll misalignment https://ld246.com/article/1734018624070
     protyle.observerLoad?.disconnect();
 
     window.siyuan.storage[Constants.LOCAL_DOCINFO] = {
@@ -123,7 +123,7 @@ const focusStack = (backStack: IBackStack) => {
             setReadonlyByConfig(protyle, true);
         }
         protyle.contentElement.scrollTop = backStack.scrollTop;
-        // 等待 av 等加载 https://ld246.com/article/1734018624070
+        // Wait for attribute views etc. to load https://ld246.com/article/1734018624070
         setTimeout(() => {
             protyle.contentElement.scrollTop = backStack.scrollTop;
         }, Constants.TIMEOUT_LOAD);

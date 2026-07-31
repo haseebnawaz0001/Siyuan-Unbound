@@ -372,7 +372,7 @@ func (c *Calendars) PutCalendarObject(objectPath string, calendarData *ical.Cale
 		return
 	}
 
-	// TODO: 处理 opts.IfNoneMatch (If-None-Match) 与 opts.IfMatch (If-Match)
+	// TODO: handle opts.IfNoneMatch (If-None-Match) and opts.IfMatch (If-Match)
 
 	var object *CalendarObject
 	if value, ok := calendar.Objects.Load(objectID); ok {

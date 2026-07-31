@@ -1,6 +1,6 @@
 import {createConfigNamespaceApi} from "../util/namespaceApi";
 
-/** AI Tab 命名空间：设置面板注册项 save */
+/** AI config namespace, used as the save handler of the items registered in the setting panel */
 export const aiConfigApi = createConfigNamespaceApi<Config.IAI>({
     namespace: "ai",
     getConfig: () => window.siyuan.config.ai,

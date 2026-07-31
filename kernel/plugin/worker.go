@@ -52,13 +52,13 @@ func (w *Worker) Run(executor TaskExecutor, callback TaskCallback) error {
 
 		defer func() {
 			defer func() {
-				// 捕获回调中的 panic 并保留原始调用栈，便于定位 Promise 处理异常。
+				// Catch a panic in the callback and preserve the original call stack, to help locate Promise handling exceptions.
 				if r := recover(); r != nil {
 					logging.LogErrorf("task callback panicked: %v\n%s", r, debug.Stack())
 				}
 			}()
 
-			// 捕获执行器中的 panic 并保留原始调用栈，同时将错误传给回调。
+			// Catch a panic in the executor and preserve the original call stack, while also passing the error to the callback.
 			if r := recover(); r != nil {
 				logging.LogErrorf("task executor panicked: %v\n%s", r, debug.Stack())
 				err = fmt.Errorf("task executor panicked: %v", r)

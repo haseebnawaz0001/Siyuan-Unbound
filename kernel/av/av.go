@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-// Package av 包含了属性视图（Attribute View）相关的实现。
+// Package av contains the implementation related to attribute views (databases).
 package av
 
 import (
@@ -36,22 +36,22 @@ import (
 	"github.com/siyuan-note/siyuan/kernel/util"
 )
 
-// AttributeView 描述了属性视图的结构。
+// AttributeView describes the structure of an attribute view.
 type AttributeView struct {
-	Spec              int                `json:"spec"`                        // 格式版本
-	ID                string             `json:"id"`                          // 属性视图 ID
-	Name              string             `json:"name"`                        // 属性视图名称
-	KeyValues         []*KeyValues       `json:"keyValues"`                   // 属性视图属性键值
-	KeyIDs            []string           `json:"keyIDs"`                      // 属性视图属性键 ID，用于排序
-	ViewID            string             `json:"viewID"`                      // 当前视图 ID
-	Views             []*View            `json:"views"`                       // 视图
-	NewItemTemplates  []*NewItemTemplate `json:"newItemTemplates,omitempty"`  // 新增条目模板
-	DefaultTemplateID string             `json:"defaultTemplateID,omitempty"` // 默认新增条目模板 ID
+	Spec              int                `json:"spec"`                        // Format version
+	ID                string             `json:"id"`                          // Attribute view ID
+	Name              string             `json:"name"`                        // Attribute view name
+	KeyValues         []*KeyValues       `json:"keyValues"`                   // Attribute view key-value pairs
+	KeyIDs            []string           `json:"keyIDs"`                      // Attribute view key IDs, used for sorting
+	ViewID            string             `json:"viewID"`                      // Current view ID
+	Views             []*View            `json:"views"`                       // Views
+	NewItemTemplates  []*NewItemTemplate `json:"newItemTemplates,omitempty"`  // Templates for new items
+	DefaultTemplateID string             `json:"defaultTemplateID,omitempty"` // Default template ID for new items
 
-	RenderedViewables map[string]Viewable `json:"-"` // 已经渲染好的视图
+	RenderedViewables map[string]Viewable `json:"-"` // Views that have already been rendered
 }
 
-// NewItemTargetType 描述新增条目模板创建的目标类型。
+// NewItemTargetType describes the target type created by a new item template.
 type NewItemTargetType string
 
 const (
@@ -59,14 +59,16 @@ const (
 	NewItemTargetDocument NewItemTargetType = "document"
 )
 
-// NewItemSaveLocation 描述文档类型模板覆盖全局新建文档位置后的保存位置。
-// nil 表示继承全局配置，非 nil 且 BoxID 为空表示使用当前数据库实例所在笔记本。
+// NewItemSaveLocation describes the save location after a document-type template overrides the global new
+// document location.
+// nil means it inherits the global configuration; non-nil with an empty BoxID means the notebook of the current
+// database instance is used.
 type NewItemSaveLocation struct {
 	BoxID        string `json:"boxID,omitempty"`
 	PathTemplate string `json:"pathTemplate"`
 }
 
-// NewItemFieldValueMode 描述新增条目模板字段默认值的填充方式。
+// NewItemFieldValueMode describes how a new item template's field default value is filled in.
 type NewItemFieldValueMode string
 
 const (
@@ -74,13 +76,13 @@ const (
 	NewItemFieldValueCurrentTime NewItemFieldValueMode = "currentTime"
 )
 
-// NewItemFieldValue 描述新增条目模板中的一个字段默认值。
+// NewItemFieldValue describes a single field's default value within a new item template.
 type NewItemFieldValue struct {
 	Mode  NewItemFieldValueMode `json:"mode"`
 	Value *Value                `json:"value,omitempty"`
 }
 
-// NewItemTemplate 描述数据库新增条目时使用的模板。
+// NewItemTemplate describes a template used when creating a new item in the database.
 type NewItemTemplate struct {
 	ID                  string                        `json:"id"`
 	Name                string                        `json:"name"`
@@ -92,16 +94,16 @@ type NewItemTemplate struct {
 	ContentTemplatePath string                        `json:"contentTemplatePath,omitempty"`
 }
 
-// NewItemTemplatesConfig 描述一次完整的新增条目模板配置修改。
+// NewItemTemplatesConfig describes one complete update to the new item templates configuration.
 type NewItemTemplatesConfig struct {
 	Templates         []*NewItemTemplate `json:"templates"`
 	DefaultTemplateID string             `json:"defaultTemplateID,omitempty"`
 }
 
-// KeyValues 描述了属性视图属性键值列表的结构。
+// KeyValues describes the structure of an attribute view's key-value list.
 type KeyValues struct {
-	Key    *Key     `json:"key"`              // 属性视图属性键
-	Values []*Value `json:"values,omitempty"` // 属性视图属性值列表
+	Key    *Key     `json:"key"`              // Attribute view key
+	Values []*Value `json:"values,omitempty"` // Attribute view value list
 }
 
 func (kValues *KeyValues) GetValue(blockID string) (ret *Value) {
@@ -138,62 +140,62 @@ func GetValue(keyValues []*KeyValues, keyID, itemID string) (ret *Value) {
 	return
 }
 
-// KeyType 描述了属性视图属性字段的类型。
+// KeyType describes the type of an attribute view field.
 type KeyType string
 
 const (
-	KeyTypeBlock      KeyType = "block"      // 主键
-	KeyTypeText       KeyType = "text"       // 文本
-	KeyTypeNumber     KeyType = "number"     // 数字
-	KeyTypeDate       KeyType = "date"       // 日期
-	KeyTypeSelect     KeyType = "select"     // 单选
-	KeyTypeMSelect    KeyType = "mSelect"    // 多选
+	KeyTypeBlock      KeyType = "block"      // Primary key
+	KeyTypeText       KeyType = "text"       // Text
+	KeyTypeNumber     KeyType = "number"     // Number
+	KeyTypeDate       KeyType = "date"       // Date
+	KeyTypeSelect     KeyType = "select"     // Single select
+	KeyTypeMSelect    KeyType = "mSelect"    // Multi-select
 	KeyTypeURL        KeyType = "url"        // URL
 	KeyTypeEmail      KeyType = "email"      // Email
-	KeyTypePhone      KeyType = "phone"      // 电话
-	KeyTypeMAsset     KeyType = "mAsset"     // 资源
-	KeyTypeTemplate   KeyType = "template"   // 模板
-	KeyTypeCreated    KeyType = "created"    // 创建时间
-	KeyTypeUpdated    KeyType = "updated"    // 更新时间
-	KeyTypeCheckbox   KeyType = "checkbox"   // 复选框
-	KeyTypeRelation   KeyType = "relation"   // 关联
-	KeyTypeRollup     KeyType = "rollup"     // 汇总
-	KeyTypeLineNumber KeyType = "lineNumber" // 行号
+	KeyTypePhone      KeyType = "phone"      // Phone
+	KeyTypeMAsset     KeyType = "mAsset"     // Asset
+	KeyTypeTemplate   KeyType = "template"   // Template
+	KeyTypeCreated    KeyType = "created"    // Created time
+	KeyTypeUpdated    KeyType = "updated"    // Updated time
+	KeyTypeCheckbox   KeyType = "checkbox"   // Checkbox
+	KeyTypeRelation   KeyType = "relation"   // Relation
+	KeyTypeRollup     KeyType = "rollup"     // Rollup
+	KeyTypeLineNumber KeyType = "lineNumber" // Line number
 )
 
-// Key 描述了属性视图属性字段的基础结构。
+// Key describes the base structure of an attribute view field.
 type Key struct {
-	ID   string  `json:"id"`   // 字段 ID
-	Name string  `json:"name"` // 字段名
-	Type KeyType `json:"type"` // 字段类型
-	Icon string  `json:"icon"` // 字段图标
-	Desc string  `json:"desc"` // 字段描述
+	ID   string  `json:"id"`   // Field ID
+	Name string  `json:"name"` // Field name
+	Type KeyType `json:"type"` // Field type
+	Icon string  `json:"icon"` // Field icon
+	Desc string  `json:"desc"` // Field description
 
-	// 以下是某些列类型的特有属性
+	// The following are properties specific to certain column types
 
-	// 单选/多选
-	Options []*SelectOption `json:"options,omitempty"` // 选项列表
+	// Single select/multi-select
+	Options []*SelectOption `json:"options,omitempty"` // Option list
 
-	// 数字
-	NumberFormat NumberFormat `json:"numberFormat"` // 列数字格式化
+	// Number
+	NumberFormat NumberFormat `json:"numberFormat"` // Column number formatting
 
-	// 模板
-	Template string `json:"template"` // 模板内容
+	// Template
+	Template string `json:"template"` // Template content
 
-	// 关联
-	Relation *Relation `json:"relation,omitempty"` // 关联信息
+	// Relation
+	Relation *Relation `json:"relation,omitempty"` // Relation info
 
-	// 汇总
-	Rollup *Rollup `json:"rollup,omitempty"` // 汇总信息
+	// Rollup
+	Rollup *Rollup `json:"rollup,omitempty"` // Rollup info
 
-	// 日期
-	Date *Date `json:"date,omitempty"` // 日期设置
+	// Date
+	Date *Date `json:"date,omitempty"` // Date settings
 
-	// 创建时间
-	Created *Created `json:"created,omitempty"` // 创建时间设置
+	// Created time
+	Created *Created `json:"created,omitempty"` // Created time settings
 
-	// 更新时间
-	Updated *Updated `json:"updated,omitempty"` // 更新时间设置
+	// Updated time
+	Updated *Updated `json:"updated,omitempty"` // Updated time settings
 }
 
 func NewKey(id, name, icon string, keyType KeyType) *Key {
@@ -216,22 +218,22 @@ func (k *Key) GetOption(name string) (ret *SelectOption) {
 }
 
 type Created struct {
-	IncludeTime bool `json:"includeTime"` // 是否填充具体时间 Add `Include time` switch to database creation time field and update time field https://github.com/siyuan-note/siyuan/issues/12091
+	IncludeTime bool `json:"includeTime"` // Whether to fill in the specific time Add `Include time` switch to database creation time field and update time field https://github.com/siyuan-note/siyuan/issues/12091
 }
 
 type Updated struct {
-	IncludeTime bool `json:"includeTime"` // 是否填充具体时间 Add `Include time` switch to database creation time field and update time field https://github.com/siyuan-note/siyuan/issues/12091
+	IncludeTime bool `json:"includeTime"` // Whether to fill in the specific time Add `Include time` switch to database creation time field and update time field https://github.com/siyuan-note/siyuan/issues/12091
 }
 
 type Date struct {
-	AutoFillNow      bool `json:"autoFillNow"`      // 是否自动填充当前时间 The database date field supports filling the current time by default https://github.com/siyuan-note/siyuan/issues/10823
-	FillSpecificTime bool `json:"fillSpecificTime"` // 是否填充具体时间 Add `Default fill specific time` switch to database date field https://github.com/siyuan-note/siyuan/issues/12089
+	AutoFillNow      bool `json:"autoFillNow"`      // Whether to automatically fill in the current time The database date field supports filling the current time by default https://github.com/siyuan-note/siyuan/issues/10823
+	FillSpecificTime bool `json:"fillSpecificTime"` // Whether to fill in a specific time Add `Default fill specific time` switch to database date field https://github.com/siyuan-note/siyuan/issues/12089
 }
 
 type Rollup struct {
-	RelationKeyID string      `json:"relationKeyID"` // 关联字段 ID
-	KeyID         string      `json:"keyID"`         // 目标字段 ID
-	Calc          *RollupCalc `json:"calc"`          // 计算方式
+	RelationKeyID string      `json:"relationKeyID"` // Relation field ID
+	KeyID         string      `json:"keyID"`         // Target field ID
+	Calc          *RollupCalc `json:"calc"`          // Calculation method
 }
 
 type RollupCalc struct {
@@ -240,46 +242,46 @@ type RollupCalc struct {
 }
 
 type Relation struct {
-	AvID      string `json:"avID"`      // 关联的属性视图 ID
-	IsTwoWay  bool   `json:"isTwoWay"`  // 是否双向关联
-	BackKeyID string `json:"backKeyID"` // 双向关联时回链关联列的 ID
+	AvID      string `json:"avID"`      // ID of the related attribute view
+	IsTwoWay  bool   `json:"isTwoWay"`  // Whether the relation is two-way
+	BackKeyID string `json:"backKeyID"` // ID of the back-link relation column for a two-way relation
 }
 
 type SelectOption struct {
-	Name  string `json:"name"`  // 选项名称
-	Color string `json:"color"` // 选项颜色
-	Desc  string `json:"desc"`  // 选项描述
+	Name  string `json:"name"`  // Option name
+	Color string `json:"color"` // Option color
+	Desc  string `json:"desc"`  // Option description
 }
 
-// View 描述了视图的结构。
+// View describes the structure of a view.
 type View struct {
-	ID               string         `json:"id"`                // 视图 ID
-	Icon             string         `json:"icon"`              // 视图图标
-	Name             string         `json:"name"`              // 视图名称
-	HideAttrViewName bool           `json:"hideAttrViewName"`  // 是否隐藏属性视图名称
-	Desc             string         `json:"desc"`              // 视图描述
-	Filters          []*ViewFilter  `json:"filters,omitempty"` // 过滤规则
-	Sorts            []*ViewSort    `json:"sorts,omitempty"`   // 排序规则
-	PageSize         int            `json:"pageSize"`          // 每页条目数
-	LayoutType       LayoutType     `json:"type"`              // 当前布局类型
-	Table            *LayoutTable   `json:"table,omitempty"`   // 表格布局
-	Gallery          *LayoutGallery `json:"gallery,omitempty"` // 卡片布局
-	Kanban           *LayoutKanban  `json:"kanban,omitempty"`  // 看板布局
-	ItemIDs          []string       `json:"itemIds,omitempty"` // 项目 ID 列表，用于维护所有项目
+	ID               string         `json:"id"`                // View ID
+	Icon             string         `json:"icon"`              // View icon
+	Name             string         `json:"name"`              // View name
+	HideAttrViewName bool           `json:"hideAttrViewName"`  // Whether to hide the attribute view name
+	Desc             string         `json:"desc"`              // View description
+	Filters          []*ViewFilter  `json:"filters,omitempty"` // Filter rules
+	Sorts            []*ViewSort    `json:"sorts,omitempty"`   // Sort rules
+	PageSize         int            `json:"pageSize"`          // Number of items per page
+	LayoutType       LayoutType     `json:"type"`              // Current layout type
+	Table            *LayoutTable   `json:"table,omitempty"`   // Table layout
+	Gallery          *LayoutGallery `json:"gallery,omitempty"` // Gallery layout
+	Kanban           *LayoutKanban  `json:"kanban,omitempty"`  // Kanban layout
+	ItemIDs          []string       `json:"itemIds,omitempty"` // Item ID list, used to maintain all items
 
-	Group        *ViewGroup `json:"group,omitempty"`     // 分组规则
-	GroupCreated int64      `json:"groupCreated"`        // 分组生成时间戳
-	Groups       []*View    `json:"groups,omitempty"`    // 分组视图列表
-	GroupItemIDs []string   `json:"groupItemIds"`        // 分组项目 ID 列表，用于维护分组中的所有项目
-	GroupCalc    *GroupCalc `json:"groupCalc,omitempty"` // 分组计算规则
-	GroupKey     *Key       `json:"groupKey,omitempty"`  // 分组字段
-	GroupVal     *Value     `json:"groupVal,omitempty"`  // 分组值
-	GroupFolded  bool       `json:"groupFolded"`         // 分组是否折叠
-	GroupHidden  int        `json:"groupHidden"`         // 分组是否隐藏，0：显示，1：空白隐藏，2：手动隐藏
-	GroupSort    int        `json:"groupSort"`           // 分组排序值，用于手动排序
+	Group        *ViewGroup `json:"group,omitempty"`     // Group rule
+	GroupCreated int64      `json:"groupCreated"`        // Group creation timestamp
+	Groups       []*View    `json:"groups,omitempty"`    // Group view list
+	GroupItemIDs []string   `json:"groupItemIds"`        // Group item ID list, used to maintain all items within the group
+	GroupCalc    *GroupCalc `json:"groupCalc,omitempty"` // Group calculation rule
+	GroupKey     *Key       `json:"groupKey,omitempty"`  // Field to group by
+	GroupVal     *Value     `json:"groupVal,omitempty"`  // Group value
+	GroupFolded  bool       `json:"groupFolded"`         // Whether the group is folded
+	GroupHidden  int        `json:"groupHidden"`         // Whether the group is hidden: 0 shown, 1 hidden when empty, 2 manually hidden
+	GroupSort    int        `json:"groupSort"`           // Group sort value, used for manual sorting
 }
 
-// ViewData 用于序列化视图数据到前端。
+// ViewData is used to serialize view data to the frontend.
 type ViewData struct {
 	ID               string     `json:"id"`
 	Icon             string     `json:"icon"`
@@ -294,7 +296,7 @@ func (view *View) IsGroupView() bool {
 	return nil != view.Group && "" != view.Group.Field
 }
 
-// GetGroupValue 获取分组视图的分组值。
+// GetGroupValue gets the group value of a group view.
 func (view *View) GetGroupValue() string {
 	if nil == view.GroupVal {
 		return ""
@@ -302,7 +304,7 @@ func (view *View) GetGroupValue() string {
 	return view.GroupVal.String(false)
 }
 
-// GetGroupByID 获取指定分组 ID 的分组视图。
+// GetGroupByID gets the group view with the specified group ID.
 func (view *View) GetGroupByID(groupID string) *View {
 	if nil == view.Groups {
 		return nil
@@ -315,7 +317,7 @@ func (view *View) GetGroupByID(groupID string) *View {
 	return nil
 }
 
-// GetGroupByGroupValue 获取指定分组值的分组视图。
+// GetGroupByGroupValue gets the group view with the specified group value.
 func (view *View) GetGroupByGroupValue(groupVal string) *View {
 	if nil == view.Groups {
 		return nil
@@ -328,7 +330,7 @@ func (view *View) GetGroupByGroupValue(groupVal string) *View {
 	return nil
 }
 
-// RemoveGroupByID 从分组视图列表中移除指定 ID 的分组视图。
+// RemoveGroupByID removes the group view with the specified ID from the group view list.
 func (view *View) RemoveGroupByID(groupID string) {
 	if nil == view.Groups {
 		return
@@ -341,7 +343,7 @@ func (view *View) RemoveGroupByID(groupID string) {
 	}
 }
 
-// GetGroupKey 获取分组视图的分组字段。
+// GetGroupKey gets the group field of a group view.
 func (view *View) GetGroupKey(attrView *AttributeView) (ret *Key) {
 	if !view.IsGroupView() {
 		return
@@ -356,23 +358,23 @@ func (view *View) GetGroupKey(attrView *AttributeView) (ret *Key) {
 	return
 }
 
-// GroupCalc 描述了分组计算规则和结果的结构。
+// GroupCalc describes the structure of the group calculation rule and its result.
 type GroupCalc struct {
-	Field     string     `json:"field"` // 字段 ID
-	FieldCalc *FieldCalc `json:"calc"`  // 计算规则和结果
+	Field     string     `json:"field"` // Field ID
+	FieldCalc *FieldCalc `json:"calc"`  // Calculation rule and result
 }
 
-// LayoutType 描述了视图布局类型。
+// LayoutType describes the view layout type.
 type LayoutType string
 
 const (
-	LayoutTypeTable   LayoutType = "table"   // 属性视图类型 - 表格
-	LayoutTypeGallery LayoutType = "gallery" // 属性视图类型 - 卡片
-	LayoutTypeKanban  LayoutType = "kanban"  // 属性视图类型 - 看板
+	LayoutTypeTable   LayoutType = "table"   // Attribute view type - table
+	LayoutTypeGallery LayoutType = "gallery" // Attribute view type - gallery
+	LayoutTypeKanban  LayoutType = "kanban"  // Attribute view type - kanban
 )
 
 const (
-	ViewDefaultPageSize = 50 // 视图默认分页大小
+	ViewDefaultPageSize = 50 // Default page size for views
 )
 
 func NewTableView() *View {
@@ -430,33 +432,33 @@ func NewKanbanView() (ret *View) {
 	}
 }
 
-// Viewable 描述了视图的接口。
+// Viewable describes the interface of a view.
 type Viewable interface {
 
-	// GetType 获取视图的布局类型。
+	// GetType gets the layout type of the view.
 	GetType() LayoutType
 
-	// GetID 获取视图的 ID。
+	// GetID gets the ID of the view.
 	GetID() string
 
-	// SetGroups 设置视图分组列表。
+	// SetGroups sets the group list of the view.
 	SetGroups(viewables []Viewable)
 
-	// SetGroupCalc 设置视图分组计算规则和结果。
+	// SetGroupCalc sets the group calculation rule and result of the view.
 	SetGroupCalc(group *GroupCalc)
 
-	// GetGroupCalc 获取视图分组计算规则和结果。
+	// GetGroupCalc gets the group calculation rule and result of the view.
 	GetGroupCalc() *GroupCalc
 
-	// SetGroupFolded 设置分组是否折叠。
+	// SetGroupFolded sets whether the group is folded.
 	SetGroupFolded(folded bool)
 
-	// GetGroupHidden 获取分组是否隐藏。
-	// hidden 0：显示，1：空白隐藏，2：手动隐藏
+	// GetGroupHidden gets whether the group is hidden.
+	// hidden: 0 shown, 1 hidden when empty, 2 manually hidden
 	GetGroupHidden() int
 
-	// SetGroupHidden 设置分组是否隐藏。
-	// hidden 0：显示，1：空白隐藏，2：手动隐藏
+	// SetGroupHidden sets whether the group is hidden.
+	// hidden: 0 shown, 1 hidden when empty, 2 manually hidden
 	SetGroupHidden(hidden int)
 }
 
@@ -474,7 +476,8 @@ func NewAttributeView(id string) (ret *AttributeView) {
 }
 
 func GetAttributeViewName(avID string) (ret string, err error) {
-	// 通过 fallback 查找 AV 定义的真实路径（普通 box 全局，加密笔记本笔记本级）
+	// Look up the real path of the AV definition via fallback (global for normal boxes, notebook-level for
+	// encrypted notebooks)
 	avJSONPath, boxID := FindAttributeViewPath(avID)
 	if avJSONPath == "" {
 		avJSONPath = GetAttributeViewDataPath(avID)
@@ -511,12 +514,13 @@ func getAttributeViewNameByPathInBox(avJSONPath, boxID string) (ret string, err 
 	return
 }
 
-// GetAttributeViewNameByPath 从指定路径读取 AV 名称（不加密，普通 box 兼容入口）。
+// GetAttributeViewNameByPath reads the AV name from the given path (unencrypted, compatibility entry point for
+// normal boxes).
 func GetAttributeViewNameByPath(avJSONPath string) (ret string, err error) {
 	return getAttributeViewNameByPathInBox(avJSONPath, "")
 }
 
-// GetAttributeViewNameInBox 获取指定笔记本中的数据库名称。
+// GetAttributeViewNameInBox gets the database name within the specified notebook.
 func GetAttributeViewNameInBox(avID, boxID string) (ret string, err error) {
 	avJSONPath, _ := FindAttributeViewPathInBox(avID, boxID)
 	if avJSONPath == "" {
@@ -572,7 +576,7 @@ func getAttributeViewContent0(attrView *AttributeView) (content string) {
 }
 
 func IsAttributeViewExist(avID string) bool {
-	// 通过 fallback 查找（普通 box 全局，加密笔记本笔记本级）
+	// Look up via fallback (global for normal boxes, notebook-level for encrypted notebooks)
 	avJSONPath, _ := FindAttributeViewPath(avID)
 	if avJSONPath == "" {
 		avJSONPath = GetAttributeViewDataPath(avID)
@@ -586,10 +590,11 @@ func ParseAttributeView(avID string) (ret *AttributeView, err error) {
 		return
 	}
 
-	// 加密笔记本的 AV 定义存笔记本级路径，通过 fallback 自动查找并解密
+	// AV definitions in encrypted notebooks are stored at a notebook-level path; look it up automatically via
+	// fallback and decrypt it
 	avJSONPath, boxID := FindAttributeViewPath(avID)
 	if avJSONPath == "" {
-		// 文件不存在，可能是首次创建，按全局路径返回（由调用方处理）
+		// File does not exist, possibly a first-time creation; return the global path (handled by the caller)
 		avJSONPath = GetAttributeViewDataPath(avID)
 		return parseAttributeViewByPathInBox(avJSONPath, "")
 	}
@@ -614,7 +619,8 @@ func ParseAttributeViewInBox(avID, boxID string) (ret *AttributeView, err error)
 		avJSONPath = attributeViewDataPathByBox(avID, boxID)
 		avBoxID = boxID
 	} else {
-		// 只在文件确实存在于该 box 内时才设置映射，避免错误 boxID 污染后续路由
+		// Only set the mapping when the file actually exists within this box, to avoid a wrong boxID polluting
+		// subsequent routing
 		if boxID != "" {
 			SetAVBoxID(avID, boxID)
 		}
@@ -645,7 +651,8 @@ func parseAttributeViewByPathInBox(avJSONPath, boxID string) (ret *AttributeView
 			logging.LogErrorf("read attribute view [%s] failed: %s", avID, readErr)
 			return
 		}
-		// 加密笔记本的 AV 定义是密文，按路径反查 boxID 后解密
+		// AV definitions in encrypted notebooks are stored as ciphertext; look up the boxID from the path and
+		// decrypt it
 		if boxID != "" {
 			data, readErr = decryptAVData(boxID, avID, data)
 			if readErr != nil {
@@ -653,8 +660,10 @@ func parseAttributeViewByPathInBox(avJSONPath, boxID string) (ret *AttributeView
 				return
 			}
 		} else if util.IsCiphertext(data) {
-			// 历史等无法取得 boxID/DEK 的全局路径上读到密文：无法解密，返回空内容而非按 JSON 解析报错。
-			// 这会在加密笔记本的 AV 因路径迁移（同步、导入、历史布局）落到全局位置时发生。
+			// Ciphertext was read from a global path where the boxID/DEK cannot be obtained (e.g. legacy data):
+			// it cannot be decrypted, so return empty content instead of erroring out on JSON parsing.
+			// This can happen when an encrypted notebook's AV ends up at the global location due to a path
+			// migration (sync, import, legacy layout).
 			return
 		}
 		cache.SetAVDataInBox(avID, boxID, data)
@@ -669,7 +678,7 @@ func parseAttributeViewByPathInBox(avJSONPath, boxID string) (ret *AttributeView
 				return
 			}
 
-			// v3.0.3 兼容之前旧版本，将 relation.contents[""] 转换为 null
+			// v3.0.3 compatibility with older versions: convert relation.contents[""] to null
 			keyValues := mapAv["keyValues"]
 			keyValuesMap := keyValues.([]any)
 			for _, kv := range keyValuesMap {
@@ -730,10 +739,10 @@ func SaveAttributeView(av *AttributeView) (err error) {
 		return
 	}
 
-	// 做一些数据兼容和订正处理
+	// Perform some data compatibility and correction processing
 	UpgradeSpec(av)
 
-	// 值去重
+	// Deduplicate values
 	blockValues := av.GetBlockKeyValues()
 	if nil != blockValues {
 		blockIDs := map[string]bool{}
@@ -754,18 +763,18 @@ func SaveAttributeView(av *AttributeView) (err error) {
 		blockValues.Values = tmp
 	}
 
-	// 视图值去重
+	// Deduplicate view values
 	for _, view := range av.Views {
-		// 项目自定义排序去重
+		// Deduplicate the item custom sort order
 		view.ItemIDs = gulu.Str.RemoveDuplicatedElem(view.ItemIDs)
 
-		// 分页大小
+		// Page size
 		if 1 > view.PageSize {
 			view.PageSize = ViewDefaultPageSize
 		}
 	}
 
-	// 清理渲染回填值
+	// Clean up rendered auto-fill values
 	for _, kv := range av.KeyValues {
 		for i := len(kv.Values) - 1; i >= 0; i-- {
 			if kv.Values[i].IsRenderAutoFill {
@@ -785,12 +794,14 @@ func SaveAttributeView(av *AttributeView) (err error) {
 		return
 	}
 
-	// 缓存与待写入数据一致时跳过落盘；缓存未命中时再读盘比对，避免无变更的重复写入
-	// 通过 fallback 查找 AV 定义的实际路径（普通 box 全局，加密笔记本笔记本级）
+	// Skip writing to disk when the cache already matches the data to be written; on a cache miss, read the disk
+	// data and compare, to avoid redundant writes when nothing changed
+	// Look up the actual path of the AV definition via fallback (global for normal boxes, notebook-level for
+	// encrypted notebooks)
 	avJSONPath, avBoxID := FindAttributeViewPath(av.ID)
 	if avJSONPath == "" {
-		// 文件不存在（首次创建），使用全局路径，boxID 为空（普通 box）
-		// 加密笔记本的首次创建由 handler 层通过 SetAVBoxID 预设路径
+		// File does not exist (first-time creation); use the global path, with an empty boxID (normal box)
+		// For encrypted notebooks, the first-time creation path is preset by the handler layer via SetAVBoxID
 		avJSONPath = GetAttributeViewDataPath(av.ID)
 	}
 	if cachedData, ok := cache.GetAVDataInBox(av.ID, avBoxID); ok {
@@ -799,7 +810,7 @@ func SaveAttributeView(av *AttributeView) (err error) {
 		}
 	} else {
 		if diskData, readErr := filelock.ReadFile(avJSONPath); nil == readErr {
-			// 加密笔记本的磁盘数据是密文，需先解密再比对
+			// The on-disk data for encrypted notebooks is ciphertext; decrypt it before comparing
 			if avBoxID != "" {
 				diskData, _ = decryptAVData(avBoxID, av.ID, diskData)
 			}
@@ -810,7 +821,7 @@ func SaveAttributeView(av *AttributeView) (err error) {
 		}
 	}
 
-	// 加密笔记本的数据需加密后再写盘
+	// Data for encrypted notebooks must be encrypted before being written to disk
 	writeData := data
 	if avBoxID != "" {
 		writeData, err = encryptAVData(avBoxID, av.ID, data)
@@ -819,7 +830,7 @@ func SaveAttributeView(av *AttributeView) (err error) {
 			return
 		}
 	}
-	// 确保目录存在（加密笔记本的笔记本级 AV 目录可能尚不存在）
+	// Make sure the directory exists (the notebook-level AV directory for an encrypted notebook may not exist yet)
 	if err = os.MkdirAll(filepath.Dir(avJSONPath), 0755); nil != err {
 		logging.LogErrorf("create attribute view dir [%s] failed: %s", filepath.Dir(avJSONPath), err)
 		return
@@ -1005,7 +1016,7 @@ func (av *AttributeView) Clone() (ret *AttributeView) {
 		kv.Values = []*Value{}
 
 		if KeyTypeRelation == kv.Key.Type {
-			// 断开关联
+			// Disconnect the relation
 			kv.Key.Relation.IsTwoWay = false
 			kv.Key.Relation.AvID = ""
 			kv.Key.Relation.BackKeyID = ""
@@ -1114,9 +1125,9 @@ var (
 )
 
 const (
-	NodeAttrNameAvs        = "custom-avs"          // 用于标记块所属的属性视图，逗号分隔 av id
-	NodeAttrView           = "custom-sy-av-view"   // 用于标记块所属的属性视图视图 view id Database block support specified view https://github.com/siyuan-note/siyuan/issues/10443
-	NodeAttrViewStaticText = "custom-sy-av-s-text" // 用于标记块所属的属性视图静态文本 Database-bound block primary key supports setting static anchor text https://github.com/siyuan-note/siyuan/issues/10049
+	NodeAttrNameAvs        = "custom-avs"          // Marks the attribute view(s) a block belongs to, comma-separated av ids
+	NodeAttrView           = "custom-sy-av-view"   // Marks the attribute view's view id a block belongs to Database block support specified view https://github.com/siyuan-note/siyuan/issues/10443
+	NodeAttrViewStaticText = "custom-sy-av-s-text" // Marks the attribute view's static text a block belongs to Database-bound block primary key supports setting static anchor text https://github.com/siyuan-note/siyuan/issues/10049
 
-	NodeAttrViewNames = "av-names" // 用于临时标记块所属的属性视图名称，空格分隔
+	NodeAttrViewNames = "av-names" // Temporarily marks the attribute view name(s) a block belongs to, space-separated
 )

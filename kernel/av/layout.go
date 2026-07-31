@@ -16,60 +16,60 @@
 
 package av
 
-// BaseLayout 描述了布局的基础结构。
+// BaseLayout describes the base structure of a layout.
 type BaseLayout struct {
-	Spec int    `json:"spec"` // 布局格式版本
-	ID   string `json:"id"`   // 布局 ID
+	Spec int    `json:"spec"` // Layout format version
+	ID   string `json:"id"`   // Layout ID
 
-	ShowIcon  bool `json:"showIcon"`  // 是否显示字段图标
-	WrapField bool `json:"wrapField"` // 是否换行字段内容
+	ShowIcon  bool `json:"showIcon"`  // Whether to show field icons
+	WrapField bool `json:"wrapField"` // Whether to wrap field content
 
-	// TODO 以下三个字段已经废弃，计划于 2026 年 6 月 30 日后删除 https://github.com/siyuan-note/siyuan/issues/15162
+	// TODO The following three fields are deprecated and are planned to be removed after 2026-06-30 https://github.com/siyuan-note/siyuan/issues/15162
 
 	//Deprecated
-	Filters []*ViewFilter `json:"filters,omitempty"` // 过滤规则
+	Filters []*ViewFilter `json:"filters,omitempty"` // Filter rules
 	//Deprecated
-	Sorts []*ViewSort `json:"sorts,omitempty"` // 排序规则
+	Sorts []*ViewSort `json:"sorts,omitempty"` // Sort rules
 	//Deprecated
-	PageSize int `json:"pageSize,omitempty"` // 每页条目数
+	PageSize int `json:"pageSize,omitempty"` // Number of items per page
 }
 
-// BaseField 描述了字段的基础结构。
+// BaseField describes the base structure of a field.
 type BaseField struct {
-	ID     string     `json:"id"`             // 字段 ID
-	Wrap   bool       `json:"wrap"`           // 是否换行
-	Hidden bool       `json:"hidden"`         // 是否隐藏
-	Desc   string     `json:"desc,omitempty"` // 字段描述
-	Calc   *FieldCalc `json:"calc,omitempty"` // 计算规则
+	ID     string     `json:"id"`             // Field ID
+	Wrap   bool       `json:"wrap"`           // Whether to wrap
+	Hidden bool       `json:"hidden"`         // Whether hidden
+	Desc   string     `json:"desc,omitempty"` // Field description
+	Calc   *FieldCalc `json:"calc,omitempty"` // Calculation rule
 }
 
-// BaseValue 描述了字段值的基础结构。
+// BaseValue describes the base structure of a field value.
 type BaseValue struct {
-	ID        string  `json:"id"`        // 字段值 ID
-	Value     *Value  `json:"value"`     // 字段值
-	ValueType KeyType `json:"valueType"` // 字段值类型
+	ID        string  `json:"id"`        // Field value ID
+	Value     *Value  `json:"value"`     // Field value
+	ValueType KeyType `json:"valueType"` // Field value type
 }
 
-// BaseInstance 描述了实例的基础结构。
+// BaseInstance describes the base structure of an instance.
 type BaseInstance struct {
 	ID               string        `json:"id"`               // ID
-	Icon             string        `json:"icon"`             // 图标
-	Name             string        `json:"name"`             // 名称
-	Desc             string        `json:"desc"`             // 描述
-	HideAttrViewName bool          `json:"hideAttrViewName"` // 是否隐藏属性视图名称
-	Filters          []*ViewFilter `json:"filters"`          // 过滤规则
-	Sorts            []*ViewSort   `json:"sorts"`            // 排序规则
-	Group            *ViewGroup    `json:"group"`            // 分组规则
-	PageSize         int           `json:"pageSize"`         // 每页项目数
-	ShowIcon         bool          `json:"showIcon"`         // 是否显示字段图标
-	WrapField        bool          `json:"wrapField"`        // 是否换行字段内容
+	Icon             string        `json:"icon"`             // Icon
+	Name             string        `json:"name"`             // Name
+	Desc             string        `json:"desc"`             // Description
+	HideAttrViewName bool          `json:"hideAttrViewName"` // Whether to hide the attribute view name
+	Filters          []*ViewFilter `json:"filters"`          // Filter rules
+	Sorts            []*ViewSort   `json:"sorts"`            // Sort rules
+	Group            *ViewGroup    `json:"group"`            // Group rule
+	PageSize         int           `json:"pageSize"`         // Number of items per page
+	ShowIcon         bool          `json:"showIcon"`         // Whether to show field icons
+	WrapField        bool          `json:"wrapField"`        // Whether to wrap field content
 
-	GroupKey    *Key       `json:"groupKey,omitempty"`   // 分组字段
-	GroupValue  *Value     `json:"groupValue,omitempty"` // 分组值
-	Groups      []Viewable `json:"groups,omitempty"`     // 分组实例列表
-	GroupCalc   *GroupCalc `json:"groupCalc,omitempty"`  // 分组计算规则和结果
-	GroupFolded bool       `json:"groupFolded"`          // 分组是否折叠
-	GroupHidden int        `json:"groupHidden"`          // 分组是否隐藏，0：显示，1：空白隐藏，2：手动隐藏
+	GroupKey    *Key       `json:"groupKey,omitempty"`   // Field to group by
+	GroupValue  *Value     `json:"groupValue,omitempty"` // Group value
+	Groups      []Viewable `json:"groups,omitempty"`     // List of group instances
+	GroupCalc   *GroupCalc `json:"groupCalc,omitempty"`  // Group calculation rule and result
+	GroupFolded bool       `json:"groupFolded"`          // Whether the group is folded
+	GroupHidden int        `json:"groupHidden"`          // Whether the group is hidden: 0 = shown, 1 = hidden when empty, 2 = manually hidden
 }
 
 func NewViewBaseInstance(view *View) *BaseInstance {
@@ -141,27 +141,27 @@ func (baseInstance *BaseInstance) GetID() string {
 	return baseInstance.ID
 }
 
-// BaseInstanceField 描述了实例字段的基础结构。
+// BaseInstanceField describes the base structure of an instance field.
 type BaseInstanceField struct {
 	ID     string     `json:"id"`     // ID
-	Name   string     `json:"name"`   // 名称
-	Type   KeyType    `json:"type"`   // 类型
-	Icon   string     `json:"icon"`   // 图标
-	Wrap   bool       `json:"wrap"`   // 是否换行
-	Hidden bool       `json:"hidden"` // 是否隐藏
-	Desc   string     `json:"desc"`   // 描述
-	Calc   *FieldCalc `json:"calc"`   // 计算规则和结果
+	Name   string     `json:"name"`   // Name
+	Type   KeyType    `json:"type"`   // Type
+	Icon   string     `json:"icon"`   // Icon
+	Wrap   bool       `json:"wrap"`   // Whether to wrap
+	Hidden bool       `json:"hidden"` // Whether hidden
+	Desc   string     `json:"desc"`   // Description
+	Calc   *FieldCalc `json:"calc"`   // Calculation rule and result
 
-	// 以下是某些字段类型的特有属性
+	// The following are attributes specific to certain field types
 
-	Options      []*SelectOption `json:"options,omitempty"`  // 选项列表
-	NumberFormat NumberFormat    `json:"numberFormat"`       // 数字字段格式化
-	Template     string          `json:"template"`           // 模板字段内容
-	Relation     *Relation       `json:"relation,omitempty"` // 关联字段
-	Rollup       *Rollup         `json:"rollup,omitempty"`   // 汇总字段
-	Date         *Date           `json:"date,omitempty"`     // 日期设置
-	Created      *Created        `json:"created,omitempty"`  // 创建时间设置
-	Updated      *Updated        `json:"updated,omitempty"`  // 更新时间设置
+	Options      []*SelectOption `json:"options,omitempty"`  // Option list
+	NumberFormat NumberFormat    `json:"numberFormat"`       // Number field formatting
+	Template     string          `json:"template"`           // Template field content
+	Relation     *Relation       `json:"relation,omitempty"` // Relation field
+	Rollup       *Rollup         `json:"rollup,omitempty"`   // Rollup field
+	Date         *Date           `json:"date,omitempty"`     // Date settings
+	Created      *Created        `json:"created,omitempty"`  // Created time settings
+	Updated      *Updated        `json:"updated,omitempty"`  // Updated time settings
 }
 
 func (baseInstanceField *BaseInstanceField) GetID() string {
@@ -184,67 +184,67 @@ func (baseInstanceField *BaseInstanceField) GetNumberFormat() NumberFormat {
 	return baseInstanceField.NumberFormat
 }
 
-// Collection 描述了一个集合的接口。
-// 集合可以是表格、卡片等，包含多个项目。
+// Collection describes the interface of a collection.
+// A collection can be a table, a set of cards, etc., containing multiple items.
 type Collection interface {
 
-	// GetItems 返回集合中的所有项目。
+	// GetItems returns all items in the collection.
 	GetItems() (ret []Item)
 
-	// SetItems 设置集合中的项目。
+	// SetItems sets the items in the collection.
 	SetItems(items []Item)
 
-	// CountItems 返回集合中的项目数量。
+	// CountItems returns the number of items in the collection.
 	CountItems() int
 
-	// GetFields 返回集合的所有字段。
+	// GetFields returns all fields of the collection.
 	GetFields() []Field
 
-	// GetField 返回指定 ID 的字段。
+	// GetField returns the field with the specified ID.
 	GetField(id string) (ret Field, fieldIndex int)
 
-	// GetValue 返回指定项目 ID 和键 ID 的字段值。
+	// GetValue returns the field value for the specified item ID and key ID.
 	GetValue(itemID, keyID string) (ret *Value)
 
-	// GetSorts 返回集合的排序规则。
+	// GetSorts returns the sort rules of the collection.
 	GetSorts() []*ViewSort
 
-	// GetFilters 返回集合的过滤规则。
+	// GetFilters returns the filter rules of the collection.
 	GetFilters() []*ViewFilter
 }
 
-// Field 描述了一个字段的接口。
+// Field describes the interface of a field.
 type Field interface {
 
-	// GetID 返回字段的 ID。
+	// GetID returns the ID of the field.
 	GetID() string
 
-	// GetType 返回字段的类型。
+	// GetType returns the type of the field.
 	GetType() KeyType
 
-	// GetCalc 返回字段的计算规则和结果。
+	// GetCalc returns the calculation rule and result of the field.
 	GetCalc() *FieldCalc
 
-	// SetCalc 设置字段的计算规则和结果。
+	// SetCalc sets the calculation rule and result of the field.
 	SetCalc(*FieldCalc)
 
-	// GetNumberFormat 返回数字字段的格式化设置。
+	// GetNumberFormat returns the formatting settings of a number field.
 	GetNumberFormat() NumberFormat
 }
 
-// Item 描述了一个项目的接口。
-// 项目可以是表格行、卡片等。
+// Item describes the interface of an item.
+// An item can be a table row, a card, etc.
 type Item interface {
 
-	// GetBlockValue 返回主键的值。
+	// GetBlockValue returns the value of the primary key.
 	GetBlockValue() *Value
 
-	// GetValues 返回项目的所有字段值。
+	// GetValues returns all field values of the item.
 	GetValues() []*Value
 
-	// GetValue 返回指定键 ID 的字段值。
+	// GetValue returns the field value for the specified key ID.
 	GetValue(keyID string) (ret *Value)
 
-	// GetID 返回项目的 ID。
+	// GetID returns the ID of the item.
 	GetID() string
 }

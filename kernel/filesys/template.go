@@ -35,7 +35,7 @@ import (
 func BuiltInTemplateFuncs() (ret template.FuncMap) {
 	ret = sprig.TxtFuncMap()
 
-	// 因为安全原因移除一些函数 https://github.com/siyuan-note/siyuan/issues/13426
+	// Remove some functions for security reasons https://github.com/siyuan-note/siyuan/issues/13426
 	delete(ret, "env")
 	delete(ret, "expandenv")
 	delete(ret, "getHostByName")

@@ -17,7 +17,7 @@ import type {SettingTabBuilder} from "../setting/builder";
 import {patchSyncConfig, refreshSyncCloudSpaceGroup} from "./syncRuntime";
 import {escapeAttr, escapeHtml} from "../../util/escape";
 
-/** 账号节：由 syncTab 注册 */
+/** Account section, registered by syncTab */
 export const registerAccountGroup = (tab: SettingTabBuilder) => {
     const group = tab.group("account", window.siyuan.languages.configGroupAccount);
 
@@ -280,33 +280,33 @@ const genAccountPaymentHTML = () => {
     let statusHTML = "";
     let actionsHTML = "";
     if (expireTime === -1) {
-        // 终身会员
+        // Lifetime member
         statusHTML = `${Constants.SIYUAN_IMAGE_VIP}${window.siyuan.languages.account12}`;
     } else if (expireTime > 0) {
-        // 订阅会员
+        // Subscriber
         if (window.siyuan.user.userSiYuanSubscriptionPlan === 2) {
-            // 试用订阅
+            // Trial subscription
             statusHTML = window.siyuan.languages.account3;
         } else {
-            // 付费订阅
+            // Paid subscription
             statusHTML = window.siyuan.languages.account8;
         }
         if (isOnetimePaid) {
-            // 功能特性
+            // Paid features
             statusHTML += " · " + window.siyuan.languages.account7;
         }
 
         const actionsHtmlParts: string[] = [];
         const daysLeft = Math.max(0, Math.floor((expireTime - Date.now()) / (24 * 60 * 60 * 1000)));
-        // 剩余天数
+        // Days left
         actionsHtmlParts.push(`<div class="ft__on-surface">${window.siyuan.languages.account6} ${daysLeft} ${window.siyuan.languages.day}</div><span class="fn__space"></span>`);
-        // 续费订阅
+        // Renew the subscription
         actionsHtmlParts.push(isIOS
             ? `<button type="button" class="b3-button b3-button--text" data-action="iOSPay" data-type="subscribe">${window.siyuan.languages.clickMeToRenew}</button>`
             : `<a class="b3-button b3-button--text" href="${getCloudURL("subscribe/siyuan")}" target="_blank">${window.siyuan.languages.clickMeToRenew}</a>`
         );
         if (!isOnetimePaid) {
-            // 购买功能特性
+            // Buy the paid features
             actionsHtmlParts.push(isIOS
                 ? `<button type="button" class="b3-button b3-button--text" data-action="iOSPay" data-type="function">${window.siyuan.languages.onepay}</button>`
                 : `<a class="b3-button b3-button--text" href="${getIndexURL("pricing.html")}" target="_blank">${window.siyuan.languages.onepay}</a>`
@@ -314,7 +314,7 @@ const genAccountPaymentHTML = () => {
         }
         actionsHTML = actionsHtmlParts.join("");
     } else if (window.siyuan.user.userSiYuanSubscriptionStatus === 2) {
-        // 订阅过期
+        // Subscription expired
         statusHTML = isOnetimePaid ? window.siyuan.languages.account7 : window.siyuan.languages.accountSubscriptionExpired;
 
         const actionsHtmlParts: string[] = [];
@@ -330,7 +330,7 @@ const genAccountPaymentHTML = () => {
         }
         actionsHTML = actionsHtmlParts.join("");
     } else {
-        // 没有订阅过
+        // Never subscribed
         statusHTML = isOnetimePaid ? window.siyuan.languages.account7 : window.siyuan.languages.accountUnpaid;
 
         const actionsHtmlParts: string[] = [];
@@ -346,14 +346,14 @@ const genAccountPaymentHTML = () => {
 ${iconVIP}${isOnetimePaid ? window.siyuan.languages.account4 : window.siyuan.languages.account1}</a>`);
         }
         if (window.siyuan.user.userSiYuanSubscriptionStatus === -1) {
-            // 试用订阅按钮
+            // Trial subscription button
             actionsHtmlParts.push(`<span class="fn__space"></span>
 <button type="button" class="b3-button" id="trialSub"><svg class="ft__secondary"><use xlink:href="#iconVIP"></use></svg>${window.siyuan.languages.freeSub}</button>`);
         }
         actionsHTML = actionsHtmlParts.join("");
     }
 
-    // 激活码包含首年订阅和终生订阅两种，在非终生订阅状态时显示输入框
+    // An activation code is either for the first year of a subscription or for a lifetime one, the input is only shown while the user is not a lifetime member
     const activationHTML = !isIOS && expireTime !== -1 ? `<div class="fn__hr"></div>
 <div class="b3-form__icon fn__block">
     <input class="b3-text-field fn__block" style="padding-right: 52px;" placeholder="${window.siyuan.languages.activationCodePlaceholder}">
@@ -433,7 +433,7 @@ const bindAccountAuthForm = (
                 showMessage(loginResponse.msg);
                 needCaptcha = loginResponse.data.needCaptcha;
                 if (needCaptcha) {
-                    // 验证码
+                    // Captcha
                     captchaInput.value = "";
                     refreshCaptchaImg();
                     authFormRoot.querySelector("#captchaRow")?.classList.remove("fn__none");
@@ -441,7 +441,7 @@ const bindAccountAuthForm = (
                 return;
             }
             if (loginResponse.code === 10) {
-                // 两步验证
+                // Two-factor authentication
                 authFormRoot.querySelector("#form1")?.classList.add("fn__none");
                 authFormRoot.querySelector("#form2")?.classList.remove("fn__none");
                 twofactorAuthCodeInput.focus();
@@ -510,31 +510,31 @@ export const onSetaccount = () => {
     const parts: string[] = [];
     if (window.siyuan.config.account.displayVIP) {
         if (!window.siyuan.user) {
-            // 未登录
+            // Not logged in
             parts.push(genToolbarItemHTML(window.siyuan.languages.freeSub, genVIPIconHTML("ft__error")));
         } else {
             const isOneTimePay = window.siyuan.user.userSiYuanOneTimePayStatus === 1;
             if (window.siyuan.user.userSiYuanProExpireTime === -1) {
-                // 终身会员
+                // Lifetime member
                 parts.push(genToolbarItemHTML(window.siyuan.languages.account12, Constants.SIYUAN_IMAGE_VIP));
             } else if (window.siyuan.user.userSiYuanProExpireTime > 0) {
-                // 订阅有效（未过期）
+                // Subscription is still valid
                 if (window.siyuan.user.userSiYuanSubscriptionPlan === 2) {
-                    // 试用订阅
+                    // Trial subscription
                     parts.push(genToolbarItemHTML(window.siyuan.languages.account3, genVIPIconHTML()));
                 } else {
-                    // 付费订阅
+                    // Paid subscription
                     parts.push(genToolbarItemHTML(window.siyuan.languages.account10, genVIPIconHTML("ft__secondary")));
                 }
             } else if (window.siyuan.user.userSiYuanSubscriptionStatus === 2 && !isOneTimePay) {
-                // 订阅过期
+                // Subscription expired
                 parts.push(genToolbarItemHTML(window.siyuan.languages.accountSubscriptionExpired, genVIPIconHTML("ft__error")));
             } else if (window.siyuan.user.userSiYuanSubscriptionStatus === -1 && !isOneTimePay) {
-                // 未订阅过
+                // Never subscribed
                 parts.push(genToolbarItemHTML(window.siyuan.languages.freeSub, genVIPIconHTML("ft__error")));
             }
             if (isOneTimePay) {
-                // 功能特性已付费
+                // Paid features have been purchased
                 parts.push(genToolbarItemHTML(window.siyuan.languages.onepay, genVIPIconHTML("ft__success")));
             }
         }

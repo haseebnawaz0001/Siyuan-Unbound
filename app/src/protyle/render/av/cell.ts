@@ -34,9 +34,9 @@ const renderCellURL = (urlContent: string) => {
             }
         }
     } catch (e) {
-        // 不是 url 地址
+        // Not a URL address
     }
-    // host 统一在输出处转义，避免非 http 协议（如 asd:<img...>）绕过 https://github.com/siyuan-note/siyuan/issues/9291
+    // host is uniformly escaped at output, to avoid a non-http protocol (e.g. asd:<img...>) bypassing this https://github.com/siyuan-note/siyuan/issues/9291
     return `<span class="av__celltext av__celltext--url" data-type="url" data-href="${escapeAttr(urlContent)}"><span>${Lute.EscapeHTMLStr(host)}</span><span class="ft__on-surface">${Lute.EscapeHTMLStr(suffix)}</span></span>`;
 };
 
@@ -435,7 +435,7 @@ export const cellScrollIntoView = (blockElement: HTMLElement, cellElement: Eleme
     }
     /// #else
     if (!blockElement.querySelector(".av__header")) {
-        // 属性面板
+        // Attribute panel
         return;
     }
     const bodyElement = hasClosestByClassName(cellElement, "av__body");
@@ -701,13 +701,13 @@ const updateCellValueByInput = (protyle: IProtyle, type: TAVCol, blockElement: H
         } : (avMaskElement.querySelector(".b3-text-field") as HTMLInputElement).value, cellElements);
     }
     if (viewType === "table" &&
-        // 兼容新增行后台隐藏
+        // Compatibility for a newly-added row being hidden in the background
         cellElements[0] &&
         !hasClosestByClassName(cellElements[0], "custom-attr")) {
         cellElements[0].classList.add("av__cell--select");
         addDragFill(cellElements[0]);
     }
-    //  单元格编辑中 ctrl+p 光标定位
+    //  Cursor positioning for ctrl+p while editing a cell
     if (!document.querySelector(".b3-dialog")) {
         focusBlock(blockElement);
     }
@@ -756,14 +756,14 @@ export const updateCellsValue = async (protyle: IProtyle, nodeElement: HTMLEleme
         }
 
         if (!item) {
-            // 兼容新增行后台隐藏
+            // Compatibility for a newly-added row being hidden in the background
             break;
         }
         const type = getTypeByCellElement(item) || item.dataset.type as TAVCol;
         if (["created", "updated", "template", "rollup"].includes(type)) {
             break;
         }
-        const cellId = item.dataset.id;   // 刚创建时无 id，更新需和 oldValue 保持一致
+        const cellId = item.dataset.id;   // No id right after creation; an update must stay consistent with oldValue
         const colId = getColId(item, viewType);
 
         text += getCellText(item) + ((cellElements[elementIndex + 1] && item.nextElementSibling && item.nextElementSibling === cellElements[elementIndex + 1]) ? "\t" : "\n\n");
@@ -773,11 +773,11 @@ export const updateCellsValue = async (protyle: IProtyle, nodeElement: HTMLEleme
         }
         json[json.length - 1].push(oldValue);
         let newValue = value;
-        // relation 为全部更新，以下类型为添加
+        // relation replaces the whole value; the following types append instead
         if (type === "mAsset") {
             if (Array.isArray(value)) {
                 newValue = oldValue.mAsset.concat(value);
-            } else if (typeof value !== "undefined" && typeof value !== "object") { // 不传入为删除，传入字符串不进行处理
+            } else if (typeof value !== "undefined" && typeof value !== "object") { // Not passing a value means delete; passing a string is not processed
                 const htmlValue: IAVCellAssetValue[] = [];
                 let link = protyle.lute.GetLinkDest(value);
                 let name = "";
@@ -830,11 +830,11 @@ export const updateCellsValue = async (protyle: IProtyle, nodeElement: HTMLEleme
                 newValue = oldValue.mAsset.concat(htmlValue);
             }
         } else if (type === "mSelect" || type === "select") {
-            // 不传入为删除
+            // Not passing a value means delete
             if (typeof value === "string") {
                 const newMSelectValue: IAVCellSelectValue[] = [];
                 let colorIndex = oldValue.mSelect.length;
-                // 以逗号分隔，去重，去空，去换行后做为选项
+                // Split by comma, dedupe, strip empties and newlines, and use the result as options
                 [...new Set(value.split(",").map(v => v.trim().replace(/\n|\r\n|\r|\u2028|\u2029/g, "")))].forEach((item) => {
                     if (!item) {
                         return;
@@ -882,7 +882,7 @@ export const updateCellsValue = async (protyle: IProtyle, nodeElement: HTMLEleme
             doOperations.push(...operations.doOperations);
             undoOperations.push(...operations.undoOperations);
         }
-        // formattedContent 在单元格渲染时没有用到，需对比保持一致
+        // formattedContent is not used when rendering the cell, so it needs to be compared and kept consistent
         if (type === "date") {
             if (!(value && typeof value === "object" && typeof value.isNotTime === "boolean")) {
                 const response = await fetchSyncPost("/api/av/getAttributeViewKeysByID", {avID: avID, keyIDs: [colId]});
@@ -966,7 +966,7 @@ export const renderCell = (cellValue: IAVCellValue, rowIndex = 0, showIcon = tru
     } else if ("url" === cellValue.type) {
         text = renderCellURL(cellValue?.url?.content || "");
     } else if (cellValue.type === "block") {
-        // 不可使用换行 https://github.com/siyuan-note/siyuan/issues/11365
+        // Line breaks cannot be used https://github.com/siyuan-note/siyuan/issues/11365
         if (cellValue?.isDetached) {
             text = `<span class="av__celltext">${Lute.EscapeHTMLStr(cellValue.block.content || "")}</span>`;
         } else {
@@ -1000,7 +1000,7 @@ export const renderCell = (cellValue: IAVCellValue, rowIndex = 0, showIcon = tru
         }
         text += "</span>";
     } else if (["lineNumber"].includes(cellValue.type)) {
-        // 渲染行号
+        // Render the line number
         text = `<span class="av__celltext" data-value='${rowIndex + 1}'>${rowIndex + 1}</span>`;
     } else if (cellValue.type === "mAsset") {
         cellValue?.mAsset?.forEach((item) => {
@@ -1039,7 +1039,7 @@ export const renderCell = (cellValue: IAVCellValue, rowIndex = 0, showIcon = tru
                 if (item?.isDetached) {
                     text += `<span data-row-id="${rowID}" class="av__cell--relation"><span${showIcon ? "" : ' class="fn__none"'}><svg><use xlink:href="#iconLine"></use></svg><span class="fn__space--5"></span></span><span class="av__celltext">${Lute.EscapeHTMLStr(item.block.content || window.siyuan.languages.untitled)}</span></span>`;
                 } else {
-                    // data-block-id 用于更新 emoji
+                    // data-block-id is used to update the emoji
                     text += `<span data-row-id="${rowID}" class="av__cell--relation" data-block-id="${item.block.id}"><span class="b3-menu__avemoji${showIcon ? "" : " fn__none"}" data-unicode="${item.block.icon || ""}">${unicode2Emoji(item.block.icon || window.siyuan.storage[Constants.LOCAL_IMAGES].file)}</span><span data-type="block-ref" data-id="${item.block.id}" data-subtype="s" class="av__celltext av__celltext--ref">${Lute.EscapeHTMLStr(item.block.content || window.siyuan.languages.untitled)}</span></span>`;
                 }
             }
@@ -1130,8 +1130,10 @@ export const getPositionByCellElement = (cellElement: HTMLElement) => {
     if (!rowElement) {
         return;
     }
-    // 直接取该行在 body 内 .av__row 列表中的序号，与划选/拖拽填充遍历 querySelectorAll(".av__row")
-    // 时的 index 保持同一基准，避免固定表头占位、虚拟滚动 spacer 等结构导致 previousElementSibling 计数错位
+    // Directly take this row's index within the body's .av__row list, keeping the same baseline as
+    // the index used when iterating querySelectorAll(".av__row") for selection/drag-fill, to avoid
+    // miscounting caused by previousElementSibling when structures like a sticky header placeholder
+    // or a virtual scroll spacer are present
     const bodyElement = hasClosestByClassName(rowElement, "av__body");
     let rowIndex = -1;
     if (bodyElement) {
@@ -1189,7 +1191,7 @@ export const dragFillCellsValue = (protyle: IProtyle, nodeElement: HTMLElement, 
                 (item.type === "block" && item.element.getAttribute("data-detached") !== "true")) {
                 return;
             }
-            // https://ld246.com/article/1707975507571 数据库下拉填充数据后异常
+            // https://ld246.com/article/1707975507571 An exception after filling data via database drag-fill
             const data = JSON.parse(JSON.stringify(originData[originKeys[index % originKeys.length]][cellIndex]));
             data.id = item.id;
             const keyID = item.colId;

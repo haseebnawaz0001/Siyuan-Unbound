@@ -85,8 +85,9 @@ func IALStr(n *ast.Node) string {
 	if 1 > len(n.KramdownIAL) {
 		return ""
 	}
-	// 这里不能进行转义，否则会导致从数据库中读取后转换为 IAL 时解析错误
-	// 所以 Some symbols should not be escaped to avoid inaccurate searches https://github.com/siyuan-note/siyuan/issues/10185 无法被修复了
+	// Escaping cannot be done here, otherwise it would cause a parse error when converting back to IAL after
+	// reading from the database, so Some symbols should not be escaped to avoid inaccurate searches
+	// https://github.com/siyuan-note/siyuan/issues/10185 cannot be fixed.
 	return string(parse.IAL2Tokens(n.KramdownIAL))
 }
 
@@ -184,7 +185,7 @@ func upgradeSpec2(tree *parse.Tree) {
 		return
 	}
 
-	// 增加了 Callout
+	// Added Callout
 
 	tree.Root.Spec = "2"
 }

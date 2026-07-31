@@ -16,9 +16,9 @@ var (
 	attributeViewRelationsLock = sync.Mutex{}
 )
 
-// relationsPath 返回 relations 索引文件路径，按 AV 归属 box 分箱。
-// 加密 box：<DataDir>/<boxID>/storage/av/relations.msgpack（DEK 加密）
-// 普通 box：<DataDir>/storage/av/relations.msgpack（明文）
+// relationsPath returns the path to the relations index file, bucketed by the box that owns the AV.
+// Encrypted box: <DataDir>/<boxID>/storage/av/relations.msgpack (DEK-encrypted)
+// Normal box: <DataDir>/storage/av/relations.msgpack (plaintext)
 func relationsPath(boxID string) string {
 	if boxID != "" {
 		return filepath.Join(util.DataDir, boxID, "storage", "av", "relations.msgpack")
@@ -26,7 +26,7 @@ func relationsPath(boxID string) string {
 	return filepath.Join(util.DataDir, "storage", "av", "relations.msgpack")
 }
 
-// readRelations 读取 relations 索引（boxID 非空时自动解密）。
+// readRelations reads the relations index (automatically decrypted when boxID is non-empty).
 func readRelations(boxID string) (avRels map[string][]string) {
 	avRels = map[string][]string{}
 	p := relationsPath(boxID)
@@ -53,7 +53,7 @@ func readRelations(boxID string) (avRels map[string][]string) {
 	return
 }
 
-// writeRelations 写入 relations 索引（boxID 非空时加密）。
+// writeRelations writes the relations index (encrypted when boxID is non-empty).
 func writeRelations(boxID string, avRels map[string][]string) {
 	p := relationsPath(boxID)
 	if err := os.MkdirAll(filepath.Dir(p), 0755); err != nil {
@@ -79,8 +79,10 @@ func writeRelations(boxID string, avRels map[string][]string) {
 	}
 }
 
-// relationsBoxIDByAvID 由 destAvID 反查归属 boxID，决定 relations 索引的存储位置。
-// 加密笔记本的 AV 返回其 boxID；普通 box 的 AV 返回空串（全局路径）。
+// relationsBoxIDByAvID looks up the owning boxID from destAvID, determining where the relations index is
+// stored.
+// For an AV in an encrypted notebook it returns that boxID; for an AV in a normal box it returns an empty
+// string (the global path).
 func relationsBoxIDByAvID(avID string) string {
 	_, boxID := FindAttributeViewPath(avID)
 	return boxID
@@ -125,8 +127,9 @@ func UpsertAvBackRel(srcAvID, destAvID string) {
 	attributeViewRelationsLock.Lock()
 	defer attributeViewRelationsLock.Unlock()
 
-	// 跨加密边界拒绝：src 和 dest 必须处于同一加密边界（都普通或同一加密 box），
-	// 否则关联会把加密 AV 的存在/结构泄漏到普通库或另一个加密 box
+	// Reject cross-encryption-boundary relations: src and dest must be within the same encryption boundary
+	// (both normal, or the same encrypted box), otherwise the relation could leak the existence/structure of
+	// an encrypted AV into a normal library or another encrypted box
 	_, srcBox := FindAttributeViewPath(srcAvID)
 	_, destBox := FindAttributeViewPath(destAvID)
 	if AVIsEncryptedBox != nil {

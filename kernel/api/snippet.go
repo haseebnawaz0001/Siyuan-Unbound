@@ -38,7 +38,7 @@ func getSnippet(c *gin.Context) {
 	}
 
 	var typ string         // js/css/all
-	var enabledArg float64 // 0：禁用，1：启用，2：全部
+	var enabledArg float64 // 0: disabled, 1: enabled, 2: all
 	var keyword string
 	if !util.ParseJsonArgs(arg, ret,
 		util.BindJsonArg("type", &typ, true, true),

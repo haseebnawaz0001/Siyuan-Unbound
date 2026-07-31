@@ -68,7 +68,7 @@ export class Options {
                 key: "『『",
                 hint: hintEmbed,
             }, {
-                key: "#", // 需在 / 之前，否则 #abc/ 会显示菜单
+                key: "#", // Must come before /, otherwise #abc/ would show the menu
                 hint: hintTag,
             }, {
                 key: "/",
@@ -77,7 +77,7 @@ export class Options {
                 key: "、",
                 hint: hintSlash,
             }, {
-                key: ":" // 必须在最后一个，否则块引用后的 : 不能被解析
+                key: ":" // Must be last, otherwise the : after a block reference can't be parsed
             }],
         },
         preview: {

@@ -27,7 +27,7 @@ export const cancelDrag = () => {
 const dragoverScroll: {
     animationId?: number,
     element?: Element,
-    space?: number, // -1 向上或向左；1 向下或向右
+    space?: number, // -1 up or left; 1 down or right
     direction?: "x" | "y",
     lastTime?: number
 } = {};
@@ -53,7 +53,7 @@ const scrollAnimation = (timestamp: number) => {
     } else {
         dragoverScroll.element.scroll({top: dragoverScroll.element.scrollTop + distance});
     }
-    // 使用 requestAnimationFrame 继续动画
+    // Use requestAnimationFrame to continue the animation
     dragoverScroll.animationId = requestAnimationFrame(scrollAnimation);
     dragoverScroll.lastTime = timestamp;
 };
@@ -76,7 +76,7 @@ export const dragOverScroll = (moveEvent: MouseEvent, contentRect: DOMRect, elem
             dragoverScroll.animationId = requestAnimationFrame(scrollAnimation);
         }
     } else {
-        // 离开滚动区域时停止滚动
+        // Stop scrolling when leaving the scroll area
         stopScrollAnimation();
     }
 };

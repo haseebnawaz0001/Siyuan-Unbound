@@ -5,7 +5,7 @@ import {getSearchKeywordsLower} from "./normalize";
 import {App} from "../../index";
 import {isPhablet} from "../../protyle/util/compatibility";
 
-/** @param visibleInSidebar 为 true 时，侧栏项被搜索过滤隐藏（`display: none`）则视为无 focus */
+/** @param visibleInSidebar When true, a sidebar item hidden by the search filter (`display: none`) counts as not focused */
 const getFocusedTabId = (dialogElement: HTMLElement, visibleInSidebar = false): TSettingTab | null => {
     const focusLi = dialogElement.querySelector(".config__side .b3-list-item.b3-list-item--focus") as HTMLElement | null;
     if (!focusLi || (visibleInSidebar && focusLi.style.display === "none")) {
@@ -75,7 +75,7 @@ const syncSettingSearch = (dialogElement: HTMLElement, app: App) => {
             continue;
         }
         item.style.display = "";
-        // 优先使用当前标签页；若当前标签页已不在命中集合，则切到侧栏顺序中的第一个命中项
+        // Prefer the current tab, and when it is no longer among the matches switch to the first match in sidebar order
         if (tabId === focusedTabId || !currentMatch) {
             currentMatch = {tabId, visibleItemIds, visibleGroupIds};
         }

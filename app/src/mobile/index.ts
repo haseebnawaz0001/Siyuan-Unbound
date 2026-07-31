@@ -94,7 +94,7 @@ class App {
             },
             ws: mainWs
         };
-        // 不能使用 touchstart，否则会被 event.stopImmediatePropagation() 阻塞
+        // Cannot use touchstart, otherwise it would be blocked by event.stopImmediatePropagation()
         window.addEventListener("click", (event: MouseEvent & { target: HTMLElement }) => {
             if (!window.siyuan.menus.menu.element.contains(event.target) && !hasClosestByAttribute(event.target, "data-menu", "true")) {
                 window.siyuan.menus.menu.remove();
@@ -115,8 +115,10 @@ class App {
                 }, Constants.TIMEOUT_TRANSITION);
             }
             if (canInput(event.target)) {
-                // 原生 App 通过桥接主动唤起键盘；移动端浏览器没有桥接，但点击可编辑区域后也会立刻触发 resize，
-                // 进而调用 activeBlur 关闭键盘（比如三星键盘 https://github.com/siyuan-note/siyuan/issues/18078），所以此处也需要上锁
+                // The native app actively shows the keyboard via the bridge; mobile browsers have no bridge, but
+                // clicking an editable area also immediately triggers resize, which in turn calls activeBlur to
+                // close the keyboard (e.g. Samsung Keyboard https://github.com/siyuan-note/siyuan/issues/18078),
+                // so we need to lock here too
                 if (window.JSAndroid && window.JSAndroid.showKeyboard || window.JSHarmony && window.JSHarmony.showKeyboard) {
                     callMobileAppShowKeyboard();
                 } else {
@@ -138,7 +140,8 @@ class App {
                     console.error("Error in focus event:", e);
                 }
                 if (canInput(this)) {
-                    // 原生 App 通过桥接主动唤起键盘；移动端浏览器没有桥接，仅上锁以阻止 focus 后立即触发的 activeBlur 关闭键盘
+                    // The native app actively shows the keyboard via the bridge; mobile browsers have no bridge, so
+                    // we only lock to prevent the activeBlur triggered right after focus from closing the keyboard
                     if (window.JSAndroid && window.JSAndroid.showKeyboard || window.JSHarmony && window.JSHarmony.showKeyboard) {
                         callMobileAppShowKeyboard();
                     } else {
@@ -153,7 +156,7 @@ class App {
         window.addEventListener("pagehide", () => {
             saveScroll(window.siyuan.mobile.editor.protyle);
         }, false);
-        // 判断手机横竖屏状态
+        // Determine the phone's portrait/landscape orientation
         window.matchMedia("(orientation:portrait)").addEventListener("change", () => {
             updateCardHV();
             activeBlur();
@@ -214,7 +217,7 @@ class App {
             window.addEventListener("blur", () => {
                 setWebViewFocusable();
             });
-            // 移动端删除键 https://github.com/siyuan-note/siyuan/issues/9259
+            // Mobile delete key https://github.com/siyuan-note/siyuan/issues/9259
             window.addEventListener("keydown", (event) => {
                 mobileKeydown(siyuanApp, event);
                 if (getSelection().rangeCount > 0) {
@@ -244,8 +247,9 @@ const siyuanApp = new App();
 initWindowOpenOverride(siyuanApp, openByMobile);
 // https://github.com/siyuan-note/siyuan/issues/8441
 window.reconnectWebSocket = () => {
-    // 后台唤醒时任一 socket 可能仍在 CONNECTING，调用 send 会抛 InvalidStateError，
-    // 单独 try/catch 防止首个错误中断整个 ping 序列；下次 reconnectWebSocket 会再次尝试
+    // When waking up from the background, any socket may still be in CONNECTING state, and calling send would
+    // throw InvalidStateError; a separate try/catch prevents the first error from aborting the whole ping
+    // sequence, and the next reconnectWebSocket call will retry
     const tryPing = (m?: { send: (cmd: string, p: Record<string, unknown>) => void }) => {
         if (!m) {
             return;

@@ -52,7 +52,7 @@ func LoadTrees(ids []string) (ret map[string]*parse.Tree) {
 
 	bts := treenode.GetBlockTrees(ids)
 
-	// 全局 blocktree 未命中的 id，遍历已打开的加密笔记本查找
+	// For ids not found in the global blocktree, search among already-opened encrypted notebooks
 	foundSet := map[string]bool{}
 	for id := range bts {
 		foundSet[id] = true
@@ -143,17 +143,18 @@ func batchLoadTrees(boxIDs, paths []string, luteEngine *lute.Lute) (ret []*parse
 	return
 }
 
-// ValidateBoxRelativePath 校验 box 内相对路径是否安全。
-// 拒绝 ..、绝对路径，确保最终路径位于 <DataDir>/<boxID> 内。
-// 允许路径以 / 开头（如 /20230101/xxx.sy），会自动标准化再去掉前导斜杠。
-// 根路径（"/" 或 ""）合法，返回空字符串。
+// ValidateBoxRelativePath validates whether a box-relative path is safe.
+// Rejects .. and absolute paths, ensuring the final path lies within <DataDir>/<boxID>.
+// A path is allowed to start with / (e.g. /20230101/xxx.sy); it is automatically normalized and the leading
+// slash is stripped.
+// The root path ("/" or "") is valid and returns an empty string.
 func ValidateBoxRelativePath(boxID, p string) (string, error) {
 	p = filepath.ToSlash(p)
-	// 记录原始路径用于 IsSubPath 校验
+	// Keep the original path for the IsSubPath check
 	origP := p
-	// 标准化：去掉前导 /
+	// Normalize: strip the leading /
 	p = strings.TrimPrefix(p, "/")
-	// 根路径直接放行（box 根目录本身是合法路径）
+	// The root path is allowed through directly (the box root directory itself is a valid path)
 	if p == "" {
 		return p, nil
 	}
@@ -186,7 +187,8 @@ func LoadTreeWithFix(boxID, p string, luteEngine *lute.Lute) (ret *parse.Tree, n
 		return
 	}
 
-	// 加密笔记本的 .sy 是密文，读盘后解密成明文供后续解析；非加密笔记本原样返回
+	// An encrypted notebook's .sy is ciphertext; after reading from disk, decrypt it to plaintext for later
+	// parsing; a non-encrypted notebook is returned as-is
 	if data, err = decryptData(boxID, p, data); nil != err {
 		logging.LogErrorf("decrypt tree [%s] failed: %s", p, err)
 		return
@@ -226,14 +228,14 @@ func LoadTreeByData(data []byte, boxID, p string, luteEngine *lute.Lute) (ret *p
 		return
 	}
 
-	parts = parts[1 : len(parts)-1] // 去掉开头的斜杆和结尾的自己
+	parts = parts[1 : len(parts)-1] // strip the leading slash element and the trailing element for itself
 	if 1 > len(parts) {
 		ret.HPath = "/" + ret.Root.IALAttr("title")
 		ret.Hash = treenode.NodeHash(ret.Root, ret, luteEngine)
 		return
 	}
 
-	// 构造 HPath
+	// Construct the HPath
 	hPathBuilder := bytes.Buffer{}
 	hPathBuilder.WriteString("/")
 	for i := range parts {
@@ -249,7 +251,7 @@ func LoadTreeByData(data []byte, boxID, p string, luteEngine *lute.Lute) (ret *p
 
 		parentDocIAL := DocIAL(parentAbsPath)
 		if 1 > len(parentDocIAL) {
-			// 子文档缺失父文档时自动补全 https://github.com/siyuan-note/siyuan/issues/7376
+			// Automatically fill in a missing parent document for a child document https://github.com/siyuan-note/siyuan/issues/7376
 			parentTree := treenode.NewTree(boxID, parentPath, hPathBuilder.String()+"Untitled", "Untitled")
 			if _, writeErr := WriteTree(parentTree); nil != writeErr {
 				logging.LogErrorf("rebuild parent tree [%s] failed: %s", parentAbsPath, writeErr)
@@ -275,13 +277,14 @@ func LoadTreeByData(data []byte, boxID, p string, luteEngine *lute.Lute) (ret *p
 }
 
 func DocIAL(absPath string) (ret map[string]string) {
-	// 加密笔记本的 .sy 是密文，流式 jsoniter 解析无法处理，需先整体读+解密。
-	// 反推 boxID：路径形如 <DataDir>/<boxID>/...；非加密笔记本走原流式逻辑。
+	// An encrypted notebook's .sy is ciphertext, which the streaming jsoniter parser cannot handle, so it must
+	// be read and decrypted as a whole first.
+	// Infer boxID: the path is of the form <DataDir>/<boxID>/...; a non-encrypted notebook uses the original streaming logic.
 	boxID := docIALBoxID(absPath)
 	if boxID != "" && DEKProvider != nil {
 		if dek, err := DEKProvider(boxID); err == nil && dek != nil {
-			// 已解锁的加密 box：整体读密文 → 解密 → 流式解析
-			// 注意：filelock.ReadFile 内部已加锁，不能在外面再 Lock/Unlock（会死锁）
+			// An already-unlocked encrypted box: read the whole ciphertext -> decrypt -> streaming parse
+			// Note: filelock.ReadFile already locks internally, so do not Lock/Unlock again outside it (would deadlock)
 			raw, readErr := filelock.ReadFile(absPath)
 			if readErr != nil {
 				logging.LogErrorf("read file [%s] failed: %s", absPath, readErr)
@@ -290,8 +293,9 @@ func DocIAL(absPath string) (ret map[string]string) {
 			relPath := filepath.ToSlash(strings.TrimPrefix(absPath, filepath.Join(util.DataDir, boxID)+string(os.PathSeparator)))
 			plain, decErr := decryptData(boxID, relPath, raw)
 			if decErr != nil {
-				// 解密失败（可能文件损坏或密钥不匹配）：返回空 map 而非 nil，
-				// 避免 LoadTreeByData 的父文档补全逻辑把 nil 误判为"文档缺失"而凭空创建文档
+				// Decryption failed (possibly a corrupted file or a key mismatch): return an empty map instead
+				// of nil, to avoid LoadTreeByData's parent-document completion logic mistaking nil for a
+				// "missing document" and creating a document out of thin air
 				logging.LogErrorf("decrypt doc [%s] for IAL failed: %s", absPath, decErr)
 				return map[string]string{}
 			}
@@ -338,7 +342,7 @@ func DocIAL(absPath string) (ret map[string]string) {
 }
 
 func TreeSize(tree *parse.Tree) (size uint64) {
-	luteEngine := util.NewLute() // 不关注用户的自定义解析渲染选项
+	luteEngine := util.NewLute() // not concerned with the user's custom parse/render options
 	renderer := render.NewJSONRenderer(tree, luteEngine.RenderOptions, luteEngine.ParseOptions)
 	return uint64(len(renderer.Render()))
 }
@@ -349,20 +353,21 @@ func WriteTree(tree *parse.Tree) (size uint64, err error) {
 		return
 	}
 
-	// 加密笔记本的落盘内容用密文 encData，缓存与比对仍用明文 data（缓存存明文）
+	// An encrypted notebook's on-disk content uses the ciphertext encData; the cache and comparisons still use the plaintext data (the cache stores plaintext)
 	encData, encErr := encryptData(tree.Box, tree.Path, data)
 	if encErr != nil {
 		err = encErr
 		return
 	}
 
-	// 缓存与待写入数据一致时跳过落盘；缓存未命中时再读盘比对，避免无变更的重复写入
+	// Skip writing to disk when the cache matches the data to be written; when there's a cache miss, read from
+	// disk and compare instead, to avoid a redundant write when there's no change
 	if cachedData, ok := cache.GetTreeDataInBox(tree.ID, tree.Box); ok {
 		if len(cachedData) == len(data) && bytes.Equal(cachedData, data) {
 			return
 		}
 	} else {
-		// 读盘比对：加密笔记本的磁盘数据是密文，需先解密成明文再与 data 比对
+		// Compare against disk: an encrypted notebook's on-disk data is ciphertext, so it must be decrypted to plaintext before comparing with data
 		if diskData, readErr := filelock.ReadFile(filePath); nil == readErr {
 			decDisk, decErr := decryptData(tree.Box, tree.Path, diskData)
 			if decErr == nil && len(decDisk) == len(data) && bytes.Equal(decDisk, data) {
@@ -400,7 +405,7 @@ func writeTreeByWriteFile(filePath string, data []byte) (err error) {
 }
 
 func prepareWriteTree(tree *parse.Tree) (data []byte, filePath string, err error) {
-	luteEngine := util.NewLute() // 不关注用户的自定义解析渲染选项
+	luteEngine := util.NewLute() // not concerned with the user's custom parse/render options
 
 	if nil == tree.Root.FirstChild {
 		newP := treenode.NewParagraph("")
@@ -436,8 +441,9 @@ func prepareWriteTree(tree *parse.Tree) (data []byte, filePath string, err error
 	return
 }
 
-// removeUnescapedUnicodeNull 只移除未被转义的 `\u0000` 字面序列。
-// 判断方法：在匹配到 `\u0000` 时向前数连续的 `\` 个数，若为偶数则视为未转义并移除。
+// removeUnescapedUnicodeNull removes only the unescaped `\u0000` literal sequences.
+// Detection method: when a match is found for `\u0000`,
+// count the run of consecutive `\` characters before it; if even, treat it as unescaped and remove it.
 func removeUnescapedUnicodeNull(data []byte) (ret []byte, needFix bool) {
 	patLen := 6 // len(`\u0000`)
 	n := len(data)
@@ -460,25 +466,25 @@ func removeUnescapedUnicodeNull(data []byte) (ret []byte, needFix bool) {
 		i += j
 		dst = append(dst, data[from:i]...)
 
-		// 快速检查是否可能匹配 `\u0000`
+		// Quick check whether it could match `\u0000`
 		if i+patLen <= n &&
 			data[i+1] == 'u' &&
 			data[i+2] == '0' &&
 			data[i+3] == '0' &&
 			data[i+4] == '0' &&
 			data[i+5] == '0' {
-			// 统计当前 `\` 之前连续的反斜杠数量
+			// Count the run of consecutive backslashes before the current `\`
 			backslashes := 0
 			for k := i - 1; k >= 0 && data[k] == '\\'; k-- {
 				backslashes++
 			}
-			// 若为偶数，则当前 `\` 未被转义，跳过整个 `\u0000`
+			// If even, the current `\` is unescaped; skip the whole `\u0000`
 			if backslashes%2 == 0 {
 				i += patLen
 				continue
 			}
 		}
-		// 否则保留当前字节
+		// Otherwise keep the current byte
 		dst = append(dst, data[i])
 		i++
 	}
@@ -490,7 +496,7 @@ func afterWriteTree(tree *parse.Tree) {
 	cache.PutDocIALInBox(tree.Path, tree.Box, docIAL)
 }
 
-// fixTreeJSONData 订正树 JSON 数据。
+// fixTreeJSONData corrects tree JSON data.
 func fixTreeJSONData(boxID, p string, jsonData []byte, luteEngine *lute.Lute) (data []byte, needFix bool, err error) {
 	jsonData, needFix = removeUnescapedUnicodeNull(jsonData)
 	ret, parseNeedFix, err := dataparser.ParseJSON(jsonData, luteEngine.ParseOptions)
@@ -514,17 +520,19 @@ func fixTreeJSONData(boxID, p string, jsonData []byte, luteEngine *lute.Lute) (d
 		needFix = true
 	}
 
-	// v3.5.1 https://github.com/siyuan-note/siyuan/pull/16657 引入的问题，属性值未转义
-	// v3.5.2 https://github.com/siyuan-note/siyuan/issues/16686 进行了修复，并加了订正逻辑 https://github.com/siyuan-note/siyuan/pull/16712
-	// https://github.com/siyuan-note/siyuan/security/advisories/GHSA-ff66-236v-p4fg XSS 漏洞："title": "&amp;\" onmouseenter=\"require('child_process').exec('calc')"
+	// An issue introduced in v3.5.1 https://github.com/siyuan-note/siyuan/pull/16657 where attribute values were not escaped
+	// Fixed in v3.5.2 https://github.com/siyuan-note/siyuan/issues/16686, with correction logic added https://github.com/siyuan-note/siyuan/pull/16712
+	// https://github.com/siyuan-note/siyuan/security/advisories/GHSA-ff66-236v-p4fg XSS vulnerability: "title": "&amp;\" onmouseenter=\"require('child_process').exec('calc')"
 	if escapeAttributeValues(ret) {
 		needFix = true
 	}
 
 	if pathID := util.GetTreeID(p); pathID != ret.Root.ID {
 		if encryptedBox(boxID) {
-			// 加密 .sy：基名 ID（pathID）必须与解密后的根块 ID 一致。不一致说明密文被替换、
-			// 文件名被篡改或 AAD 认证被绕过，不得静默修正——fail-closed，符合加密笔记本威胁模型。
+			// Encrypted .sy: the basename ID (pathID) must match the decrypted root block ID. A mismatch
+			// means the ciphertext was replaced, the filename was tampered with, or AAD authentication was
+			// bypassed, and must not be silently corrected -- fail closed, consistent with the encrypted
+			// notebook threat model.
 			err = fmt.Errorf("encrypted .sy [%s]: base id [%s] != root id [%s]", p, pathID, ret.Root.ID)
 			logging.LogErrorf("%s", err)
 			return
@@ -556,7 +564,7 @@ func fixTreeJSONData(boxID, p string, jsonData []byte, luteEngine *lute.Lute) (d
 	if err = os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
 		return
 	}
-	// 订正后的 data 是明文，加密笔记本落盘前需加密
+	// The corrected data is plaintext; an encrypted notebook must encrypt it before writing to disk
 	encData, encErr := encryptData(ret.Box, ret.Path, data)
 	if encErr != nil {
 		err = encErr
@@ -585,7 +593,7 @@ func parseJSON2Tree(boxID, p string, jsonData []byte, luteEngine *lute.Lute) (re
 	return
 }
 
-// escapeAttributeValues 转义属性值
+// escapeAttributeValues escapes attribute values
 func escapeAttributeValues(tree *parse.Tree) (hasEscaped bool) {
 	if nil == tree || nil == tree.Root {
 		return false
@@ -604,14 +612,15 @@ func escapeAttributeValues(tree *parse.Tree) (hasEscaped bool) {
 	return hasEscaped
 }
 
-// escapeNodeAttributeValues 转义节点的属性值
+// escapeNodeAttributeValues escapes a node's attribute values
 func escapeNodeAttributeValues(node *ast.Node) (escaped bool) {
 	if nil == node || 0 == len(node.KramdownIAL) {
 		return false
 	}
 
 	for _, kv := range node.KramdownIAL {
-		// 解码再编码后发生变化则说明未正确转义或存在恶意拼接，需要订正
+		// If decoding then re-encoding produces a change, it means the value was not properly escaped or
+		// contains malicious concatenation, and needs correction
 		canonical := html.EscapeAttrVal(html.UnescapeAttrVal(kv[1]))
 		if canonical != kv[1] {
 			kv[1] = canonical

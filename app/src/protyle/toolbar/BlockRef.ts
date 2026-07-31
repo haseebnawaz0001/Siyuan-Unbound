@@ -7,7 +7,7 @@ export class BlockRef extends ToolbarItem {
 
     constructor(protyle: IProtyle, menuItem: IMenuItem) {
         super(protyle, menuItem);
-        // 不能用 getEventName，否则会导致光标位置变动到点击的文档中
+        // Cannot use getEventName, otherwise the cursor position would shift to the clicked document
         this.element.addEventListener("click", (event: MouseEvent & { changedTouches: MouseEvent[] }) => {
             if (protyle.toolbar.range.toString() === "") {
                 return;

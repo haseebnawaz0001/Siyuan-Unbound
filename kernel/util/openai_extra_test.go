@@ -32,7 +32,7 @@ func TestExtraBodyForModel(t *testing.T) {
 	}{
 		{"MiniMax-M3", map[string]any{"reasoning_split": true}},
 		{"minimax-m1", map[string]any{"reasoning_split": true}},
-		{"MINIMAX-M3", map[string]any{"reasoning_split": true}}, // 大小写不敏感
+		{"MINIMAX-M3", map[string]any{"reasoning_split": true}}, // Case-insensitive
 		{"abab-6.5-chat", map[string]any{"reasoning_split": true}},
 		{"ABAB-7", map[string]any{"reasoning_split": true}},
 		{"gpt-4o", nil},
@@ -62,13 +62,13 @@ func extraEqual(a, b map[string]any) bool {
 }
 
 func TestExtraBodyTransport_ChatPostMerged(t *testing.T) {
-	// 拦截 chat/completions POST 请求，验证 extraBody 字段被合并进请求体。
+	// Intercept the chat/completions POST request and verify the extraBody field is merged into the request body.
 	var captured map[string]any
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, _ := io.ReadAll(r.Body)
 		_ = json.Unmarshal(body, &captured)
 		w.Header().Set("Content-Type", "application/json")
-		// 返回一个合法的最小 chat completion 响应。
+		// Return a valid minimal chat completion response.
 		w.Write([]byte(`{"id":"1","object":"chat.completion","choices":[{"index":0,"message":{"role":"assistant","content":"hi"},"finish_reason":"stop"}]}`))
 	}))
 	defer server.Close()
@@ -95,7 +95,7 @@ func TestExtraBodyTransport_ChatPostMerged(t *testing.T) {
 }
 
 func TestExtraBodyTransport_NonChatPassthrough(t *testing.T) {
-	// 非 chat 请求（如 GET /v1/models）应原样透传，不注入任何字段。
+	// Non-chat requests (e.g. GET /v1/models) should be passed through unchanged, with no fields injected.
 	var receivedBody []byte
 	var method string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -128,7 +128,7 @@ func TestExtraBodyTransport_NonChatPassthrough(t *testing.T) {
 }
 
 func TestExtraBodyTransport_InvalidJSONPassthrough(t *testing.T) {
-	// 请求体不是合法 JSON 时，应原样透传原始 body，不破坏请求。
+	// When the request body isn't valid JSON, the original body should be passed through unchanged, without breaking the request.
 	var receivedBody []byte
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		receivedBody, _ = io.ReadAll(r.Body)
@@ -156,7 +156,7 @@ func TestExtraBodyTransport_InvalidJSONPassthrough(t *testing.T) {
 }
 
 func TestExtraBodyTransport_EmptyExtraPassthrough(t *testing.T) {
-	// extraBody 为空时，即便是 chat POST 也应原样透传（不经过合并逻辑）。
+	// When extraBody is empty, even a chat POST should be passed through unchanged (bypassing the merge logic).
 	var receivedBody []byte
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		receivedBody, _ = io.ReadAll(r.Body)

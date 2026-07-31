@@ -92,7 +92,8 @@ func ExportCodeBlock(blockID string) (filePath string, err error) {
 		name := tree.Root.IALAttr("title") + "-" + util.CurrentTimeSecondsStr() + ".txt"
 		name = util.FilterFileName(name)
 		exportFolder := filepath.Join(util.TempDir, "export")
-		// 加密笔记本的导出归入 boxID 子目录，确保 LockBox 清理和服务端校验锁定状态
+		// Exports from encrypted notebooks go under a boxID subdirectory, so LockBox cleanup and server-side lock
+		// verification work correctly
 		if IsEncryptedBox(tree.Box) {
 			exportFolder = filepath.Join(exportFolder, tree.Box)
 		}
@@ -108,7 +109,8 @@ func ExportCodeBlock(blockID string) (filePath string, err error) {
 			return writeErr
 		}
 
-		// 加密笔记本的导出须注册托管 token，否则服务端守卫拒绝下载
+		// Exports from encrypted notebooks must register a managed token, otherwise the server-side guard rejects
+		// the download
 		if IsEncryptedBox(tree.Box) {
 			filePath = "/export/" + registerManagedEncryptedExport(tree.Box, "code", writePath)
 		} else {
@@ -152,14 +154,15 @@ func ExportAv2CSV(avID, blockID string) (zipPath string, err error) {
 		name := util.FilterFileName(getAttrViewName(attrView))
 		table := getAttrViewTable(attrView, view, "")
 
-		// 遵循视图过滤和排序规则 Use filtering and sorting of current view settings when exporting database blocks https://github.com/siyuan-note/siyuan/issues/10474
+		// Follow the view's filter and sort rules. Use filtering and sorting of current view settings when exporting database blocks https://github.com/siyuan-note/siyuan/issues/10474
 		cachedAttrViews := map[string]*av.AttributeView{}
 		rollupFurtherCollections := sql.GetFurtherCollections(attrView, cachedAttrViews)
 		av.Filter(table, attrView, rollupFurtherCollections, cachedAttrViews)
 		av.Sort(table, attrView)
 
 		exportFolder := filepath.Join(util.TempDir, "export")
-		// 加密笔记本的导出归入 boxID 子目录，确保 LockBox 清理和服务端校验锁定状态
+		// Exports from encrypted notebooks go under a boxID subdirectory, so LockBox cleanup and server-side lock
+		// verification work correctly
 		if avBoxID != "" {
 			exportFolder = filepath.Join(exportFolder, avBoxID)
 		}
@@ -174,7 +177,7 @@ func ExportAv2CSV(avID, blockID string) (zipPath string, err error) {
 			return openErr
 		}
 
-		if _, err = f.WriteString("\xEF\xBB\xBF"); err != nil { // 写入 UTF-8 BOM，避免使用 Microsoft Excel 打开乱码
+		if _, err = f.WriteString("\xEF\xBB\xBF"); err != nil { // Write a UTF-8 BOM to avoid garbled text when opening with Microsoft Excel
 			f.Close()
 			return err
 		}
@@ -332,7 +335,8 @@ func ExportAv2CSV(avID, blockID string) (zipPath string, err error) {
 		f.Close()
 		os.RemoveAll(exportFolder)
 
-		// 加密笔记本的导出须注册托管 token，否则服务端守卫拒绝下载
+		// Exports from encrypted notebooks must register a managed token, otherwise the server-side guard rejects
+		// the download
 		if avBoxID != "" {
 			zipPath = "/export/" + registerManagedEncryptedExport(avBoxID, "csv", absZipPath)
 		} else {
@@ -368,11 +372,11 @@ func Export2Liandi(id string) (err error) {
 		msgId := util.PushMsg(Conf.Language(182), 15000)
 		defer util.PushClearMsg(msgId)
 
-		// 判断帖子是否已经存在，存在则使用更新接口
+		// Check whether the post already exists; if so, use the update API
 		const liandiArticleIdAttrName = "custom-liandi-articleid"
-		const liandiArticleIdAttrNameOld = "custom-liandi-articleId" // 兼容旧属性名
+		const liandiArticleIdAttrNameOld = "custom-liandi-articleId" // for compatibility with the old attribute name
 		foundArticle := false
-		// 优先使用新属性名，如果不存在则尝试旧属性名
+		// Prefer the new attribute name, and fall back to the old one if it doesn't exist
 		articleId := tree.Root.IALAttr(liandiArticleIdAttrName)
 		if "" == articleId {
 			articleId = tree.Root.IALAttr(liandiArticleIdAttrNameOld)
@@ -451,7 +455,7 @@ func Export2Liandi(id string) (err error) {
 
 		if !foundArticle {
 			articleId = result.Data.(string)
-			tree, _ = LoadTreeByBlockID(id) // 这里必须重新加载，因为前面导出时已经修改了树结构
+			tree, _ = LoadTreeByBlockID(id) // must reload here since the earlier export step already modified the tree structure
 			tree.Root.SetIALAttr(liandiArticleIdAttrName, articleId)
 			if err = writeTreeUpsertQueue(tree); err != nil {
 				return err
@@ -525,20 +529,26 @@ func ExportSystemLog() (zipPath string) {
 	return
 }
 
-// exportLockedByBlockID 由 docID/blockID 反查 boxID，判断其所属加密笔记本是否未解锁。
-// 未解锁返回 true（调用方应中止导出并返回空结果）；普通笔记本或已解锁返回 false。
-// 用于文档级导出入口的统一 guard，避免未解锁时读出密文或空结果。
+// exportLockedByBlockID looks up the boxID from a docID/blockID and checks whether the owning encrypted notebook
+// is still locked.
+// Returns true if locked (the caller should abort the export and return an empty result); returns false for a
+// regular notebook or an already-unlocked one.
+// Used as a unified guard at document-level export entry points, to avoid reading out ciphertext or an empty
+// result while locked.
 func exportLockedByBlockID(id string) bool {
 	bt := treenode.GetBlockTree(id)
 	if nil == bt {
-		return false // 找不到块树，交给后续流程处理
+		return false // block tree not found, let the subsequent flow handle it
 	}
 	return IsEncryptedBox(bt.BoxID) && !IsBoxUnlocked(bt.BoxID)
 }
 
-// withExportReadLockByBlockID 由 blockID 反查 boxID，若属于加密笔记本则全程持读锁执行 fn。
-// 持锁期间 LockBox（自动锁定）会阻塞等待，避免操作中途清 DEK/删导出目录导致部分明文写出。
-// 普通笔记本或块树不存在时直接执行 fn。嵌套调用安全：sync.RWMutex.RLock 可重入。
+// withExportReadLockByBlockID looks up the boxID from a blockID, and if it belongs to an encrypted notebook, holds
+// the read lock for the entire duration of fn.
+// While the lock is held, LockBox (auto-lock) blocks and waits, preventing the DEK from being cleared or the
+// export directory from being deleted mid-operation, which could otherwise leak partial plaintext.
+// For a regular notebook or a missing block tree, fn is executed directly. Safe for nested calls:
+// sync.RWMutex.RLock is reentrant.
 func withExportReadLockByBlockID(id string, fn func() error) error {
 	bt := treenode.GetBlockTree(id)
 	if nil == bt || !IsEncryptedBox(bt.BoxID) {
@@ -556,7 +566,8 @@ func withExportReadLockByBlockID(id string, fn func() error) error {
 }
 
 func ExportNotebookSY(id string) (zipPath string) {
-	// 加密笔记本必须已解锁才能导出（DEK 在内存才能读 .sy/assets/AV 明文）
+	// An encrypted notebook must already be unlocked to be exported (the DEK needs to be in memory to read
+	// the plaintext .sy/assets/AV data)
 	if IsEncryptedBox(id) && !IsBoxUnlocked(id) {
 		logging.LogErrorf("export encrypted notebook [%s] failed: locked", id)
 		return
@@ -606,7 +617,7 @@ func ExportDataInFolder(exportFolder string) (name string, err error) {
 
 	data := filepath.Join(util.WorkspaceDir, "data")
 	if util.ContainerStd == util.Container {
-		// 桌面端检查磁盘可用空间
+		// Check available disk space on the desktop client
 
 		dataSize, sizeErr := util.SizeOfDirectory(data)
 		if sizeErr != nil {
@@ -616,13 +627,13 @@ func ExportDataInFolder(exportFolder string) (name string, err error) {
 		}
 
 		_, _, tempExportFree := util.GetDiskUsage(util.TempDir)
-		if int64(tempExportFree) < dataSize*2 { // 压缩 zip 文件时需要 data 的两倍空间
+		if int64(tempExportFree) < dataSize*2 { // compressing the zip file needs twice the space of the data dir
 			err = fmt.Errorf(Conf.Language(242), humanize.BytesCustomCeil(tempExportFree, 2), humanize.BytesCustomCeil(uint64(dataSize)*2, 2))
 			return
 		}
 
 		_, _, targetExportFree := util.GetDiskUsage(exportFolder)
-		if int64(targetExportFree) < dataSize { // 复制 zip 最多需要 data 一样的空间
+		if int64(targetExportFree) < dataSize { // copying the zip needs at most the same space as the data dir
 			err = fmt.Errorf(Conf.Language(242), humanize.BytesCustomCeil(targetExportFree, 2), humanize.BytesCustomCeil(uint64(dataSize), 2))
 			return
 		}
@@ -722,7 +733,9 @@ func ExportResources(resourcePaths []string, mainName string) (exportFilePath st
 
 	exportBasePath := filepath.Join(util.TempDir, "export")
 	if encryptedBoxID != "" {
-		// 加密资源导出全程持有读锁。LockBox 会等待导出结束后再删除该 box 的导出目录，避免锁定后写回明文。
+		// Hold the read lock for the entire duration of an encrypted resource export. LockBox will wait for the
+		// export to finish before deleting that box's export directory, preventing plaintext from being written
+		// back after locking.
 		HoldBoxReadLock(encryptedBoxID)
 		defer ReleaseBoxReadLock(encryptedBoxID)
 		if _, dekErr := GetDEKIfUnlocked(encryptedBoxID); dekErr != nil {
@@ -731,7 +744,8 @@ func ExportResources(resourcePaths []string, mainName string) (exportFilePath st
 		exportBasePath = filepath.Join(exportBasePath, encryptedBoxID, "resources")
 	}
 
-	// 加密笔记本的物理导出目录使用随机标识，mainName 仅用于用户可见的压缩包名称和包内顶层目录。
+	// The physical export directory for an encrypted notebook uses a random identifier; mainName is only used
+	// for the user-visible archive name and the top-level directory inside the archive.
 	exportID, err := newManagedEncryptedExportID()
 	if err != nil {
 		return "", err
@@ -742,7 +756,8 @@ func ExportResources(resourcePaths []string, mainName string) (exportFilePath st
 		zipBaseName = "resources"
 	}
 	zipFileName := zipBaseName + ".zip"
-	// 普通和加密导出统一使用随机 exportID 作为物理目录，zipBaseName 仅用于 ZIP 内顶层目录名和下载文件名
+	// Both regular and encrypted exports use a random exportID as the physical directory; zipBaseName is only
+	// used for the top-level directory name inside the ZIP and the downloaded file name
 	zipFilePath := filepath.Join(exportBasePath, exportID+"-"+zipFileName)
 	if err = os.MkdirAll(exportFolderPath, 0755); err != nil {
 		logging.LogErrorf("create export temp folder failed: %s", err)
@@ -756,17 +771,17 @@ func ExportResources(resourcePaths []string, mainName string) (exportFilePath st
 		}
 	}()
 
-	// 将需要导出的文件/文件夹复制到临时文件夹
+	// Copy the files/folders to be exported into the temp folder
 	for _, resourcePath := range resourcePaths {
-		resourceFullPath := filepath.Join(util.WorkspaceDir, resourcePath) // 资源完整路径
+		resourceFullPath := filepath.Join(util.WorkspaceDir, resourcePath) // full path of the resource
 		if !util.IsAbsPathInWorkspace(resourceFullPath) {
 			logging.LogErrorf("resource path [%s] is not in workspace", resourceFullPath)
 			err = errors.New("resource path [" + resourcePath + "] is not in workspace")
 			return
 		}
 
-		resourceBaseName := filepath.Base(resourceFullPath)                   // 资源名称
-		resourceCopyPath := filepath.Join(exportFolderPath, resourceBaseName) // 资源副本完整路径
+		resourceBaseName := filepath.Base(resourceFullPath)                   // resource name
+		resourceCopyPath := filepath.Join(exportFolderPath, resourceBaseName) // full path of the resource copy
 		if err = copyExportResource(resourceFullPath, resourceCopyPath); err != nil {
 			logging.LogErrorf("copy resource will be exported from [%s] to [%s] failed: %s", resourcePath, resourceCopyPath, err)
 			err = fmt.Errorf(Conf.Language(14), err.Error())
@@ -812,7 +827,8 @@ func ExportResources(resourcePaths []string, mainName string) (exportFilePath st
 	return
 }
 
-// copyExportResource 复制导出资源，目录逐文件处理以避免将加密资源作为普通文件读取。
+// copyExportResource copies an export resource, processing directories file by file to avoid reading encrypted
+// resources as plain files.
 func copyExportResource(source, destination string) error {
 	info, err := os.Lstat(source)
 	if err != nil {
@@ -847,7 +863,8 @@ func copyExportResource(source, destination string) error {
 	})
 }
 
-// copyExportFile 复制单个导出文件，并在加密资源存在名称映射时恢复用户可见名称。
+// copyExportFile copies a single export file, restoring the user-visible name when a name mapping exists for
+// an encrypted resource.
 func copyExportFile(source, destination string) error {
 	boxID := ExtractBoxIDFromAssetsPath(source)
 	if boxID != "" && IsEncryptedBox(boxID) {
@@ -865,7 +882,8 @@ func copyExportFile(source, destination string) error {
 	return copyAssetDecryptIfEncrypted(source, destination)
 }
 
-// uniqueExportFilePath 在同一导出目录中为同名文件生成稳定的序号后缀。
+// uniqueExportFilePath generates a stable numeric suffix for files with the same name within the same export
+// directory.
 func uniqueExportFilePath(destination string) string {
 	if _, err := os.Lstat(destination); err != nil {
 		return destination
@@ -880,7 +898,8 @@ func uniqueExportFilePath(destination string) string {
 	}
 }
 
-// exportResourcesEncryptedBox 校验资源导出是否跨越加密边界，并返回唯一允许的加密来源 boxID。
+// exportResourcesEncryptedBox validates that a resource export does not cross an encryption boundary, and
+// returns the single allowed encrypted source boxID.
 func exportResourcesEncryptedBox(resourcePaths []string) (encryptedBoxID string, err error) {
 	hasNormalResource := false
 	for _, resourcePath := range resourcePaths {
@@ -921,7 +940,7 @@ func ExportPreview(id string, fillCSSVar bool) (retStdHTML string) {
 		tree := prepareExportTree(bt)
 		tree = exportTree(tree, false, false, true,
 			blockRefMode, Conf.Export.BlockEmbedMode, Conf.Export.FileAnnotationRefMode,
-			"#", "#", // 这里固定使用 # 包裹标签，否则无法正确解析标签 https://github.com/siyuan-note/siyuan/issues/13857
+			"#", "#", // always use # to wrap tags here, otherwise tags cannot be parsed correctly https://github.com/siyuan-note/siyuan/issues/13857
 			Conf.Export.BlockRefTextLeft, Conf.Export.BlockRefTextRight,
 			Conf.Export.AddTitle, Conf.Export.InlineMemo, true, true)
 		luteEngine := NewLute()
@@ -931,7 +950,7 @@ func ExportPreview(id string, fillCSSVar bool) (retStdHTML string) {
 
 		adjustHeadingLevel(bt, tree)
 
-		// 移除超级块的属性列表 https://github.com/siyuan-note/siyuan/issues/13451
+		// Remove the attribute list of super blocks https://github.com/siyuan-note/siyuan/issues/13451
 		var unlinks []*ast.Node
 		ast.Walk(tree.Root, func(n *ast.Node, entering bool) ast.WalkStatus {
 			if entering && ast.NodeKramdownBlockIAL == n.Type && nil != n.Previous && ast.NodeSuperBlock == n.Previous.Type {
@@ -960,7 +979,7 @@ func ExportPreview(id string, fillCSSVar bool) (retStdHTML string) {
 
 		md := treenode.FormatNode(tree.Root, luteEngine)
 		tree = parse.Parse("", []byte(md), luteEngine.ParseOptions)
-		// 使用实际主题样式值替换样式变量 Use real theme style value replace var in preview mode https://github.com/siyuan-note/siyuan/issues/11458
+		// Replace style variables with the actual theme style values. Use real theme style value replace var in preview mode https://github.com/siyuan-note/siyuan/issues/11458
 		if fillCSSVar {
 			fillThemeStyleVar(tree)
 		}
@@ -1096,7 +1115,7 @@ func ExportMarkdownHTML(id, savePath string, docx, merge bool) (name, dom string
 			Conf.Export.BlockRefTextLeft, Conf.Export.BlockRefTextRight,
 			Conf.Export.AddTitle, Conf.Export.InlineMemo, true, true)
 		name = path.Base(tree.HPath)
-		name = util.FilterFileName(name) // 导出 PDF、HTML 和 Word 时未移除不支持的文件名符号 https://github.com/siyuan-note/siyuan/issues/5614
+		name = util.FilterFileName(name) // unsupported file name characters were not removed when exporting PDF, HTML and Word https://github.com/siyuan-note/siyuan/issues/5614
 		savePath = strings.TrimSpace(savePath)
 
 		if err := os.MkdirAll(savePath, 0755); err != nil {
@@ -1138,7 +1157,7 @@ func ExportMarkdownHTML(id, savePath string, docx, merge bool) (name, dom string
 		if 1 == Conf.Appearance.Mode {
 			theme = Conf.Appearance.ThemeDark
 		}
-		// 复制主题文件夹
+		// Copy the theme folder
 		srcs = []string{"themes/" + theme}
 		appearancePath := util.AppearancePath
 		if util.IsSymlinkPath(util.AppearancePath) {
@@ -1160,9 +1179,9 @@ func ExportMarkdownHTML(id, savePath string, docx, merge bool) (name, dom string
 			}
 		}
 
-		// 只复制图标文件夹中的 icon.js 文件
+		// Only copy the icon.js file from the icon folder
 		iconName := Conf.Appearance.Icon
-		// 如果使用的不是内建图标（litheness），需要复制 litheness 作为后备
+		// If the icon in use is not the built-in one (litheness), copy litheness as a fallback
 		if iconName != "litheness" && iconName != "" {
 			srcIconFile := filepath.Join(appearancePath, "icons", "litheness", "icon.js")
 			toIconDir := filepath.Join(savePath, "appearance", "icons", "litheness")
@@ -1175,7 +1194,7 @@ func ExportMarkdownHTML(id, savePath string, docx, merge bool) (name, dom string
 				logging.LogWarnf("copy icon file from [%s] to [%s] failed: %s", srcIconFile, toIconFile, err)
 			}
 		}
-		// 复制当前使用的图标文件
+		// Copy the currently used icon file
 		if iconName != "" {
 			srcIconFile := filepath.Join(appearancePath, "icons", iconName, "icon.js")
 			toIconDir := filepath.Join(savePath, "appearance", "icons", iconName)
@@ -1189,7 +1208,7 @@ func ExportMarkdownHTML(id, savePath string, docx, merge bool) (name, dom string
 			}
 		}
 
-		// 复制自定义表情图片
+		// Copy custom emoji images
 		emojis := emojisInTree(tree)
 		for _, emoji := range emojis {
 			from := filepath.Join(util.DataDir, emoji)
@@ -1213,7 +1232,7 @@ func ExportMarkdownHTML(id, savePath string, docx, merge bool) (name, dom string
 				return ast.WalkContinue
 			}
 			if ast.NodeEmojiImg == n.Type {
-				// 自定义表情图片地址去掉开头的 /
+				// Strip the leading / from custom emoji image addresses
 				n.Tokens = bytes.ReplaceAll(n.Tokens, []byte("src=\"/emojis"), []byte("src=\"emojis"))
 			} else if ast.NodeList == n.Type {
 				if nil != n.ListData && 1 == n.ListData.Typ {
@@ -1226,7 +1245,7 @@ func ExportMarkdownHTML(id, savePath string, docx, merge bool) (name, dom string
 				}
 			} else if n.IsTextMarkType("code") {
 				if nil != n.Next && ast.NodeText == n.Next.Type {
-					// 行级代码导出 word 之后会有多余的零宽空格 https://github.com/siyuan-note/siyuan/issues/14825
+					// there is an extra zero-width space after exporting inline code to word https://github.com/siyuan-note/siyuan/issues/14825
 					n.Next.Tokens = bytes.TrimPrefix(n.Next.Tokens, []byte(editor.Zwsp))
 				}
 			}
@@ -1274,7 +1293,7 @@ func ExportHTML(id, savePath string, pdf, keepFold, merge bool) (name, dom strin
 
 		blockRefMode := Conf.Export.BlockRefMode
 		var headings []*ast.Node
-		if pdf { // 导出 PDF 需要标记目录书签
+		if pdf { // exporting PDF needs table-of-contents bookmarks marked
 			ast.Walk(tree.Root, func(n *ast.Node, entering bool) ast.WalkStatus {
 				if entering && ast.NodeHeading == n.Type && !n.ParentIs(ast.NodeBlockquote) && !n.ParentIs(ast.NodeCallout) {
 					headings = append(headings, n)
@@ -1302,7 +1321,7 @@ func ExportHTML(id, savePath string, pdf, keepFold, merge bool) (name, dom strin
 			Conf.Export.AddTitle, Conf.Export.InlineMemo, true, true)
 		adjustHeadingLevel(bt, tree)
 		name = path.Base(tree.HPath)
-		name = util.FilterFileName(name) // 导出 PDF、HTML 和 Word 时未移除不支持的文件名符号 https://github.com/siyuan-note/siyuan/issues/5614
+		name = util.FilterFileName(name) // unsupported file name characters were not removed when exporting PDF, HTML and Word https://github.com/siyuan-note/siyuan/issues/5614
 
 		if "" != savePath {
 			if err := os.MkdirAll(savePath, 0755); err != nil {
@@ -1324,7 +1343,7 @@ func ExportHTML(id, savePath string, pdf, keepFold, merge bool) (name, dom strin
 			}
 		}
 
-		if !pdf && "" != savePath { // 导出 HTML 需要复制静态资源
+		if !pdf && "" != savePath { // exporting HTML needs static resources copied
 			srcs := []string{"stage/build/export", "stage/protyle"}
 			for _, src := range srcs {
 				from := filepath.Join(util.WorkingDir, src)
@@ -1339,7 +1358,7 @@ func ExportHTML(id, savePath string, pdf, keepFold, merge bool) (name, dom strin
 			if 1 == Conf.Appearance.Mode {
 				theme = Conf.Appearance.ThemeDark
 			}
-			// 复制主题文件夹
+			// Copy the theme folder
 			srcs = []string{"themes/" + theme}
 			appearancePath := util.AppearancePath
 			if util.IsSymlinkPath(util.AppearancePath) {
@@ -1359,9 +1378,9 @@ func ExportHTML(id, savePath string, pdf, keepFold, merge bool) (name, dom strin
 				}
 			}
 
-			// 只复制图标文件夹中的 icon.js 文件
+			// Only copy the icon.js file from the icon folder
 			iconName := Conf.Appearance.Icon
-			// 如果使用的不是内建图标（litheness），需要复制 litheness 作为后备
+			// If the icon in use is not the built-in one (litheness), copy litheness as a fallback
 			if iconName != "litheness" && iconName != "" {
 				srcIconFile := filepath.Join(appearancePath, "icons", "litheness", "icon.js")
 				toIconDir := filepath.Join(savePath, "appearance", "icons", "litheness")
@@ -1374,7 +1393,7 @@ func ExportHTML(id, savePath string, pdf, keepFold, merge bool) (name, dom strin
 					logging.LogWarnf("copy icon file from [%s] to [%s] failed: %s", srcIconFile, toIconFile, err)
 				}
 			}
-			// 复制当前使用的图标文件
+			// Copy the currently used icon file
 			if iconName != "" {
 				srcIconFile := filepath.Join(appearancePath, "icons", iconName, "icon.js")
 				toIconDir := filepath.Join(savePath, "appearance", "icons", iconName)
@@ -1388,7 +1407,7 @@ func ExportHTML(id, savePath string, pdf, keepFold, merge bool) (name, dom strin
 				}
 			}
 
-			// 复制自定义表情图片
+			// Copy custom emoji images
 			emojis := emojisInTree(tree)
 			for _, emoji := range emojis {
 				from := filepath.Join(util.DataDir, emoji)
@@ -1408,8 +1427,8 @@ func ExportHTML(id, savePath string, pdf, keepFold, merge bool) (name, dom strin
 		luteEngine.RenderOptions.ProtyleContenteditable = false
 		luteEngine.SetProtyleMarkNetImg(false)
 
-		// 不进行安全过滤，因为导出时需要保留所有的 HTML 标签
-		// 使用属性 `data-export-html` 导出时 `<style></style>` 标签丢失 https://github.com/siyuan-note/siyuan/issues/6228
+		// Don't run security sanitization, because all HTML tags need to be preserved on export
+		// The `<style></style>` tag was lost when exporting with the `data-export-html` attribute https://github.com/siyuan-note/siyuan/issues/6228
 		luteEngine.SetSanitize(false)
 
 		renderer := render.NewProtyleExportRenderer(tree, luteEngine.RenderOptions, luteEngine.ParseOptions)
@@ -1451,7 +1470,7 @@ func prepareExportTree(bt *treenode.BlockTree) (ret *parse.Tree) {
 }
 
 func processIFrame(tree *parse.Tree) {
-	// 导出 PDF/Word 时 IFrame 块使用超链接 https://github.com/siyuan-note/siyuan/issues/4035
+	// Use hyperlinks for IFrame blocks when exporting PDF/Word https://github.com/siyuan-note/siyuan/issues/4035
 	ast.Walk(tree.Root, func(n *ast.Node, entering bool) ast.WalkStatus {
 		if !entering || ast.NodeIFrame != n.Type {
 			return ast.WalkContinue
@@ -1563,7 +1582,7 @@ func processPDFWatermark(pdfCtx *model.Context, watermark bool) {
 
 	desc := Conf.Export.PDFWatermarkDesc
 	if "text" == mode && util.ContainsCJK(str) {
-		// 中日韩文本水印需要安装字体文件
+		// A CJK text watermark requires a font file to be installed
 		descParts := strings.Split(desc, ",")
 		m := map[string]string{}
 		for _, descPart := range descParts {
@@ -1722,8 +1741,9 @@ func processPDFBookmarks(pdfCtx *model.Context, headings []*ast.Node) {
 	}
 }
 
-// processPDFLinkEmbedAssets 处理资源文件超链接，根据 removeAssets 参数决定是否将资源文件嵌入到 PDF 中。
-// 导出 PDF 时支持将资源文件作为附件嵌入 https://github.com/siyuan-note/siyuan/issues/7414
+// processPDFLinkEmbedAssets processes hyperlinks to asset files, deciding based on the removeAssets parameter
+// whether to embed asset files into the PDF.
+// Supports embedding asset files as attachments when exporting PDF https://github.com/siyuan-note/siyuan/issues/7414
 func processPDFLinkEmbedAssets(pdfCtx *model.Context, assetDests []string, boxID string, removeAssets bool) {
 	var assetAbsPaths []string
 	for _, dest := range assetDests {
@@ -1774,8 +1794,9 @@ func processPDFLinkEmbedAssets(pdfCtx *model.Context, assetDests []string, boxID
 		}
 
 		if !removeAssets {
-			// 不移除资源文件夹的话将超链接指向资源文件夹
-			// 加密资源的 link.URI 需要保留 ?box= 上下文，否则导出的 PDF 链接无法解析
+			// If the resource folder isn't removed, point the hyperlink at the resource folder
+			// For encrypted resources, link.URI needs to keep the ?box= context, otherwise the exported PDF link
+			// cannot be resolved
 			if idx := strings.Index(sourceURI, "?"); 0 < idx {
 				if strings.Contains(sourceURI[idx:], "box=") {
 					link.URI = sourceURI
@@ -1790,7 +1811,7 @@ func processPDFLinkEmbedAssets(pdfCtx *model.Context, assetDests []string, boxID
 			continue
 		}
 
-		// 移除资源文件夹的话使用内嵌附件
+		// If the resource folder is removed, use an embedded attachment instead
 
 		absPath, getErr := GetAssetAbsPathInBox(sourceURI, boxID)
 		if nil != getErr {
@@ -1804,7 +1825,8 @@ func processPDFLinkEmbedAssets(pdfCtx *model.Context, assetDests []string, boxID
 				logging.LogWarnf("read encrypted asset [%s] failed: %s", sourceURI, readErr)
 				continue
 			}
-			// 加密笔记本的临时资源归入 boxID 子目录，确保 LockBox 清理和服务端校验锁定状态
+			// Temp resources for encrypted notebooks go under a boxID subdirectory, so LockBox cleanup and
+			// server-side lock verification work correctly
 			pdfAssetsDir := filepath.Join(util.TempDir, "export", assetBoxID, "pdf-assets")
 			if mkErr := os.MkdirAll(pdfAssetsDir, 0755); mkErr != nil {
 				logging.LogWarnf("mkdir pdf-assets [%s] failed: %s", pdfAssetsDir, mkErr)
@@ -1892,7 +1914,7 @@ func processPDFLinkEmbedAssets(pdfCtx *model.Context, assetDests []string, boxID
 		}
 	}
 
-	// 添加附件注解指向内嵌的附件
+	// Add attachment annotations pointing to the embedded attachments
 	for page, anns := range attachmentMap {
 		pageDictIndRef, pageErr := pdfCtx.PageDictIndRef(page)
 		if nil != pageErr {
@@ -1958,8 +1980,8 @@ func ExportStdMarkdown(id string, assetsDestSpace2Underscore, fillCSSVar, adjust
 		}
 
 		var defBlockIDs []string
-		if 4 == Conf.Export.BlockRefMode { // 脚注+锚点哈希
-			// 导出锚点哈希，这里先记录下所有定义块的 ID
+		if 4 == Conf.Export.BlockRefMode { // footnote + anchor hash
+			// Exporting anchor hashes, so record the IDs of all definition blocks here first
 			ast.Walk(tree.Root, func(n *ast.Node, entering bool) ast.WalkStatus {
 				if !entering {
 					return ast.WalkContinue
@@ -1996,31 +2018,35 @@ func ExportStdMarkdown(id string, assetsDestSpace2Underscore, fillCSSVar, adjust
 	return ret
 }
 
-// ExportOptions 为单次导出提供的临时选项，缺省字段（nil）使用全局 Conf.Export 的值。
-// 通用部分可被各导出格式复用，Markdown 专属部分仅 Markdown 导出使用。
-// 用于「导出 Markdown 参数对话框」https://github.com/siyuan-note/siyuan/issues/17031
+// ExportOptions provides temporary options for a single export; fields left at their zero value (nil) fall back
+// to the global Conf.Export values.
+// The common section can be reused by every export format, while the Markdown-specific section is only used by
+// Markdown export.
+// Used by the "export Markdown parameters dialog" https://github.com/siyuan-note/siyuan/issues/17031
 type ExportOptions struct {
-	// 通用部分（PDF/Word/HTML/Markdown 均读取）
-	AddTitle              *bool   `json:"addTitle"`              // 是否添加文档标题
-	InlineMemo            *bool   `json:"inlineMemo"`            // 是否导出行级备注
-	BlockRefMode          *int    `json:"blockRefMode"`          // 内容块引用导出模式
-	BlockEmbedMode        *int    `json:"blockEmbedMode"`        // 内容块嵌入导出模式
-	FileAnnotationRefMode *int    `json:"fileAnnotationRefMode"` // 文件标注引用导出模式
-	BlockRefTextLeft      *string `json:"blockRefTextLeft"`      // 块引锚文本左侧符号
-	BlockRefTextRight     *string `json:"blockRefTextRight"`     // 块引锚文本右侧符号
-	TagOpenMarker         *string `json:"tagOpenMarker"`         // 标签开始标记符
-	TagCloseMarker        *string `json:"tagCloseMarker"`        // 标签结束标记符
-	// Markdown 专属部分
-	IncludeSubDocs     *bool `json:"includeSubDocs"`     // 是否包含子文档
-	IncludeRelatedDocs *bool `json:"includeRelatedDocs"` // 是否包含关联文档
-	MarkdownYFM        *bool `json:"markdownYFM"`        // 是否添加 YAML Front Matter
-	RemoveAssetsID     *bool `json:"removeAssetsID"`     // 是否移除资源文件名中的 ID
+	// Common section (read by PDF/Word/HTML/Markdown)
+	AddTitle              *bool   `json:"addTitle"`              // whether to add the document title
+	InlineMemo            *bool   `json:"inlineMemo"`            // whether to export inline memos
+	BlockRefMode          *int    `json:"blockRefMode"`          // content block reference export mode
+	BlockEmbedMode        *int    `json:"blockEmbedMode"`        // content block embed export mode
+	FileAnnotationRefMode *int    `json:"fileAnnotationRefMode"` // file annotation reference export mode
+	BlockRefTextLeft      *string `json:"blockRefTextLeft"`      // symbol to the left of block ref anchor text
+	BlockRefTextRight     *string `json:"blockRefTextRight"`     // symbol to the right of block ref anchor text
+	TagOpenMarker         *string `json:"tagOpenMarker"`         // tag opening marker
+	TagCloseMarker        *string `json:"tagCloseMarker"`        // tag closing marker
+	// Markdown-specific section
+	IncludeSubDocs     *bool `json:"includeSubDocs"`     // whether to include sub-documents
+	IncludeRelatedDocs *bool `json:"includeRelatedDocs"` // whether to include related documents
+	MarkdownYFM        *bool `json:"markdownYFM"`        // whether to add YAML Front Matter
+	RemoveAssetsID     *bool `json:"removeAssetsID"`     // whether to strip the ID from asset file names
 }
 
-// applyExportOptions 临时用 opts 覆盖 Conf.Export，返回还原函数（务必 defer 调用）。
-// 用于「导出 Markdown 参数对话框」#17031，导出过程串行执行，覆盖期间无并发风险。
+// applyExportOptions temporarily overrides Conf.Export with opts, returning a restore function (make sure to
+// defer the call).
+// Used by the "export Markdown parameters dialog" #17031; exports run serially, so there's no concurrency risk
+// during the override.
 func applyExportOptions(opts *ExportOptions) func() {
-	snapshot := *Conf.Export // 值拷贝保存原状
+	snapshot := *Conf.Export // save the original state via a value copy
 	if nil != opts {
 		if nil != opts.AddTitle {
 			Conf.Export.AddTitle = *opts.AddTitle
@@ -2065,24 +2091,25 @@ func applyExportOptions(opts *ExportOptions) func() {
 	return func() { *Conf.Export = snapshot }
 }
 
-// ExportPandocConvertZipWithOptions 在 ExportPandocConvertZip 基础上接受单次导出选项 #17031。
+// ExportPandocConvertZipWithOptions builds on ExportPandocConvertZip by accepting per-export options #17031.
 func ExportPandocConvertZipWithOptions(ids []string, pandocTo, ext string, opts *ExportOptions) (name, zipPath string) {
 	restore := applyExportOptions(opts)
 	defer restore()
 	return ExportPandocConvertZip(ids, pandocTo, ext)
 }
 
-// ExportNotebookMarkdownWithOptions 在 ExportNotebookMarkdown 基础上接受单次导出选项 #17031。
+// ExportNotebookMarkdownWithOptions builds on ExportNotebookMarkdown by accepting per-export options #17031.
 func ExportNotebookMarkdownWithOptions(boxID string, opts *ExportOptions) (zipPath string) {
 	restore := applyExportOptions(opts)
 	defer restore()
 	return ExportNotebookMarkdown(boxID)
 }
 
-// ParseExportOptions 从 JSON 请求参数中解析导出选项，未传入的字段保持 nil（沿用全局配置）#17031。
+// ParseExportOptions parses export options from JSON request parameters; fields that aren't passed in stay nil
+// (falling back to the global config) #17031.
 func ParseExportOptions(arg map[string]any) (opts *ExportOptions) {
 	opts = &ExportOptions{}
-	// 通用部分
+	// Common section
 	if nil != arg["addTitle"] {
 		v := arg["addTitle"].(bool)
 		opts.AddTitle = &v
@@ -2119,7 +2146,7 @@ func ParseExportOptions(arg map[string]any) (opts *ExportOptions) {
 		v := arg["tagCloseMarker"].(string)
 		opts.TagCloseMarker = &v
 	}
-	// Markdown 专属部分
+	// Markdown-specific section
 	if nil != arg["includeSubDocs"] {
 		v := arg["includeSubDocs"].(bool)
 		opts.IncludeSubDocs = &v
@@ -2203,7 +2230,7 @@ func ExportNotebookMarkdown(boxID string) (zipPath string) {
 }
 
 func yfm(docIAL map[string]string) string {
-	// 导出 Markdown 文件时开头附上一些元数据 https://github.com/siyuan-note/siyuan/issues/6880
+	// Prepend some metadata at the beginning when exporting a Markdown file https://github.com/siyuan-note/siyuan/issues/6880
 
 	buf := bytes.Buffer{}
 	buf.WriteString("---\n")
@@ -2263,10 +2290,12 @@ func yfm(docIAL map[string]string) string {
 	return buf.String()
 }
 
-// treeToSYJSON 把内存中的 tree 序列化为 .sy 格式的明文 JSON 字节。
-// 用于导出 .sy.zip：加密笔记本的 tree 已被 filesys.LoadTree 透明解密成明文，
-// 这里重新序列化（而非 filelock.ReadFile 直接读盘，那会拿到密文）。
-// 与 filesys.prepareWriteTree 的区别：无 UpsertBlockTree 写库副作用、路径无关，纯序列化。
+// treeToSYJSON serializes an in-memory tree to plaintext .sy-format JSON bytes.
+// Used for exporting .sy.zip: for an encrypted notebook, the tree has already been transparently decrypted to
+// plaintext by filesys.LoadTree, so it's re-serialized here (rather than reading the disk directly via
+// filelock.ReadFile, which would return ciphertext).
+// Difference from filesys.prepareWriteTree: no UpsertBlockTree DB write side effect, no path dependency, pure
+// serialization only.
 func treeToSYJSON(tree *parse.Tree) (data []byte) {
 	treenode.UpgradeSpec(tree)
 	luteEngine := util.NewLute()
@@ -2310,15 +2339,17 @@ func exportSYZip(boxID, rootDirPath, baseFolderName string, docPaths []string, i
 	dir, name := path.Split(baseFolderName)
 	name = util.FilterFileName(name)
 	if strings.HasSuffix(name, "..") {
-		// 文档标题以 `..` 结尾时无法导出 Markdown https://github.com/siyuan-note/siyuan/issues/4698
-		// 似乎是 os.MkdirAll 的 bug，以 .. 结尾的路径无法创建，所以这里加上 _ 结尾
+		// Markdown cannot be exported when the document title ends with `..` https://github.com/siyuan-note/siyuan/issues/4698
+		// This appears to be an os.MkdirAll bug: a path ending in .. cannot be created, so a trailing _ is appended here
 		name += "_"
 	}
 	baseFolderName = path.Join(dir, name)
 	box := Conf.Box(boxID)
 
-	// 加密笔记本的导出全程持读锁，并把明文中间目录与产物写到 temp/export/<boxID>/sy/<exportID>/ 受控目录下，
-	// 以便 LockBox 清理与托管下载校验。普通笔记本保持既有以 boxName 为名的导出路径，行为不变。
+	// For an encrypted notebook, hold the read lock for the entire export, writing the plaintext intermediate
+	// directory and the resulting artifact under the controlled temp/export/<boxID>/sy/<exportID>/ directory,
+	// so LockBox cleanup and managed-download verification work. A regular notebook keeps its existing export
+	// path named after boxName, unchanged.
 	encrypted := IsEncryptedBox(boxID)
 	var exportID string
 	if encrypted {
@@ -2408,9 +2439,10 @@ func exportSYZip(boxID, rootDirPath, baseFolderName string, docPaths []string, i
 	util.PushEndlessProgress(Conf.Language(65))
 	count = 0
 
-	// 按文件夹结构复制选择的树
-	// 注意：tree 已被 filesys.LoadTree 透明解密成明文，这里序列化为明文 JSON 写盘
-	// （不可 filelock.ReadFile 直接读盘，加密笔记本的磁盘 .sy 是密文）。
+	// Copy the selected trees preserving the folder structure
+	// Note: tree has already been transparently decrypted to plaintext by filesys.LoadTree, so it's serialized
+	// to plaintext JSON and written here (it cannot be read directly from disk via filelock.ReadFile, since the
+	// on-disk .sy of an encrypted notebook is ciphertext).
 	total := len(trees) + len(refTrees)
 	for _, tree := range trees {
 		writePath := strings.TrimPrefix(tree.Path, rootDirPath)
@@ -2430,7 +2462,7 @@ func exportSYZip(boxID, rootDirPath, baseFolderName string, docPaths []string, i
 	}
 
 	count = 0
-	// 引用树放在导出文件夹根路径下
+	// Referenced trees are placed at the root of the export folder
 	for treeID, tree := range refTrees {
 		writePath := filepath.Join(exportDir, treeID+".sy")
 		if writeErr := os.WriteFile(writePath, treeToSYJSON(tree), 0644); nil != writeErr {
@@ -2442,10 +2474,10 @@ func exportSYZip(boxID, rootDirPath, baseFolderName string, docPaths []string, i
 		util.PushEndlessProgress(Conf.language(65) + " " + fmt.Sprintf(Conf.Language(66), fmt.Sprintf("%d/%d ", count, total)+tree.HPath))
 	}
 
-	// 将引用树合并到选择树中，以便后面一次性导出资源文件
+	// Merge the referenced trees into the selected trees, so their asset files can be exported together afterward
 	maps.Copy(trees, refTrees)
 
-	// 导出引用的资源文件
+	// Export referenced asset files
 	assetPathMap, err := allAssetAbsPaths()
 	if nil != err {
 		logging.LogWarnf("get assets abs path failed: %s", err)
@@ -2506,7 +2538,7 @@ func exportSYZip(boxID, rootDirPath, baseFolderName string, docPaths []string, i
 			copiedAssets.Add(asset)
 		}
 
-		// 复制自定义表情图片
+		// Copy custom emoji images
 		emojis := emojisInTree(tree)
 		for _, emoji := range emojis {
 			from := filepath.Join(util.DataDir, emoji)
@@ -2517,7 +2549,7 @@ func exportSYZip(boxID, rootDirPath, baseFolderName string, docPaths []string, i
 		}
 	}
 
-	// 导出数据库 Attribute View export https://github.com/siyuan-note/siyuan/issues/8710
+	// Export the database. Attribute View export https://github.com/siyuan-note/siyuan/issues/8710
 	exportStorageAvDir := filepath.Join(exportDir, "storage", "av")
 	var avIDs []string
 	avBoxes := map[string]string{}
@@ -2558,7 +2590,7 @@ func exportSYZip(boxID, rootDirPath, baseFolderName string, docPaths []string, i
 		exportAv(avID, avBoxes[avID], exportStorageAvDir, exportDir, assetPathMap)
 	}
 
-	// 导出闪卡 Export related flashcard data when exporting .sy.zip https://github.com/siyuan-note/siyuan/issues/9372
+	// Export flashcards. Export related flashcard data when exporting .sy.zip https://github.com/siyuan-note/siyuan/issues/9372
 	exportStorageRiffDir := filepath.Join(exportDir, "storage", "riff")
 	deck, loadErr := riff.LoadDeck(exportStorageRiffDir, builtinDeckID, Conf.Flashcard.RequestRetention, Conf.Flashcard.MaximumInterval, Conf.Flashcard.Weights)
 	if nil != loadErr {
@@ -2578,7 +2610,7 @@ func exportSYZip(boxID, rootDirPath, baseFolderName string, docPaths []string, i
 		}
 	}
 
-	// 导出自定义排序
+	// Export the custom sort order
 	sortPath := filepath.Join(util.DataDir, box.ID, ".siyuan", "sort.json")
 	fullSortIDs := map[string]int{}
 	sortIDs := map[string]int{}
@@ -2621,7 +2653,8 @@ func exportSYZip(boxID, rootDirPath, baseFolderName string, docPaths []string, i
 		}
 	}
 
-	// 加密笔记本先写 .partial 再原子 rename，并把产物登记为托管下载令牌；普通笔记本保持原行为。
+	// For encrypted notebooks, write a .partial file first and then rename it atomically, registering the
+	// artifact as a managed download token; regular notebooks keep the original behavior.
 	zipBaseName := baseFolderName + ".sy.zip"
 	zipPath = exportDir + ".sy.zip"
 	zipPartialPath := zipPath + ".partial"
@@ -2662,8 +2695,9 @@ func exportSYZip(boxID, rootDirPath, baseFolderName string, docPaths []string, i
 }
 
 func exportAv(avID, boxID, exportStorageAvDir, exportFolder string, assetPathMap map[string]string) {
-	// 用 box-aware 路径解析 + 自动解密读取 AV 定义明文（加密笔记本的 AV 在 <boxID>/storage/av/，
-	// GetAttributeViewDataPath 只查全局路径会漏；filelock.Copy 会拷密文）。
+	// Use box-aware path resolution plus automatic decryption to read the plaintext AV definition (for an
+	// encrypted notebook the AV lives at <boxID>/storage/av/; GetAttributeViewDataPath, which only checks the
+	// global path, would miss it, and filelock.Copy would copy the ciphertext).
 	var avData []byte
 	var readErr error
 	if boxID != "" {
@@ -2699,7 +2733,7 @@ func exportAv(avID, boxID, exportStorageAvDir, exportFolder string, assetPathMap
 
 	for _, keyValues := range attrView.KeyValues {
 		switch keyValues.Key.Type {
-		case av.KeyTypeMAsset: // 导出资源文件列 https://github.com/siyuan-note/siyuan/issues/9919
+		case av.KeyTypeMAsset: // export the asset file column https://github.com/siyuan-note/siyuan/issues/9919
 			for _, value := range keyValues.Values {
 				for _, asset := range value.MAsset {
 					if !util.IsAssetLinkDest([]byte(asset.Content), false) {
@@ -2727,7 +2761,7 @@ func exportAv(avID, boxID, exportStorageAvDir, exportFolder string, assetPathMap
 		}
 	}
 
-	// 级联导出关联列关联的数据库
+	// Cascade-export the databases linked via relation columns
 	exportRelationAvs(avID, boxID, exportStorageAvDir)
 }
 
@@ -2775,7 +2809,7 @@ func walkRelationAvs(avID, boxID string, exportAvIDs *hashset.Set) {
 	exportAvIDs.Add(avID)
 	for _, keyValues := range attrView.KeyValues {
 		switch keyValues.Key.Type {
-		case av.KeyTypeRelation: // 导出关联列
+		case av.KeyTypeRelation: // export the relation column
 			if nil == keyValues.Key.Relation {
 				break
 			}
@@ -2840,7 +2874,7 @@ func exportMarkdownContent(rootID, ext string, exportRefMode int, defBlockIDs []
 		Conf.Export.AddTitle, Conf.Export.InlineMemo, defBlockIDs, singleFile, false)
 	docIAL := parse.IAL2Map(tree.Root.KramdownIAL)
 	if Conf.Export.MarkdownYFM {
-		// 导出 Markdown 时在文档头添加 YFM 开关 https://github.com/siyuan-note/siyuan/issues/7727
+		// Toggle for adding YFM at the top of the document when exporting Markdown https://github.com/siyuan-note/siyuan/issues/7727
 		exportedMd = yfm(docIAL) + exportedMd
 	}
 	return
@@ -2867,7 +2901,7 @@ func exportMarkdownContent0(id string, tree *parse.Tree, cloudAssetsBase string,
 	if "" != cloudAssetsBase {
 		luteEngine.RenderOptions.LinkBase = cloudAssetsBase
 	}
-	if assetsDestSpace2Underscore { // 上传到社区图床的资源文件会将空格转为下划线，所以这里也需要将文档内容做相应的转换
+	if assetsDestSpace2Underscore { // asset files uploaded to the community image host have spaces converted to underscores, so the document content needs the same conversion here
 		ast.Walk(tree.Root, func(n *ast.Node, entering bool) ast.WalkStatus {
 			if !entering {
 				return ast.WalkContinue
@@ -2909,9 +2943,9 @@ func exportMarkdownContent0(id string, tree *parse.Tree, cloudAssetsBase string,
 			}
 		}
 
-		if 4 == blockRefMode { // 脚注+锚点哈希
+		if 4 == blockRefMode { // footnote + anchor hash
 			if n.IsBlock() && gulu.Str.Contains(n.ID, defBlockIDs) {
-				// 如果是定义块，则在开头处添加锚点
+				// If this is a definition block, add an anchor at the beginning
 				anchorSpan := treenode.NewSpanAnchor(n.ID)
 				if ast.NodeDocument != n.Type {
 					firstLeaf := treenode.FirstLeafBlock(n)
@@ -2933,7 +2967,7 @@ func exportMarkdownContent0(id string, tree *parse.Tree, cloudAssetsBase string,
 			}
 
 			if treenode.IsBlockRef(n) {
-				// 如果是引用元素，则将其转换为超链接，指向 xxx.md#block-id
+				// If this is a reference element, convert it to a hyperlink pointing at xxx.md#block-id
 				defID, linkText := getExportBlockRefLinkText(n, blockRefTextLeft, blockRefTextRight)
 				if gulu.Str.Contains(defID, defBlockIDs) {
 					var href string
@@ -2996,15 +3030,15 @@ func exportTree(tree *parse.Tree, wysiwyg, keepFold, avHiddenCol bool,
 	ret = tree
 	id := tree.Root.ID
 
-	// 解析查询嵌入节点
+	// Resolve query embed nodes
 	depth := 0
 	resolveEmbedR(ret.Root, blockEmbedMode, luteEngine, &[]string{}, &depth)
 
-	// 将当前文档的块超链接转换为引用
+	// Convert block hyperlinks in the current document into references
 	blockLink2Ref(ret)
 
-	// 收集引用转脚注+锚点哈希（可能跨文档递归）
-	var refFootnoteOrder []string // 按顺序存储 defID
+	// Collect references to convert into footnote + anchor hash (may recurse across documents)
+	var refFootnoteOrder []string // stores defIDs in order
 	refFootnotesByID := make(map[string]*refAsFootnotes)
 	if 4 == blockRefMode && singleFile {
 		depth = 0
@@ -3038,7 +3072,7 @@ func exportTree(tree *parse.Tree, wysiwyg, keepFold, avHiddenCol bool,
 		case ast.NodeHeading:
 			n.SetIALAttr("id", n.ID)
 		case ast.NodeMathBlockContent:
-			n.Tokens = bytes.TrimSpace(n.Tokens) // 导出 Markdown 时去除公式内容中的首尾空格 https://github.com/siyuan-note/siyuan/issues/4666
+			n.Tokens = bytes.TrimSpace(n.Tokens) // strip leading/trailing whitespace from formula content when exporting Markdown https://github.com/siyuan-note/siyuan/issues/4666
 			return ast.WalkContinue
 		case ast.NodeTextMark:
 			if n.IsTextMarkType("inline-memo") {
@@ -3072,26 +3106,26 @@ func exportTree(tree *parse.Tree, wysiwyg, keepFold, avHiddenCol bool,
 			return ast.WalkContinue
 		}
 
-		// 处理引用节点
+		// Process reference nodes
 		defID, linkText := getExportBlockRefLinkText(n, blockRefTextLeft, blockRefTextRight)
 
 		switch blockRefMode {
-		case 2: // 锚文本块链
+		case 2: // anchor-text block link
 			blockRefLink := &ast.Node{Type: ast.NodeTextMark, TextMarkTextContent: linkText, TextMarkAHref: "siyuan://blocks/" + defID}
 			blockRefLink.KramdownIAL = n.KramdownIAL
 			blockRefLink.TextMarkType = "a " + n.TextMarkType
 			blockRefLink.TextMarkInlineMemoContent = n.TextMarkInlineMemoContent
 			n.InsertBefore(blockRefLink)
 			unlinks = append(unlinks, n)
-		case 3: // 仅锚文本
+		case 3: // anchor text only
 			blockRefLink := &ast.Node{Type: ast.NodeTextMark, TextMarkType: strings.TrimSpace(strings.ReplaceAll(n.TextMarkType, "block-ref", "")), TextMarkTextContent: linkText}
 			blockRefLink.KramdownIAL = n.KramdownIAL
 			blockRefLink.TextMarkInlineMemoContent = n.TextMarkInlineMemoContent
 			n.InsertBefore(blockRefLink)
 			unlinks = append(unlinks, n)
-		case 4: // 脚注+锚点哈希
+		case 4: // footnote + anchor hash
 			if currentTreeNodeIDs[defID] {
-				// 当前文档内不转换脚注，直接使用锚点哈希 https://github.com/siyuan-note/siyuan/issues/13283
+				// Don't convert to a footnote within the current document; use the anchor hash directly https://github.com/siyuan-note/siyuan/issues/13283
 				n.TextMarkType = "a " + n.TextMarkType
 				n.TextMarkTextContent = linkText
 				n.TextMarkAHref = "#" + defID
@@ -3120,11 +3154,11 @@ func exportTree(tree *parse.Tree, wysiwyg, keepFold, avHiddenCol bool,
 		n.Unlink()
 	}
 
-	if 4 == blockRefMode { // 脚注+锚点哈希
+	if 4 == blockRefMode { // footnote + anchor hash
 		unlinks = nil
 		footnotesDefBlock := resolveFootnotesDefs(&refFootnoteOrder, refFootnotesByID, ret, currentTreeNodeIDs, blockRefTextLeft, blockRefTextRight)
 		if nil != footnotesDefBlock {
-			// 如果是聚焦导出，可能存在没有使用的脚注定义块，在这里进行清理
+			// For a focused export there may be unused footnote definition blocks, so clean them up here
 			// Improve focus export conversion of block refs to footnotes https://github.com/siyuan-note/siyuan/issues/10647
 			footnotesRefs := ret.Root.ChildrenByType(ast.NodeFootnotesRef)
 			for footnotesDef := footnotesDefBlock.FirstChild; nil != footnotesDef; footnotesDef = footnotesDef.Next {
@@ -3169,7 +3203,7 @@ func exportTree(tree *parse.Tree, wysiwyg, keepFold, avHiddenCol bool,
 			ret.Root.PrependChild(title)
 		}
 	} else {
-		if 4 == blockRefMode { // 脚注+锚点哈希
+		if 4 == blockRefMode { // footnote + anchor hash
 			refRoot := slices.Contains(refFootnoteOrder, id)
 
 			footnotesDefs := tree.Root.ChildrenByType(ast.NodeFootnotesDef)
@@ -3194,7 +3228,7 @@ func exportTree(tree *parse.Tree, wysiwyg, keepFold, avHiddenCol bool,
 		}
 	}
 
-	// 导出时支持导出题头图 https://github.com/siyuan-note/siyuan/issues/4372
+	// Support exporting the document title image https://github.com/siyuan-note/siyuan/issues/4372
 	titleImgPath := treenode.GetDocTitleImgPath(ret.Root)
 	if "" != titleImgPath {
 		p := &ast.Node{Type: ast.NodeParagraph}
@@ -3217,9 +3251,9 @@ func exportTree(tree *parse.Tree, wysiwyg, keepFold, avHiddenCol bool,
 			return ast.WalkContinue
 		}
 
-		// 支持按照现有折叠状态导出 PDF https://github.com/siyuan-note/siyuan/issues/5941
+		// Support exporting PDF according to the existing fold state https://github.com/siyuan-note/siyuan/issues/5941
 		if !keepFold {
-			// 块折叠以后导出 HTML/PDF 固定展开 https://github.com/siyuan-note/siyuan/issues/4064
+			// Folded blocks are always expanded when exporting HTML/PDF https://github.com/siyuan-note/siyuan/issues/4064
 			n.RemoveIALAttr("fold")
 			n.RemoveIALAttr("heading-fold")
 		} else {
@@ -3229,7 +3263,7 @@ func exportTree(tree *parse.Tree, wysiwyg, keepFold, avHiddenCol bool,
 			}
 		}
 
-		// 导出时去掉内容块闪卡样式 https://github.com/siyuan-note/siyuan/issues/7374
+		// Strip the flashcard style from content blocks on export https://github.com/siyuan-note/siyuan/issues/7374
 		if n.IsBlock() {
 			n.RemoveIALAttr(NodeAttrRiffDecks)
 		}
@@ -3237,11 +3271,12 @@ func exportTree(tree *parse.Tree, wysiwyg, keepFold, avHiddenCol bool,
 		switch n.Type {
 		case ast.NodeParagraph:
 			if nil == n.FirstChild {
-				// 空的段落块需要补全文本展位，否则后续格式化后再解析树会语义不一致 https://github.com/siyuan-note/siyuan/issues/5806
+				// An empty paragraph block needs a placeholder text node, otherwise re-parsing the tree after
+				// subsequent formatting would be semantically inconsistent https://github.com/siyuan-note/siyuan/issues/5806
 				emptyParagraphs = append(emptyParagraphs, n)
 			}
 		case ast.NodeWidget:
-			// 挂件块导出 https://github.com/siyuan-note/siyuan/issues/3834 https://github.com/siyuan-note/siyuan/issues/6188
+			// Widget block export https://github.com/siyuan-note/siyuan/issues/3834 https://github.com/siyuan-note/siyuan/issues/6188
 
 			if wysiwyg {
 				exportHtmlVal := n.IALAttr("data-export-html")
@@ -3254,10 +3289,10 @@ func exportTree(tree *parse.Tree, wysiwyg, keepFold, avHiddenCol bool,
 			}
 
 			exportMdVal := n.IALAttr("data-export-md")
-			exportMdVal = html.UnescapeString(exportMdVal) // 导出 `data-export-md` 时未解析代码块与行内代码内的转义字符 https://github.com/siyuan-note/siyuan/issues/4180
+			exportMdVal = html.UnescapeString(exportMdVal) // escaped characters inside code blocks and inline code were not parsed when exporting `data-export-md` https://github.com/siyuan-note/siyuan/issues/4180
 			if "" != exportMdVal {
 				luteEngine0 := util.NewLute()
-				luteEngine0.SetYamlFrontMatter(true) // 挂件导出属性 `data-export-md` 支持 YFM https://github.com/siyuan-note/siyuan/issues/7752
+				luteEngine0.SetYamlFrontMatter(true) // the widget export attribute `data-export-md` supports YFM https://github.com/siyuan-note/siyuan/issues/7752
 				exportMdTree := parse.Parse("", []byte(exportMdVal), luteEngine0.ParseOptions)
 				var insertNodes []*ast.Node
 				for c := exportMdTree.Root.FirstChild; nil != c; c = c.Next {
@@ -3280,7 +3315,7 @@ func exportTree(tree *parse.Tree, wysiwyg, keepFold, avHiddenCol bool,
 			return ast.WalkContinue
 		}
 
-		// Shift+Enter 换行在导出为 Markdown 时使用硬换行 https://github.com/siyuan-note/siyuan/issues/3458
+		// Shift+Enter line breaks use a hard line break when exporting to Markdown https://github.com/siyuan-note/siyuan/issues/3458
 		n.Tokens = bytes.ReplaceAll(n.Tokens, []byte("\n"), []byte("  \n"))
 		return ast.WalkContinue
 	})
@@ -3303,7 +3338,8 @@ func exportTree(tree *parse.Tree, wysiwyg, keepFold, avHiddenCol bool,
 		}
 
 		avID := n.AttributeViewID
-		// 用 box-aware 路径解析（加密笔记本的 AV 在 <boxID>/storage/av/，GetAttributeViewDataPath 只查全局会漏）
+		// Use box-aware path resolution (for an encrypted notebook the AV lives at <boxID>/storage/av/;
+		// GetAttributeViewDataPath, which only checks the global path, would miss it)
 		if avJSONPath, _ := av.FindAttributeViewPath(avID); "" == avJSONPath {
 			return ast.WalkContinue
 		}
@@ -3323,7 +3359,7 @@ func exportTree(tree *parse.Tree, wysiwyg, keepFold, avHiddenCol bool,
 
 		table := getAttrViewTable(attrView, view, "")
 
-		// 遵循视图过滤和排序规则 Use filtering and sorting of current view settings when exporting database blocks https://github.com/siyuan-note/siyuan/issues/10474
+		// Follow the view's filter and sort rules. Use filtering and sorting of current view settings when exporting database blocks https://github.com/siyuan-note/siyuan/issues/10474
 		cachedAttrViews := map[string]*av.AttributeView{}
 		rollupFurtherCollections := sql.GetFurtherCollections(attrView, cachedAttrViews)
 		av.Filter(table, attrView, rollupFurtherCollections, cachedAttrViews)
@@ -3337,7 +3373,7 @@ func exportTree(tree *parse.Tree, wysiwyg, keepFold, avHiddenCol bool,
 		mdTableHead.AppendChild(mdTableHeadRow)
 		for _, col := range table.Columns {
 			if avHiddenCol && col.Hidden {
-				// 按需跳过隐藏列 Improve database table view exporting https://github.com/siyuan-note/siyuan/issues/12232
+				// Skip hidden columns as needed. Improve database table view exporting https://github.com/siyuan-note/siyuan/issues/12232
 				continue
 			}
 
@@ -3657,7 +3693,8 @@ func resolveFootnotesDefs(refFootnoteOrder *[]string, refFootnotesByID map[strin
 		if ast.NodeHeading == defNode.Type {
 			nodes = append(nodes, defNode)
 			if currentTree.ID != docID {
-				// 同文档块引转脚注缩略定义考虑容器块和标题块 https://github.com/siyuan-note/siyuan/issues/5917
+				// Consider container blocks and heading blocks when abbreviating the footnote definition for a
+				// same-document block ref https://github.com/siyuan-note/siyuan/issues/5917
 				children := treenode.HeadingChildren(defNode)
 				nodes = append(nodes, children...)
 			}
@@ -3690,7 +3727,7 @@ func resolveFootnotesDefs(refFootnoteOrder *[]string, refFootnotesByID map[strin
 					} else {
 						if isNodeInTree(defID, currentTree) {
 							if currentTreeNodeIDs[defID] {
-								// 当前文档内不转换脚注，直接使用锚点哈希 https://github.com/siyuan-note/siyuan/issues/13283
+								// Don't convert to a footnote within the current document; use the anchor hash directly https://github.com/siyuan-note/siyuan/issues/13283
 								n.TextMarkType = "a"
 								n.TextMarkTextContent = blockRefTextLeft + n.TextMarkTextContent + blockRefTextRight
 								n.TextMarkAHref = "#" + defID
@@ -3748,7 +3785,7 @@ func resolveFootnotesDefs(refFootnoteOrder *[]string, refFootnotesByID map[strin
 
 				docID := util.GetTreeID(n.Path)
 				if currentTree.ID == docID {
-					// 同文档块引转脚注缩略定义 https://github.com/siyuan-note/siyuan/issues/3299
+					// Abbreviate the footnote definition for a same-document block ref https://github.com/siyuan-note/siyuan/issues/3299
 					if text := sql.GetRefText(n.ID); 64 < utf8.RuneCountInString(text) {
 						var unlinkChildren []*ast.Node
 						for c := n.FirstChild; nil != c; c = c.Next {
@@ -3820,7 +3857,7 @@ func addRefFootnoteAndRecurse(currentTree *parse.Tree, defID, anchorText string,
 		return
 	}
 	if isNodeInTree(defID, currentTree) {
-		// 当前文档内不转换脚注，直接使用锚点哈希 https://github.com/siyuan-note/siyuan/issues/13283
+		// Don't convert to a footnote within the current document; use the anchor hash directly https://github.com/siyuan-note/siyuan/issues/13283
 		return
 	}
 	if Conf.Editor.BlockRefDynamicAnchorTextMaxLen < utf8.RuneCountInString(anchorText) {
@@ -3890,7 +3927,7 @@ func processFileAnnotationRef(refID string, n *ast.Node, fileAnnotationRefMode i
 		logging.LogErrorf("read file [%s] failed: %s", sya, readErr)
 		return ast.WalkSkipChildren
 	}
-	// 加密 box 的 .sya 是密文，需先解密
+	// The .sya of an encrypted box is ciphertext and needs to be decrypted first
 	if IsEncryptedBox(boxID) {
 		HoldBoxReadLock(boxID)
 		defer ReleaseBoxReadLock(boxID)
@@ -3946,14 +3983,16 @@ func exportPandocConvertZip(boxID, baseFolderName string, docPaths, defBlockIDs 
 	dir, name := path.Split(baseFolderName)
 	name = util.FilterFileName(name)
 	if strings.HasSuffix(name, "..") {
-		// 文档标题以 `..` 结尾时无法导出 Markdown https://github.com/siyuan-note/siyuan/issues/4698
-		// 似乎是 os.MkdirAll 的 bug，以 .. 结尾的路径无法创建，所以这里加上 _ 结尾
+		// Markdown cannot be exported when the document title ends with `..` https://github.com/siyuan-note/siyuan/issues/4698
+		// This appears to be an os.MkdirAll bug: a path ending in .. cannot be created, so a trailing _ is appended here
 		name += "_"
 	}
 	baseFolderName = path.Join(dir, name)
 
-	// 加密笔记本的导出全程持读锁，并把明文中间目录与产物写到 temp/export/<boxID>/markdown/<exportID>/ 受控目录下，
-	// 以便 LockBox 清理与托管下载校验。普通笔记本保持既有以 baseFolderName 为名的导出路径，行为不变。
+	// For an encrypted notebook, hold the read lock for the entire export, writing the plaintext intermediate
+	// directory and the resulting artifact under the controlled temp/export/<boxID>/markdown/<exportID>/
+	// directory, so LockBox cleanup and managed-download verification work. A regular notebook keeps its
+	// existing export path named after baseFolderName, unchanged.
 	encrypted := IsEncryptedBox(boxID)
 	var exportID string
 	if encrypted {
@@ -3999,19 +4038,19 @@ func exportPandocConvertZip(boxID, baseFolderName string, docPaths, defBlockIDs 
 		}
 		hPath := tree.HPath
 		dir, name = path.Split(hPath)
-		dir = util.FilterFilePath(dir) // 导出文档时未移除不支持的文件名符号 https://github.com/siyuan-note/siyuan/issues/4590
+		dir = util.FilterFilePath(dir) // unsupported file name characters were not removed when exporting documents https://github.com/siyuan-note/siyuan/issues/4590
 		name = util.FilterFileName(name)
 		hPath = path.Join(dir, name)
 		p = hPath + ext
 		if 1 == len(docPaths) {
-			// 如果仅导出单个文档则使用文档标题作为文件名，不使用父路径 https://github.com/siyuan-note/siyuan/issues/13635#issuecomment-3794560233
+			// If only a single document is being exported, use the document title as the file name instead of the parent path https://github.com/siyuan-note/siyuan/issues/13635#issuecomment-3794560233
 			p = name + ext
 		}
 
 		writePath := filepath.Join(exportFolder, p)
 		hash := fmt.Sprintf("%x", sha1.Sum([]byte(md)))
 		if gulu.File.IsExist(writePath) && hash != wrotePathHash[writePath] {
-			// 重名文档加 ID
+			// Append the ID for documents with the same name
 			p = hPath + "-" + rootID + ext
 			writePath = filepath.Join(exportFolder, p)
 		}
@@ -4024,13 +4063,13 @@ func exportPandocConvertZip(boxID, baseFolderName string, docPaths, defBlockIDs 
 		if isEmpty {
 			entries, readErr := os.ReadDir(filepath.Join(util.DataDir, tree.Box, strings.TrimSuffix(tree.Path, ".sy")))
 			if nil == readErr && 0 < len(entries) {
-				// 如果文档内容为空并且存在子文档则仅导出文件夹
+				// If the document content is empty and sub-documents exist, only export the folder
 				// Improve export of empty documents with subdocuments https://github.com/siyuan-note/siyuan/issues/15009
 				continue
 			}
 		}
 
-		// 解析导出后的标准 Markdown，汇总 assets
+		// Parse the exported standard Markdown and collect assets
 		treeBoxID := tree.Box
 		tree = parse.Parse("", gulu.Str.ToBytes(md), luteEngine.ParseOptions)
 		removeAssetsID(tree, assetsOldNew, assetsNewOld)
@@ -4044,7 +4083,8 @@ func exportPandocConvertZip(boxID, baseFolderName string, docPaths, defBlockIDs 
 				continue
 			}
 
-			// 导出 Markdown 时链接路径中的空格被编码为 `%20`，需要替换回空格后才能正确获取原始资源路径
+			// When exporting Markdown, spaces in link paths are encoded as `%20`, which must be decoded back to
+			// spaces before the original resource path can be resolved correctly
 			// Improve export of Markdown hyperlink spaces https://github.com/siyuan-note/siyuan/issues/9792
 			// No assets were exported when exporting Markdown https://github.com/siyuan-note/siyuan/issues/17046
 			spaceEncodedNewAsset := strings.ReplaceAll(newAsset, " ", "%20")
@@ -4082,7 +4122,7 @@ func exportPandocConvertZip(boxID, baseFolderName string, docPaths, defBlockIDs 
 			md = strings.ReplaceAll(md, assetsOld, assetsNew)
 		}
 
-		// 调用 Pandoc 进行格式转换
+		// Call Pandoc to perform the format conversion
 		pandocErr := util.Pandoc(pandocFrom, pandocTo, writePath, md)
 		if pandocErr != nil {
 			logging.LogErrorf("pandoc failed: %s", pandocErr)
@@ -4093,7 +4133,8 @@ func exportPandocConvertZip(boxID, baseFolderName string, docPaths, defBlockIDs 
 		util.PushEndlessProgress(Conf.language(65) + " " + fmt.Sprintf(Conf.language(70), fmt.Sprintf("%d/%d %s", i+1, len(docPaths), name)))
 	}
 
-	// 加密笔记本先写 .partial 再原子 rename，并把产物登记为托管下载令牌；普通笔记本保持原行为。
+	// For encrypted notebooks, write a .partial file first and then rename it atomically, registering the
+	// artifact as a managed download token; regular notebooks keep the original behavior.
 	zipBaseName := baseFolderName + ext + ".zip"
 	zipPath = exportFolder + ".zip"
 	zipPartialPath := zipPath + ".partial"
@@ -4107,7 +4148,7 @@ func exportPandocConvertZip(boxID, baseFolderName string, docPaths, defBlockIDs 
 		return ""
 	}
 
-	// 导出 Markdown zip 包内不带文件夹 https://github.com/siyuan-note/siyuan/issues/6869
+	// The exported Markdown zip package doesn't contain a wrapping folder https://github.com/siyuan-note/siyuan/issues/6869
 	entries, err := os.ReadDir(exportFolder)
 	if err != nil {
 		logging.LogErrorf("read export markdown folder [%s] failed: %s", exportFolder, err)
@@ -4172,10 +4213,10 @@ func removeAssetsID(tree *parse.Tree, assetsOldNew, assetsNewOld map[string]stri
 			name = util.RemoveID(name)
 			newDest := "assets/" + name
 			if existOld := assetsNewOld[newDest]; "" != existOld {
-				if existOld == dest { // 已存在相同资源路径
+				if existOld == dest { // the same resource path already exists
 					setAssetsLinkDest(node, dest, newDest)
 				} else {
-					// 存在同名但内容不同的资源文件，保留 ID
+					// A resource file with the same name but different content exists, so keep the ID
 					assetsNewOld[dest] = dest
 					assetsOldNew[dest] = dest
 				}
@@ -4194,7 +4235,7 @@ func getExportBlockRefLinkText(blockRef *ast.Node, blockRefTextLeft, blockRefTex
 	if "" == linkText {
 		linkText = sql.GetRefText(defID)
 	}
-	linkText = util.UnescapeHTML(linkText) // 块引锚文本导出时 `&` 变为实体 `&amp;` https://github.com/siyuan-note/siyuan/issues/7659
+	linkText = util.UnescapeHTML(linkText) // `&` was turned into the `&amp;` entity when exporting block ref anchor text https://github.com/siyuan-note/siyuan/issues/7659
 	if Conf.Editor.BlockRefDynamicAnchorTextMaxLen < utf8.RuneCountInString(linkText) {
 		linkText = gulu.Str.SubStr(linkText, Conf.Editor.BlockRefDynamicAnchorTextMaxLen) + "..."
 	}
@@ -4279,7 +4320,7 @@ func exportRefTrees(tree *parse.Tree, defBlockIDs *[]string, retTrees map[string
 			}
 			exportRefTrees(defTree, defBlockIDs, retTrees)
 		} else if ast.NodeAttributeView == n.Type {
-			// 导出数据库所在文档时一并导出绑定块所在文档
+			// Also export the documents containing bound blocks when exporting the document that hosts the database
 			// Export the binding block docs when exporting the doc where the database is located https://github.com/siyuan-note/siyuan/issues/11486
 
 			avID := n.AttributeViewID
@@ -4369,7 +4410,8 @@ func getAttrViewTableAligns(table *av.Table, hiddenCol bool) (ret []int) {
 	return
 }
 
-// adjustHeadingLevel 聚焦导出（即非文档块）的情况下，将第一个标题层级提升为一级（如果开启了添加文档标题的话提升为二级）。
+// adjustHeadingLevel promotes the first heading to level 1 when doing a focused export (i.e. not a document
+// block), or to level 2 if adding the document title is enabled.
 // Export preview mode supports focus use https://github.com/siyuan-note/siyuan/issues/15340
 func adjustHeadingLevel(bt *treenode.BlockTree, tree *parse.Tree) {
 	if "d" == bt.Type {

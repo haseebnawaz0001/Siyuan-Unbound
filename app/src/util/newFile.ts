@@ -27,7 +27,7 @@ type NewDocRequest = {
     app: App;
     notebookId: string;
     currentPath: string;
-    /** 是否有来自编辑器或文件树选中项的焦点目标 */
+    /** Whether there is a focus target coming from the editor or a file-tree selection */
     hasFocusTarget: boolean;
     name?: string;
     paths?: string[];
@@ -35,7 +35,7 @@ type NewDocRequest = {
     onCreated?: (id: string, title: string) => void;
 };
 
-/** 按配置路径创建文档；从聚焦编辑器或文件树推断上下文；可选 name 指定文档名 */
+/** Creates a document per the configured path; infers context from the focused editor or file tree; an optional name specifies the document name */
 export const newFile = (app: App, name?: string) => {
     if (getOpenNotebookCount() === 0) {
         showMessage(window.siyuan.languages.newFileTip);
@@ -203,7 +203,8 @@ function runNewDoc(request: NewDocRequest) {
 
 function getNewDocHPath(targetNotebookId: string, currentNotebookId: string, currentPath: string, callback: (hPath: string) => void) {
     if (targetNotebookId !== currentNotebookId) {
-        // 跨笔记本时当前文档路径在目标笔记本中不存在，直接按目标笔记本根路径解析
+        // When crossing notebooks, the current document path does not exist in the target notebook,
+        // so resolve directly against the target notebook's root path
         callback("/");
         return;
     }
@@ -244,7 +245,7 @@ function runNewDocInTree(request: NewDocRequest) {
     });
 }
 
-/** 同笔记本 + 有聚焦 + 非根路径 时取当前文档 ID */
+/** Takes the current document ID when it is the same notebook + has focus + not the root path */
 function getCreateDocParentID(hasFocusTarget: boolean, notebookId: string, currentPath: string, targetNotebookId: string): string | undefined {
     return hasFocusTarget && notebookId === targetNotebookId && currentPath !== "/"
         ? getDisplayName(currentPath, true, true)
@@ -301,10 +302,12 @@ function openCreatedDoc(app: App, id: string, onCreated?: (id: string, title: st
 }
 
 /**
- * 块引新建文档。
- * 
- * 与 `newFile` 入口路径解析规则对齐；创建后仅回调插入引用，不打开新文档页签。
- * 独立于 `runNewDoc` 编排，避免给通用入口引入块引专用参数。
+ * Creates a new document from a block reference.
+ *
+ * Aligned with the `newFile` entry point's path-resolution rules; after creation it only invokes
+ * the callback to insert the reference, without opening a tab for the new document.
+ * Kept independent of `runNewDoc`'s orchestration, to avoid introducing block-reference-specific
+ * parameters into the general-purpose entry point.
  */
 export const newFileByRefHint = (
     protyle: IProtyle,

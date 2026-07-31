@@ -22,8 +22,9 @@ export const getDefaultOperatorByType = (type: TAVCol) => {
     }
 };
 
-// getEditableFilters 返回可直接增删改的叶子/分组数组。
-// spec 5 后顶层为单个根组，编辑对象是其 filters；兼容旧扁平数据时直接返回顶层数组。
+// getEditableFilters returns the leaf/group array that can be directly added/removed/modified.
+// After spec 5 the top level is a single root group whose filters are the edit target; for backward
+// compatibility with old flat data, the top-level array is returned directly.
 export const getEditableFilters = (data: IAV): IAVFilter[] => {
     if (data.view.filters.length === 1 && (data.view.filters[0].filters || data.view.filters[0].combination)) {
         if (!data.view.filters[0].filters) {
@@ -34,14 +35,15 @@ export const getEditableFilters = (data: IAV): IAVFilter[] => {
     return data.view.filters;
 };
 
-// getRootFilters 返回用于递归渲染/遍历的根节点数组（与 getEditableFilters 同源）。
+// getRootFilters returns the root node array used for recursive rendering/traversal (same source as getEditableFilters).
 const getRootFilters = (data: IAV): IAVFilter[] => getEditableFilters(data);
 
-// getFilterByPath 按索引路径（如 "0,1,2"）在节点树中定位节点。返回 undefined 表示未找到。
+// getFilterByPath locates a node in the node tree by an index path (e.g. "0,1,2"). Returns undefined if not found.
 export const getFilterByPath = (nodes: IAVFilter[], path: string): IAVFilter => {
     if (!path || "" === path) {
-        // path 为空/缺省表示根组本身；但 nodes 是根组子节点数组，根组节点不在其中。
-        // 调用方若需操作根组节点，应直接访问 data.view.filters[0]。
+        // An empty/omitted path means the root group itself; but nodes is the root group's children array,
+        // so the root group node itself is not in it.
+        // Callers that need to operate on the root group node should access data.view.filters[0] directly.
         return undefined;
     }
     const indices = path.split(",").map(i => parseInt(i, 10));
@@ -58,8 +60,8 @@ export const getFilterByPath = (nodes: IAVFilter[], path: string): IAVFilter => 
     return current;
 };
 
-// getParentByPath 返回路径末层级的父节点数组，及最后一层级的下标。
-// 用于在指定父分组内插入/删除子节点。路径 "" 视为根。
+// getParentByPath returns the parent node array at the last path level, along with the last level's index.
+// Used to insert/remove child nodes within a specified parent group. An empty path "" is treated as root.
 export const getParentByPath = (nodes: IAVFilter[], path: string): { parent: IAVFilter[], index: number } => {
     if (!path || "" === path) {
         return {parent: nodes, index: -1};
@@ -79,7 +81,8 @@ export const getParentByPath = (nodes: IAVFilter[], path: string): { parent: IAV
     return {parent: list, index: lastIndex};
 };
 
-// removeFilterByPath 按路径移除节点。返回是否成功。空分组在 UI 层不自动裁剪（保留用户结构）。
+// removeFilterByPath removes a node by path. Returns whether it succeeded. Empty groups are not
+// auto-pruned at the UI layer (the user's structure is preserved).
 export const removeFilterByPath = (nodes: IAVFilter[], path: string): boolean => {
     const {parent, index} = getParentByPath(nodes, path);
     if (!parent || index < 0 || index >= parent.length) {
@@ -93,7 +96,8 @@ export const removeFilterByPath = (nodes: IAVFilter[], path: string): boolean =>
     return true;
 };
 
-// removeFiltersByColumn 递归移除引用指定列的叶子，并裁剪变空的分组。返回处理后的新数组。
+// removeFiltersByColumn recursively removes leaves referencing the given column and prunes groups
+// that become empty. Returns the resulting new array.
 export const removeFiltersByColumn = (filters: IAVFilter[], column: string): IAVFilter[] => {
     const ret: IAVFilter[] = [];
     filters.forEach(f => {
@@ -109,7 +113,7 @@ export const removeFiltersByColumn = (filters: IAVFilter[], column: string): IAV
     return ret;
 };
 
-// hasFilterForColumn 递归判断过滤树中是否存在引用指定列的叶子。
+// hasFilterForColumn recursively checks whether the filter tree contains a leaf referencing the given column.
 export const hasFilterForColumn = (filters: IAVFilter[], column: string): boolean => {
     for (const f of filters) {
         if (f.filters) {
@@ -123,7 +127,7 @@ export const hasFilterForColumn = (filters: IAVFilter[], column: string): boolea
     return false;
 };
 
-// addFilterGroup 在指定路径的分组下追加一个空 AND 分组。
+// addFilterGroup appends an empty AND group under the group at the given path.
 export const addFilterGroup = (data: IAV, path: string) => {
     let target: IAVFilter[];
     if ("" === path) {
@@ -150,7 +154,8 @@ export const addFilter = (options: {
     parentPath?: string
 }) => {
     const menu = new Menu(Constants.MENU_AV_ADD_FILTER);
-    // 定位目标分组：支持向指定分组内追加，同分组允许同列多条件（如 状态=完成 OR 状态=进行中）
+    // Locate the target group: supports appending into a specified group; the same group allows multiple
+    // conditions on the same column (e.g. Status=Done OR Status=In Progress)
     let targetGroupFilters: IAVFilter[];
     if (options.parentPath && options.parentPath !== "") {
         const node = getFilterByPath(getRootFilters(options.data), options.parentPath);
@@ -159,7 +164,7 @@ export const addFilter = (options: {
         targetGroupFilters = getEditableFilters(options.data);
     }
     getFieldsByData(options.data).forEach((column) => {
-        // 行号类型列不可筛选
+        // Line number type columns cannot be filtered
         if (column.type !== "lineNumber") {
             menu.addItem({
                 label: column.name,
@@ -171,11 +176,12 @@ export const addFilter = (options: {
                         operator,
                         value,
                     };
-                    // 插入到目标分组（复用查重时已定位的 targetGroupFilters，它持有该分组子数组的稳定引用）
+                    // Insert into the target group (reuse targetGroupFilters located during dedup lookup; it holds a
+                    // stable reference to that group's child array)
                     const oldFilters = JSON.parse(JSON.stringify(options.data.view.filters));
                     targetGroupFilters.push(filter);
                     const blockID = options.blockElement.getAttribute("data-node-id");
-                    // 保存新增的占位条件，inline 控件立即可编辑（无需弹层）
+                    // Save the newly added placeholder condition; the inline control is immediately editable (no popup needed)
                     transaction(options.protyle, [{
                         action: "setAttrViewFilters",
                         avID: options.avId,
@@ -212,7 +218,7 @@ export const getFiltersHTML = (data: IAV) => {
         andOrTextWidth = Math.max(andOrTextWidth, measureEl.offsetWidth);
     });
     document.body.removeChild(measureEl);
-    // 宽度需容纳文字 + b3-select 的左右 padding（8 + 26）+ 余量
+    // Width must accommodate the text plus b3-select's left/right padding (8 + 26) plus some margin
     const andOrControlWidth = andOrTextWidth + 36;
     const genAndOrSelect = (groupPath: string, combination: string) =>
         `<select class="b3-select" data-type="toggleCombination" data-path="${groupPath}" style="width:${andOrControlWidth}px;"><option value="and" ${combination === "and" ? "selected" : ""}>${window.siyuan.languages.filterCombinationAnd}</option><option value="or" ${combination === "or" ? "selected" : ""}>${window.siyuan.languages.filterCombinationOr}</option></select>`;
@@ -352,9 +358,10 @@ export const convertGroupToFilter = (nodes: IAVFilter[], path: string): boolean 
     return true;
 };
 
-// ============ 内联化筛选编辑（替代 setFilter 弹层） ============
+// ============ Inline filter editing (replaces the setFilter popup) ============
 
-// getOperatorSelectByType 按值类型生成操作符 <select> 的 option HTML，标记当前 operator 为 selected。
+// getOperatorSelectByType generates the operator <select> option HTML based on the value type,
+// marking the current operator as selected.
 const getOperatorSelectByType = (type: TAVCol, currentOperator: string): string => {
     const opt = (value: string, label: string) => `<option ${value === currentOperator ? "selected" : ""} value="${value}">${label}</option>`;
     switch (type) {
@@ -401,7 +408,8 @@ const getOperatorSelectByType = (type: TAVCol, currentOperator: string): string 
 
 const rollupTargetColumns = new WeakMap<IAVColumn, IAVColumn>();
 
-// prepareFilterColumns 加载汇总字段指向的原始字段，使筛选控件可以按原始类型展示。
+// prepareFilterColumns loads the original field that a rollup field points to, so the filter
+// control can render according to the original type.
 export const prepareFilterColumns = async (data: IAV) => {
     const fields = getFieldsByData(data);
     const avRequests = new Map<string, Promise<IAVColumn[]>>();
@@ -427,8 +435,9 @@ export const prepareFilterColumns = async (data: IAV) => {
     await Promise.all(tasks);
 };
 
-// resolveFilterValueType 解析 filter 实际的值类型。
-// 汇总类型优先使用计算结果类型，否则使用汇总指向的原始字段类型。
+// resolveFilterValueType resolves the actual value type of a filter.
+// For rollup types, the calculation result type is used first; otherwise the type of the original
+// field the rollup points to is used.
 const resolveFilterValueType = (filter: IAVFilter, colData: IAVColumn): { type: TAVCol, colData: IAVColumn, isRollup: boolean } => {
     const valueType = filter.value?.type as TAVCol;
     if (valueType !== "rollup") {
@@ -477,18 +486,20 @@ const genEmptyFilterValue = (column: IAVColumn): { operator: TAVFilterOperator, 
     };
 };
 
-// genInlineFilterHTML 生成单个叶子过滤条件的内联可编辑 HTML（operator select + 值控件）。
-// 替代原 genFilterItem 的只读 chip。colData 为该列配置（含 options/relation/rollup 等）。
+// genInlineFilterHTML generates the inline editable HTML for a single leaf filter condition
+// (operator select + value control).
+// Replaces the old read-only chip from genFilterItem. colData is the column config for this
+// column (including options/relation/rollup, etc.).
 const genInlineFilterHTML = (filter: IAVFilter, colData: IAVColumn, path: string): string => {
     const {type: valueType, colData: valueColumn, isRollup} = resolveFilterValueType(filter, colData);
     const operator = filter.operator;
     const isEmptyOp = operator === "Is empty" || operator === "Is not empty";
     const valueHidden = isEmptyOp ? " fn__none" : "";
 
-    // 操作符 select
+    // Operator select
     const operatorSelect = `<select class="b3-select" data-type="operation" data-path="${path}">${getOperatorSelectByType(valueType, operator)}</select>`;
 
-    // 量化器 select（rollup/mAsset 才有）
+    // Quantifier select (only present for rollup/mAsset)
     const quantifierSelect = (isRollup || valueType === "mAsset")
         ? `<select class="b3-select" data-type="quantifier" data-path="${path}">
 <option ${(!filter.quantifier || filter.quantifier === "Any") ? "selected" : ""} value="Any">${window.siyuan.languages.filterQuantifierAny}</option>
@@ -497,9 +508,9 @@ const genInlineFilterHTML = (filter: IAVFilter, colData: IAVColumn, path: string
 </select>`
         : "";
 
-    // 值控件（按类型）
+    // Value control (by type)
     let valueHTML = "";
-    let extraHTML = ""; // 放在 valueContainer 外的附加 HTML（如 select 下拉面板，避免影响行宽）
+    let extraHTML = ""; // Extra HTML placed outside valueContainer (e.g. select dropdown panel, to avoid affecting row width)
     const filterValue = getFilterCellValue(filter);
     if (["text", "url", "block", "email", "phone", "template"].includes(valueType)) {
         const content = filterValue?.[valueType as "text"]?.content || "";
@@ -518,7 +529,7 @@ const genInlineFilterHTML = (filter: IAVFilter, colData: IAVColumn, path: string
     } else if (valueType === "select" || valueType === "mSelect") {
         const {trigger, dropdown} = genInlineSelectHTML(filter, valueColumn, path, valueType);
         valueHTML = trigger;
-        extraHTML = dropdown; // 下拉面板放 valueContainer 外，fixed 定位不影响行宽
+        extraHTML = dropdown; // Dropdown panel placed outside valueContainer; fixed positioning doesn't affect row width
     } else if (valueType === "relation") {
         const content = filterValue?.relation?.blockIDs?.[0] || "";
         valueHTML = `<input class="b3-text-field b3-text-field--text fn__flex-1" value="${escapeFilterValue(content)}" data-type="filterValue" data-type-rel="relation" data-path="${path}">`;
@@ -527,16 +538,18 @@ const genInlineFilterHTML = (filter: IAVFilter, colData: IAVColumn, path: string
     return `${quantifierSelect}${operatorSelect}<span class="av__filter-value${valueHidden}" data-type="valueContainer" data-path="${path}">${valueHTML}</span>${extraHTML}`;
 };
 
-// genInlineDateHTML 生成日期类型的内联控件（绝对/相对切换 + Is between 结束日期）。
+// genInlineDateHTML generates the inline control for date type columns (absolute/relative toggle + Is between end date).
 const genInlineDateHTML = (filter: IAVFilter, valueType: TAVCol, path: string): string => {
     const dateValue = getFilterCellValue(filter)?.[valueType as "date"];
     const showToday1 = !filter.relativeDate?.direction;
     const showToday2 = !filter.relativeDate2?.direction;
     const isBetween = filter.operator === "Is between";
 
-    // formatAbsDate 把时间戳格式化为 yyyy-MM-dd；空值/非法值返回 ""，避免 <input type="date"> 报 "Invalid Date"。
-    // 0 也视作空值：created/updated 类型的 content 经后端 int64 往返后 null 会变成 0，
-    // 否则 dayjs(0) 会渲染成 1970-01-01（与 date 类型 isNotEmpty:false 时的空白表现对齐）。
+    // formatAbsDate formats a timestamp as yyyy-MM-dd; empty/invalid values return "" to avoid
+    // <input type="date"> showing "Invalid Date".
+    // 0 is also treated as empty: for created/updated types, content becomes 0 after a null round-trips
+    // through the backend's int64 handling; otherwise dayjs(0) would render as 1970-01-01 (this keeps it
+    // consistent with the blank appearance of date type when isNotEmpty is false).
     const formatAbsDate = (timestamp: any): string => {
         if (!timestamp) {
             return "";
@@ -556,8 +569,9 @@ const genInlineDateHTML = (filter: IAVFilter, valueType: TAVCol, path: string): 
 <option value="1"${relativeDate?.direction === 1 ? " selected" : ""}>${window.siyuan.languages.nextDate}</option>
 <option value="0"${showToday ? " selected" : ""}>${window.siyuan.languages.current}</option>
 </select>`;
-        // “当前”方向下数量 count 无意义（后端按单位取今天/本周/本月/今年），故仅隐藏 relCount；
-        // 但单位 relUnit 必须保留，以便用户选择天/周/月/年
+        // The count is meaningless under the "current" direction (the backend takes today/this week/this
+        // month/this year based on the unit), so only relCount is hidden;
+        // but the relUnit unit must be kept so the user can choose day/week/month/year
         const relCount = `<input type="number" min="1" step="1" value="${relativeDate?.count || 1}" class="b3-text-field b3-text-field--text av__filter-num" data-type="relCount${suffix}" data-path="${path}" style="${(!relativeDate || showToday) ? "display:none;" : ""}">`;
         const relUnit = `<select class="b3-select" data-type="relUnit${suffix}" data-path="${path}" style="${!relativeDate ? "display:none;" : ""}">
 <option value="0"${relativeDate?.unit === 0 ? " selected" : ""}>${window.siyuan.languages.day}</option>
@@ -573,21 +587,22 @@ const genInlineDateHTML = (filter: IAVFilter, valueType: TAVCol, path: string): 
     return `<span class="av__filter-date-col">${filter1}<span data-type="filter2Wrap" data-path="${path}" style="${isBetween ? "" : "display:none;"}">${filter2}</span></span>`;
 };
 
-// genInlineSelectHTML 生成 select/mSelect 的内联多选 chip 列表 + 搜索。
+// genInlineSelectHTML generates the inline multi-select chip list + search for select/mSelect.
 const genInlineSelectHTML = (filter: IAVFilter, colData: IAVColumn, path: string, valueType: TAVCol): { trigger: string, dropdown: string } => {
     const isSingle = valueType === "select";
     const options = colData.options || [];
     const selectedValues = (getFilterCellValue(filter)?.mSelect || []).filter((s: IAVCellSelectValue) => s.content);
     const placeholder = isSingle ? window.siyuan.languages.select : window.siyuan.languages.multiSelect;
 
-    // 触发器：显示已选值的 chip（与表格单元格样式一致），无选中时显示 placeholder + 下拉箭头
+    // Trigger: shows chips for selected values (consistent with the table cell style); when nothing is
+    // selected, shows a placeholder + dropdown arrow
     const selectedChips = selectedValues.map((item: IAVCellSelectValue) => {
         return `<span class="b3-chip b3-chip--middle av__select-chip" style="background-color:var(--b3-font-background${item.color});color:var(--b3-font-color${item.color})">${escapeHtml(item.content)}</span>`;
     }).join("");
     const triggerContent = selectedChips || `<span class="ft__on-surface fn__ellipsis">${placeholder}</span>`;
     const trigger = `<span class="av__select-trigger" data-type="selectTrigger" data-path="${path}">${triggerContent}<svg class="av__select-trigger-arrow"><use xlink:href="#iconDown"></use></svg></span>`;
 
-    // 下拉面板
+    // Dropdown panel
     const searchInput = options.length > 5
         ? `<input class="b3-text-field" placeholder="${window.siyuan.languages.search}" data-type="filterSearch" data-path="${path}">`
         : "";
@@ -604,15 +619,16 @@ ${searchInput}<div class="av__select-options" data-type="selectOptions" data-pat
     return {trigger, dropdown};
 };
 
-// readInlineValue 从叶子行内 DOM 读取值，按类型返回 { value, relativeDate, relativeDate2 }。
-// 修正点①：date 用 data-type 精确定位，废弃全局 textElements 索引。
+// readInlineValue reads the value from the leaf row's DOM, returning { value, relativeDate,
+// relativeDate2 } based on the type.
+// Fix #1: date uses data-type for precise targeting, replacing the old global textElements index.
 const readInlineValue = (rowElement: HTMLElement, valueType: TAVCol, operator: string, filter: IAVFilter): { newValue: IAVCellValue, relativeDate: IAVRelativeDate, relativeDate2: IAVRelativeDate } => {
     let newValue: IAVCellValue = filter.value;
     let relativeDate: IAVRelativeDate = filter.relativeDate;
     let relativeDate2: IAVRelativeDate = filter.relativeDate2;
 
     if (operator === "Is empty" || operator === "Is not empty") {
-        // 空操作符：值保留类型壳，无实际内容
+        // Empty operator: keep the value's type shell with no actual content
         newValue = genEmptyCellValue(valueType);
         relativeDate = undefined;
         relativeDate2 = undefined;
@@ -628,7 +644,7 @@ const readInlineValue = (rowElement: HTMLElement, valueType: TAVCol, operator: s
         const val = input?.value || "";
         newValue = val ? genCellValue(valueType, val) : genEmptyCellValue(valueType);
     } else if (["date", "created", "updated"].includes(valueType)) {
-        // 修正点①：用 data-type 精确定位绝对日期 input
+        // Fix #1: use data-type to precisely target the absolute date input
         const dateTypeSel = rowElement.querySelector('[data-type="dateType"]') as HTMLSelectElement;
         const isRelative = dateTypeSel?.value === "custom";
         if (isRelative) {
@@ -668,11 +684,12 @@ const readInlineValue = (rowElement: HTMLElement, valueType: TAVCol, operator: s
             relativeDate2 = undefined;
         }
     } else if (valueType === "select" || valueType === "mSelect") {
-        // 扫描下拉面板内选中的 chip（#iconCheck）。下拉在行外（fixed 定位），用 path 全局查找
+        // Scan the dropdown panel for selected chips (#iconCheck). The dropdown is outside the row
+        // (fixed positioning), so look it up globally by path
         const path = rowElement.dataset.path;
         const mSelect: IAVCellSelectValue[] = [];
         const dropdown = document.querySelector(`[data-type="selectDropdown"][data-path="${path}"]`);
-        const searchRoot = dropdown || rowElement; // 兜底：兼容旧结构
+        const searchRoot = dropdown || rowElement; // Fallback: for backward compatibility with the old structure
         searchRoot.querySelectorAll('[data-type="selectOption"]').forEach((chip: HTMLElement) => {
             const useEl = chip.querySelector("use");
             if (useEl && useEl.getAttribute("xlink:href") === "#iconCheck") {
@@ -682,7 +699,7 @@ const readInlineValue = (rowElement: HTMLElement, valueType: TAVCol, operator: s
         newValue = mSelect.length > 0 ? genCellValue(valueType, mSelect) : genEmptyCellValue(valueType);
     }
 
-    // rollup 包装
+    // rollup wrapping
     if (filter.value?.type === "rollup") {
         newValue = {type: "rollup", rollup: {contents: [newValue]}} as IAVCellValue;
     }
@@ -690,7 +707,7 @@ const readInlineValue = (rowElement: HTMLElement, valueType: TAVCol, operator: s
     return {newValue, relativeDate, relativeDate2};
 };
 
-// readRelativeDate 从行内读取相对日期配置（suffix 为 "" 或 "2"）。
+// readRelativeDate reads the relative date config from the row (suffix is "" or "2").
 const readRelativeDate = (rowElement: HTMLElement, suffix: string): IAVRelativeDate => {
     const dirSel = rowElement.querySelector(`[data-type="dataDirection${suffix}"]`) as HTMLSelectElement;
     const countInput = rowElement.querySelector(`[data-type="relCount${suffix}"]`) as HTMLInputElement;
@@ -703,7 +720,8 @@ const readRelativeDate = (rowElement: HTMLElement, suffix: string): IAVRelativeD
     };
 };
 
-// commitFilter 即时保存单个条件的修改。reRender=true 时重渲染整个面板（结构变化场景）。
+// commitFilter immediately saves changes to a single condition. When reRender=true, re-renders
+// the whole panel (for structural change scenarios).
 export const commitFilter = (data: IAV, path: string, newFilter: IAVFilter, protyle: IProtyle, blockID: string, avID: string, menuElement: HTMLElement, reRender: boolean) => {
     const editable = getEditableFilters(data);
     const {parent, index} = getParentByPath(editable, path);
@@ -730,9 +748,9 @@ export const commitFilter = (data: IAV, path: string, newFilter: IAVFilter, prot
     }
 };
 
-// bindInlineFilterEvents 绑定内联筛选编辑的事件（事件委托到面板）。即时保存。
+// bindInlineFilterEvents binds events for inline filter editing (delegated to the panel). Saves immediately.
 export const bindInlineFilterEvents = (panelElement: HTMLElement, data: IAV, protyle: IProtyle, blockID: string, avID: string) => {
-    // 防重复绑定：事件委托绑在 panelElement 上，同一面板实例只需绑一次
+    // Prevent duplicate binding: events are delegated on panelElement, only needs to be bound once per panel instance
     if (panelElement.dataset.filterEventsBound === "true") {
         return;
     }
@@ -740,14 +758,14 @@ export const bindInlineFilterEvents = (panelElement: HTMLElement, data: IAV, pro
     const menuElement = panelElement.querySelector(".b3-menu") as HTMLElement;
     const fields = getFieldsByData(data);
 
-    // 通过 data-path 定位叶子行
+    // Locate the leaf row via data-path
     const getRow = (target: HTMLElement): HTMLElement => {
         const path = target.dataset.path;
         if (!path) return null;
         return menuElement.querySelector(`[data-path="${path}"]`) as HTMLElement;
     };
 
-    // 查找列配置
+    // Find the column config
     const findColData = (path: string): IAVColumn => {
         const filter = getFilterByPath(getEditableFilters(data), path);
         if (!filter) return null;
@@ -761,7 +779,7 @@ export const bindInlineFilterEvents = (panelElement: HTMLElement, data: IAV, pro
         return colData;
     };
 
-    // 保存当前行的值（从 DOM 读取后提交）
+    // Save the current row's value (read from DOM then submit)
     const saveRow = (rowElement: HTMLElement, path: string, reRender: boolean) => {
         const filter = getFilterByPath(getEditableFilters(data), path);
         const colData = findColData(path);
@@ -784,7 +802,7 @@ export const bindInlineFilterEvents = (panelElement: HTMLElement, data: IAV, pro
         commitFilter(data, path, newFilter, protyle, blockID, avID, menuElement, reRender);
     };
 
-    // operator change：切换操作符，可能需要重渲染（结构变化如 Is between/Is empty）
+    // operator change: switching the operator may require a re-render (structural changes like Is between/Is empty)
     panelElement.addEventListener("change", (event: Event) => {
         const target = event.target as HTMLElement;
         const type = target.dataset.type;
@@ -795,7 +813,7 @@ export const bindInlineFilterEvents = (panelElement: HTMLElement, data: IAV, pro
         if (!row) return;
 
         if (type === "fieldSelect") {
-            // 切换字段：用新字段的默认 operator + 空 value 替换，整体重渲染
+            // Switching field: replace with the new field's default operator + empty value, re-render the whole thing
             const newColId = (target as HTMLSelectElement).value;
             const newColData = fields.find((f: IAVColumn) => f.id === newColId);
             if (newColData) {
@@ -808,7 +826,8 @@ export const bindInlineFilterEvents = (panelElement: HTMLElement, data: IAV, pro
                 commitFilter(data, path, newFilter, protyle, blockID, avID, menuElement, true);
             }
         } else if (type === "operation") {
-            // 判断是否结构变化（需重渲染）：date 的 Is between 切换、空操作符切换
+            // Determine whether this is a structural change (requiring a re-render): toggling date's Is
+            // between, or toggling an empty operator
             const filter = getFilterByPath(getEditableFilters(data), path);
             const colData = findColData(path);
             const {type: valueType} = resolveFilterValueType(filter, colData);
@@ -819,8 +838,9 @@ export const bindInlineFilterEvents = (panelElement: HTMLElement, data: IAV, pro
                 ((newOp === "Is empty" || newOp === "Is not empty") !== (oldOp === "Is empty" || oldOp === "Is not empty"));
             saveRow(row, path, structureChange);
         } else if (type === "quantifier" || type?.startsWith("dataDirection") || type?.startsWith("dateType")) {
-            // 量化器、日期方向、日期类型变化：保存。dateType 切换绝对/相对、dataDirection 切换“当前/前/后”
-            // 都会改变 relCount/relUnit 的显示状态，需重渲染
+            // Quantifier, date direction, date type changes: save. Toggling dateType (absolute/relative) or
+            // dataDirection (current/past/future) both change the visibility state of relCount/relUnit,
+            // requiring a re-render
             if (type === "dateType" || type === "dateType2" || type?.startsWith("dataDirection")) {
                 saveRow(row, path, true);
             } else {
@@ -829,12 +849,12 @@ export const bindInlineFilterEvents = (panelElement: HTMLElement, data: IAV, pro
         } else if (type === "relUnit" || type === "relUnit2") {
             saveRow(row, path, false);
         } else if (type === "filterValue") {
-            // select/change 触发（非键盘输入的 change，如浏览器自动填充）
+            // Triggered by select/change (a change not from keyboard input, e.g. browser autofill)
             saveRow(row, path, false);
         }
     });
 
-    // 值输入 blur / Enter 保存
+    // Save on value input blur / Enter
     panelElement.addEventListener("blur", (event: Event) => {
         const target = event.target as HTMLElement;
         if (target.dataset.type === "filterValue" || target.dataset.type?.startsWith("absDate") || target.dataset.type?.startsWith("relCount")) {
@@ -842,7 +862,7 @@ export const bindInlineFilterEvents = (panelElement: HTMLElement, data: IAV, pro
             const row = getRow(target);
             if (path && row) saveRow(row, path, false);
         }
-    }, true); // capture 捕获 blur（blur 不冒泡）
+    }, true); // capture to catch blur (blur doesn't bubble)
 
     panelElement.addEventListener("keydown", (event: KeyboardEvent) => {
         const target = event.target as HTMLElement;
@@ -857,37 +877,37 @@ export const bindInlineFilterEvents = (panelElement: HTMLElement, data: IAV, pro
         }
     });
 
-    // select 下拉触发：点击展开/收起选项面板
+    // select dropdown trigger: click to expand/collapse the options panel
     panelElement.addEventListener("click", (event: MouseEvent) => {
         const target = event.target as HTMLElement;
-        // 先处理 selectTrigger（展开/收起下拉）
+        // First handle selectTrigger (expand/collapse the dropdown)
         const trigger = target.closest('[data-type="selectTrigger"]') as HTMLElement;
         if (trigger) {
             const path = trigger.dataset.path;
-            // 下拉面板已移到行外（fixed 定位），用 path 全局查找
+            // The dropdown panel has been moved outside the row (fixed positioning); look it up globally by path
             const dropdown = menuElement.querySelector(`[data-type="selectDropdown"][data-path="${path}"]`) as HTMLElement;
             if (dropdown) {
-                // 收起其它已展开的下拉
+                // Collapse any other expanded dropdowns
                 menuElement.querySelectorAll('[data-type="selectDropdown"]').forEach((el: HTMLElement) => {
                     if (el !== dropdown) el.style.display = "none";
                 });
                 if (dropdown.style.display === "none") {
-                    // 展开时用 fixed 定位到 trigger 下方（避免被 overflow:auto 裁剪）
+                    // When expanding, use fixed positioning below the trigger (to avoid being clipped by overflow:auto)
                     const rect = trigger.getBoundingClientRect();
                     dropdown.style.zIndex = (++window.siyuan.zIndex).toString();
                     dropdown.style.left = rect.left + "px";
                     dropdown.style.width = Math.max(rect.width, 120) + "px";
-                    // 先临时显示以测量真实高度，再决定向上还是向下展开
+                    // Temporarily show it first to measure the real height, then decide whether to expand up or down
                     dropdown.style.visibility = "hidden";
                     dropdown.style.display = "block";
                     const dropdownHeight = dropdown.offsetHeight;
                     dropdown.style.visibility = "";
                     const spaceBelow = window.innerHeight - rect.bottom;
                     if (spaceBelow < dropdownHeight + 8 && rect.top > dropdownHeight + 8) {
-                        // 下方不够且上方够：向上展开，紧贴 trigger 上方
+                        // Not enough space below but enough above: expand upward, flush against the top of the trigger
                         dropdown.style.top = (rect.top - dropdownHeight - 4) + "px";
                     } else {
-                        // 向下展开
+                        // Expand downward
                         dropdown.style.top = (rect.bottom + 4) + "px";
                     }
                 } else {
@@ -897,7 +917,7 @@ export const bindInlineFilterEvents = (panelElement: HTMLElement, data: IAV, pro
             event.stopImmediatePropagation();
             return;
         }
-        // 再处理 selectOption chip 点击（切换选中态）
+        // Then handle selectOption chip clicks (toggle selected state)
         const chip = target.closest('[data-type="selectOption"]') as HTMLElement;
         if (!chip) return;
         const path = chip.dataset.path;
@@ -908,7 +928,7 @@ export const bindInlineFilterEvents = (panelElement: HTMLElement, data: IAV, pro
         const useEl = chip.querySelector("use");
         const isCheck = useEl.getAttribute("xlink:href") === "#iconCheck";
         if (isSingle && !isCheck) {
-            // 单选：点击新选项时，先取消该下拉内所有其它已选项
+            // Single select: when clicking a new option, first deselect all other selected options in this dropdown
             dropdown.querySelectorAll('[data-type="selectOption"]').forEach((c: HTMLElement) => {
                 if (c !== chip) {
                     const u = c.querySelector("use");
@@ -919,10 +939,10 @@ export const bindInlineFilterEvents = (panelElement: HTMLElement, data: IAV, pro
                 }
             });
         }
-        // toggle 当前项 iconCheck/iconUncheck + primary 类
+        // Toggle the current item's iconCheck/iconUncheck + primary class
         useEl.setAttribute("xlink:href", isCheck ? "#iconUncheck" : "#iconCheck");
         chip.classList.toggle("b3-chip--primary", !isCheck);
-        // 更新触发器显示（重建 chip 列表，与表格单元格样式一致）
+        // Update the trigger display (rebuild the chip list, consistent with the table cell style)
         const triggerEl = menuElement.querySelector(`[data-type="selectTrigger"][data-path="${path}"]`) as HTMLElement;
         if (triggerEl && dropdown) {
             const isSingleSel = dropdown.dataset.single === "true";
@@ -943,7 +963,7 @@ export const bindInlineFilterEvents = (panelElement: HTMLElement, data: IAV, pro
         event.stopImmediatePropagation();
     });
 
-    // 点击面板空白处收起所有 select 下拉
+    // Clicking a blank area of the panel collapses all select dropdowns
     panelElement.addEventListener("click", (event: MouseEvent) => {
         const target = event.target as HTMLElement;
         if (!target.closest('[data-type="selectTrigger"]') && !target.closest('[data-type="selectDropdown"]')) {
@@ -958,12 +978,12 @@ export const bindInlineFilterEvents = (panelElement: HTMLElement, data: IAV, pro
         }
     }, true);
 
-    // select 搜索过滤
+    // select search filtering
     panelElement.addEventListener("input", (event: InputEvent) => {
         const target = event.target as HTMLElement;
         if (target.dataset.type === "filterSearch") {
             const path = target.dataset.path;
-            // 下拉面板在行外，用 path 查找 dropdown 内的选项
+            // The dropdown panel is outside the row; look up options inside the dropdown by path
             const dropdown = menuElement.querySelector(`[data-type="selectDropdown"][data-path="${path}"]`);
             if (!dropdown) return;
             const key = (target as HTMLInputElement).value.toLowerCase();
@@ -972,7 +992,8 @@ export const bindInlineFilterEvents = (panelElement: HTMLElement, data: IAV, pro
                 chip.style.display = (!key || name.indexOf(key) > -1 || key.indexOf(name) > -1) ? "" : "none";
             });
         } else if (target.dataset.type === "filterValue" && target.dataset.typeRel === "relation") {
-            // 关联筛选按主键显示文本匹配，输入内容同时作为候选搜索关键字和筛选值。
+            // Relation filtering matches against the displayed primary key text; the input content serves as
+            // both the candidate search keyword and the filter value.
             const path = target.dataset.path;
             const filter = getFilterByPath(getEditableFilters(data), path);
             const sourceColumn = findColData(path);
@@ -1021,7 +1042,7 @@ export const bindInlineFilterEvents = (panelElement: HTMLElement, data: IAV, pro
         }
     });
 
-    // relation 候选点击填值
+    // Fill the value when a relation candidate is clicked
     panelElement.addEventListener("click", (event: MouseEvent) => {
         const target = event.target as HTMLElement;
         const item = target.closest('[data-type="relList"] .b3-list-item') as HTMLElement;
@@ -1036,5 +1057,5 @@ export const bindInlineFilterEvents = (panelElement: HTMLElement, data: IAV, pro
         }
         listEl.style.display = "none";
         saveRow(row, path, false);
-    }, true); // capture，避免与 selectOption click 冲突
+    }, true); // capture, to avoid conflicting with the selectOption click
 };

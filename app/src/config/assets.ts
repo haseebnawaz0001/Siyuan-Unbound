@@ -23,7 +23,7 @@ import {openMobileFileById} from "../mobile/editor";
 import {BlockPanel} from "../block/Panel";
 /// #endif
 
-/** 资源 Tab 侧栏 / 全局搜索索引文案 */
+/** Text indexed for the sidebar and the global search of the assets tab */
 export const collectAssetsTabSearchStrings = (): string[] => [
     window.siyuan.languages.assets,
     window.siyuan.languages.unreferencedAssets,
@@ -31,7 +31,7 @@ export const collectAssetsTabSearchStrings = (): string[] => [
     window.siyuan.languages.missingAssets,
 ];
 
-/** 资源 Tab 挂载（面板页，不走注册表渲染） */
+/** Mounts the assets tab, a panel page that is not rendered through the registry */
 export const mountAssetsTab = (root: HTMLElement, keywords?: string, app?: App) => {
     if (root.innerHTML === "") {
         assets.element = root;

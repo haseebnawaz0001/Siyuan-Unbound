@@ -42,7 +42,7 @@ var (
 func RefreshRhyResultJob() {
 	_, err := GetRhyResult(context.TODO(), true)
 	if nil != err {
-		// 系统唤醒后可能还没有网络连接，这里等待后再重试
+		// The network connection may not be up yet right after the system wakes, so wait here before retrying
 		go func() {
 			time.Sleep(7 * time.Second)
 			GetRhyResult(context.TODO(), true)
@@ -59,7 +59,7 @@ func GetRhyResult(ctx context.Context, force bool) (map[string]any, error) {
 		return cachedRhyResult, nil
 	}
 
-	// 并发调用只执行一次实际请求
+	// Concurrent calls only trigger one actual request
 	v, err, _ := rhyResultFlight.Do("rhyResult", func() (any, error) {
 		return getRhyResult0(ctx)
 	})

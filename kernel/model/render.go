@@ -59,7 +59,7 @@ func renderOutline(heading *ast.Node, luteEngine *lute.Lute) (ret string) {
 		}
 
 		if style := n.IALAttr("style"); "" != style {
-			if strings.Contains(style, "font-size") { // 大纲字号不应该跟随字体设置 https://github.com/siyuan-note/siyuan/issues/7202
+			if strings.Contains(style, "font-size") { // Outline font size shouldn't follow the font setting https://github.com/siyuan-note/siyuan/issues/7202
 				style = regexp.MustCompile("font-size:.*?;").ReplaceAllString(style, "font-size: inherit;")
 				n.SetIALAttr("style", style)
 			}
@@ -75,7 +75,7 @@ func renderOutline(heading *ast.Node, luteEngine *lute.Lute) (ret string) {
 			}
 		case ast.NodeText, ast.NodeLinkText, ast.NodeCodeBlockCode, ast.NodeMathBlockContent:
 			tokens := html.EscapeHTML(n.Tokens)
-			tokens = bytes.ReplaceAll(tokens, []byte(" "), []byte("&nbsp;")) // 大纲面板条目中无法显示多个空格 https://github.com/siyuan-note/siyuan/issues/4370
+			tokens = bytes.ReplaceAll(tokens, []byte(" "), []byte("&nbsp;")) // Multiple consecutive spaces can't be shown in outline panel entries https://github.com/siyuan-note/siyuan/issues/4370
 			buf.Write(tokens)
 		case ast.NodeBackslashContent:
 			buf.Write(html.EscapeHTML(n.Tokens))
@@ -89,7 +89,7 @@ func renderOutline(heading *ast.Node, luteEngine *lute.Lute) (ret string) {
 			return ast.WalkSkipChildren
 		case ast.NodeImage:
 			if title := n.ChildByType(ast.NodeLinkTitle); nil != title {
-				// 标题后直接跟图片时图片的提示文本不再渲染到大纲中 https://github.com/siyuan-note/siyuan/issues/6278
+				// When an image directly follows a heading, its title text is no longer rendered into the outline https://github.com/siyuan-note/siyuan/issues/6278
 				title.Unlink()
 			}
 			dom := luteEngine.RenderNodeBlockDOM(n)
@@ -118,7 +118,7 @@ func renderBlockText(node *ast.Node, excludeTypes []string, removeLineBreak bool
 	ret = util.EscapeHTML(ret)
 	ret = strings.TrimSpace(ret)
 	if "" == ret {
-		// 复制内容为空的块作为块引用时粘贴无效 https://github.com/siyuan-note/siyuan/issues/4962
+		// Pasting fails when copying a block with empty content as a block reference https://github.com/siyuan-note/siyuan/issues/4962
 		buf := bytes.Buffer{}
 		ast.Walk(node, func(n *ast.Node, entering bool) ast.WalkStatus {
 			if !entering {
@@ -183,7 +183,7 @@ func renderBlockDOMByNodes(nodes []*ast.Node, luteEngine *lute.Lute) string {
 			if entering {
 				if n.IsBlock() {
 					if avs := n.IALAttr(av.NodeAttrNameAvs); "" != avs {
-						// 填充属性视图角标 Display the database title on the block superscript https://github.com/siyuan-note/siyuan/issues/10545
+						// Populate the attribute view badge: display the database title on the block superscript https://github.com/siyuan-note/siyuan/issues/10545
 						avNames := getAvNames(n.IALAttr(av.NodeAttrNameAvs))
 						if "" != avNames {
 							n.SetIALAttr(av.NodeAttrViewNames, avNames)
@@ -282,7 +282,8 @@ func resolveEmbedR(n *ast.Node, blockEmbedMode int, luteEngine *lute.Lute, resol
 				var md string
 				if "d" == sqlBlock.Type {
 					if 0 == blockEmbedMode {
-						// 嵌入块中出现了大于等于上方非嵌入块的标题时需要降低嵌入块中的标题级别
+						// When a heading inside an embedded block is at or above the level of the non-embedded
+						// heading above it, the heading levels inside the embedded block need to be demoted
 						// Improve export of heading levels in embedded blocks
 						// https://github.com/siyuan-note/siyuan/issues/12233
 						// https://github.com/siyuan-note/siyuan/issues/12741
@@ -312,7 +313,8 @@ func resolveEmbedR(n *ast.Node, blockEmbedMode int, luteEngine *lute.Lute, resol
 					h := treenode.GetNodeInTree(subTree, sqlBlock.ID)
 					var hChildren []*ast.Node
 
-					// 从嵌入块的 IAL 属性中解析 custom-heading-mode，使用全局配置作为默认值
+					// Parse custom-heading-mode from the embedded block's IAL attributes, falling back to the
+					// global config as the default
 					blockHeadingMode := Conf.Editor.HeadingEmbedMode
 					if customHeadingMode := n.IALAttr("custom-heading-mode"); "" != customHeadingMode {
 						if mode, err := strconv.Atoi(customHeadingMode); nil == err && (mode == 0 || mode == 1 || mode == 2) {
@@ -320,25 +322,26 @@ func resolveEmbedR(n *ast.Node, blockEmbedMode int, luteEngine *lute.Lute, resol
 						}
 					}
 
-					// 根据 blockHeadingMode 处理标题块的显示
-					// blockHeadingMode: 0=显示标题与下方的块，1=仅显示标题，2=仅显示标题下方的块
+					// Handle the heading block's display according to blockHeadingMode
+					// blockHeadingMode: 0=show the heading and the blocks below it, 1=show only the heading,
+					// 2=show only the blocks below the heading
 					if 1 == blockHeadingMode {
-						// 仅显示标题
+						// Show only the heading
 						hChildren = append(hChildren, h)
 					} else if 2 == blockHeadingMode {
-						// 仅显示标题下方的块（默认行为）
+						// Show only the blocks below the heading (default behavior)
 						if "1" != h.IALAttr("fold") {
 							children := treenode.HeadingChildren(h)
 							for _, c := range children {
 								if "1" == c.IALAttr("heading-fold") {
-									// 嵌入块包含折叠标题时不应该显示其下方块 https://github.com/siyuan-note/siyuan/issues/4765
+									// Don't show the blocks below a folded heading inside an embedded block https://github.com/siyuan-note/siyuan/issues/4765
 									continue
 								}
 								hChildren = append(hChildren, c)
 							}
 						}
 					} else {
-						// 0: 显示标题与下方的块
+						// 0: show the heading and the blocks below it
 						hChildren = append(hChildren, h)
 						hChildren = append(hChildren, treenode.HeadingChildren(h)...)
 					}
@@ -378,9 +381,9 @@ func resolveEmbedR(n *ast.Node, blockEmbedMode int, luteEngine *lute.Lute, resol
 				buf := &bytes.Buffer{}
 				lines := strings.Split(md, "\n")
 				for i, line := range lines {
-					if 0 == blockEmbedMode { // 使用原始文本
+					if 0 == blockEmbedMode { // use the original text
 						buf.WriteString(line)
-					} else { // 使用引述块
+					} else { // use a blockquote
 						buf.WriteString("> " + line)
 					}
 					if i < len(lines)-1 {

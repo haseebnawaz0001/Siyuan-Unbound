@@ -650,7 +650,8 @@ export const openNewItemTemplateDialog = (options: {
                     try {
                         (valueElement as HTMLInputElement & {showPicker?: () => void}).showPicker?.();
                     } catch {
-                        // 浏览器会在当前事件不具备用户激活状态时拒绝打开选择器，输入框仍可正常点击选择。
+                        // The browser refuses to open the picker when the current event lacks user
+                        // activation state; the input field can still be clicked to select normally.
                     }
                 }
             });

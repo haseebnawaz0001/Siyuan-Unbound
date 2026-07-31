@@ -466,7 +466,8 @@ export const bindEditEvent = (options: {
                     blockID: options.blockID
                 });
                 (options.menuElement.querySelector('[data-type="addOption"]') as HTMLInputElement).focus();
-                // 添加选项后面板增高，需按首次锚点重新定位（sticky 锁底部，顶部上移避免溢出视口）
+                // The panel grows taller after adding an option, so it must be repositioned based on
+                // the initial anchor (sticky-locked to the bottom, with the top shifting up to avoid overflowing the viewport)
                 const prevTop = parseFloat(options.menuElement.dataset.positionTop);
                 if (!isNaN(prevTop)) {
                     setPosition(options.menuElement, parseFloat(options.menuElement.dataset.positionX), prevTop, 0, 0, true);
@@ -632,8 +633,9 @@ const addAttrViewColAnimation = (options: {
             } else {
                 previousElement = item.querySelector(".av__cell").previousElementSibling;
             }
-            // 分组视图下空分组或被虚拟滚动裁剪的行内可能找不到锚点单元格，此时跳过该行，
-            // 避免在 null 上调用 insertAdjacentHTML 抛出异常而中断整轮遍历 https://github.com/siyuan-note/siyuan/issues/18014
+            // The anchor cell may not be found for an empty group in a grouped view, or a row trimmed
+            // by virtual scrolling; skip that row in this case, to avoid calling insertAdjacentHTML on
+            // null and throwing an exception that would abort the whole iteration https://github.com/siyuan-note/siyuan/issues/18014
             if (!previousElement) {
                 return;
             }
@@ -827,7 +829,7 @@ export const showColMenu = (protyle: IProtyle, blockElement: Element, cellElemen
                 type: "edit",
                 colId,
                 cb(avElement) {
-                    // 修改名字后点击编辑，需要更新名字
+                    // After changing the name and clicking edit, the name needs to be updated
                     const editNameElement = avElement.querySelector('.b3-text-field[data-type="name"]') as HTMLInputElement;
                     editNameElement.value = colName;
                     editNameElement.select();
@@ -837,7 +839,7 @@ export const showColMenu = (protyle: IProtyle, blockElement: Element, cellElemen
     });
     menu.addSeparator({id: "separator_1"});
 
-    // 行号类型不参与筛选和排序
+    // The line number type does not participate in filtering and sorting
     if (type !== "lineNumber") {
         menu.addItem({
             id: "filter",
@@ -850,15 +852,17 @@ export const showColMenu = (protyle: IProtyle, blockElement: Element, cellElemen
                     ignoreRows: true,
                 }, (response) => {
                     const avData = response.data as IAV;
-                    // 该字段还没有筛选条件时，创建它的默认筛选条件（其它字段的筛选不影响）；
-                    // 已有该字段筛选时直接打开总筛选配置面板，避免每次重复新建
+                    // When this field doesn't have a filter condition yet, create its default filter
+                    // condition (filters on other fields are unaffected);
+                    // when this field already has a filter, directly open the overall filter config
+                    // panel, to avoid creating a new one every time
                     if (!hasFilterForColumn(avData.view.filters, colId)) {
                         const filter: IAVFilter = {
                             column: colId,
                             operator: getDefaultOperatorByType(type),
                             value: genCellValue(type, ""),
                         };
-                        // 深拷贝旧值用于 undo，撤销时恢复完整筛选状态而非清空全部
+                        // Deep-copy the old value for undo, so undoing restores the complete filter state rather than clearing everything
                         const oldFilters = JSON.parse(JSON.stringify(avData.view.filters));
                         getEditableFilters(avData).push(filter);
                         transaction(protyle, [{
@@ -873,7 +877,9 @@ export const showColMenu = (protyle: IProtyle, blockElement: Element, cellElemen
                             blockID: blockElement.getAttribute("data-node-id")
                         }]);
                     }
-                    // 打开总筛选配置面板，复用已含新筛选条件的 avData，避免 openMenuPanel 二次 fetch 与刚提交的事务竞争而读到旧数据
+                    // Open the overall filter config panel, reusing avData which already contains the
+                    // new filter condition, to avoid openMenuPanel's second fetch racing with the
+                    // just-committed transaction and reading stale data
                     openMenuPanel({
                         protyle,
                         blockElement,
@@ -1840,7 +1846,7 @@ export const addCol = (protyle: IProtyle, blockElement: Element, previousID?: st
             blockElement.setAttribute("updated", newUpdated);
         }
     });
-    // 在创建时间前插入 lineNumber
+    // Insert lineNumber before "created time"
     menu.addItem({
         id: "lineNumber",
         icon: "iconOrderedList",

@@ -101,9 +101,9 @@ func Pandoc(from, to, o, content string) (err error) {
 }
 
 var (
-	PandocBinPath         string // Pandoc 可执行文件路径
-	PandocTemplatePath    string // Pandoc Docx 模板文件路径
-	PandocColorFilterPath string // Pandoc 颜色过滤器路径
+	PandocBinPath         string // Pandoc executable path
+	PandocTemplatePath    string // Pandoc Docx template file path
+	PandocColorFilterPath string // Pandoc color filter path
 )
 
 func InitPandoc() {
@@ -230,18 +230,18 @@ func IsValidPandocBin(binPath string) bool {
 		return false
 	}
 
-	// 解析符号链接
+	// Resolve symlinks
 	if real, err := filepath.EvalSymlinks(binPath); err == nil {
 		binPath = real
 	}
 
-	// 文件信息检查
+	// File info check
 	fi, err := os.Stat(binPath)
 	if err != nil || fi.IsDir() || !fi.Mode().IsRegular() {
 		return false
 	}
 
-	// 读取文件头判断是否为二进制并排除脚本（#!）
+	// Read the file header to determine whether it's binary, and exclude scripts (#!)
 	f, err := os.Open(binPath)
 	if err != nil {
 		return false
@@ -252,13 +252,13 @@ func IsValidPandocBin(binPath string) bool {
 	n, _ := f.Read(header)
 	header = header[:n]
 
-	// 拒绝以 shebang 开头的脚本
+	// Reject scripts starting with a shebang
 	if bytes.HasPrefix(header, []byte("#!")) {
 		return false
 	}
 
 	isBin := false
-	// 常见二进制魔数：ELF, PE("MZ"), Mach-O (32/64, big/little), FAT
+	// Common binary magic numbers: ELF, PE("MZ"), Mach-O (32/64, big/little), FAT
 	if len(header) >= 4 {
 		switch {
 		case bytes.Equal(header[:4], []byte{0x7f, 'E', 'L', 'F'}):
@@ -279,7 +279,7 @@ func IsValidPandocBin(binPath string) bool {
 		isBin = true
 	}
 
-	// Windows 上允许 .exe 文件（作为补充判断）
+	// Allow .exe files on Windows (as a supplementary check)
 	if !isBin && gulu.OS.IsWindows() {
 		ext := strings.ToLower(filepath.Ext(binPath))
 		if ext == ".exe" {

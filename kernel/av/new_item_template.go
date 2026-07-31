@@ -24,7 +24,7 @@ import (
 	"github.com/88250/lute/ast"
 )
 
-// SetNewItemTemplates 校验并替换数据库的新增条目模板配置。
+// SetNewItemTemplates validates and replaces the database's new-item template configuration.
 func (av *AttributeView) SetNewItemTemplates(config *NewItemTemplatesConfig) error {
 	if nil == config {
 		return errors.New("new item templates config is nil")
@@ -81,7 +81,7 @@ func (av *AttributeView) SetNewItemTemplates(config *NewItemTemplatesConfig) err
 	return nil
 }
 
-// GetNewItemTemplate 根据 ID 获取新增条目模板。
+// GetNewItemTemplate gets a new-item template by ID.
 func (av *AttributeView) GetNewItemTemplate(id string) *NewItemTemplate {
 	for _, itemTemplate := range av.NewItemTemplates {
 		if nil != itemTemplate && itemTemplate.ID == id {
@@ -91,7 +91,7 @@ func (av *AttributeView) GetNewItemTemplate(id string) *NewItemTemplate {
 	return nil
 }
 
-// RemoveNewItemTemplateFieldValue 删除所有新增条目模板中指定字段的配置。
+// RemoveNewItemTemplateFieldValue removes the configuration for the given field from all new-item templates.
 func (av *AttributeView) RemoveNewItemTemplateFieldValue(keyID string) (changed bool) {
 	for _, itemTemplate := range av.NewItemTemplates {
 		if nil == itemTemplate || nil == itemTemplate.FieldValues {
@@ -108,12 +108,12 @@ func (av *AttributeView) RemoveNewItemTemplateFieldValue(keyID string) (changed 
 	return
 }
 
-// RemoveNewItemTemplateSelectOption 删除所有新增条目模板中指定字段的候选值。
+// RemoveNewItemTemplateSelectOption removes the given field's option from all new-item templates.
 func (av *AttributeView) RemoveNewItemTemplateSelectOption(keyID, optionName string) (changed bool) {
 	return av.updateNewItemTemplateSelectOption(keyID, optionName, "", "", true)
 }
 
-// RenameNewItemTemplateSelectOption 同步修改所有新增条目模板中的候选值。
+// RenameNewItemTemplateSelectOption synchronizes the option rename across all new-item templates.
 func (av *AttributeView) RenameNewItemTemplateSelectOption(keyID, oldName, newName, newColor string) (changed bool) {
 	return av.updateNewItemTemplateSelectOption(keyID, oldName, newName, newColor, false)
 }
@@ -163,7 +163,8 @@ func (av *AttributeView) updateNewItemTemplateSelectOption(keyID, oldName, newNa
 	return
 }
 
-// RemoveNewItemTemplateRelationItems 删除所有新增条目模板中指向指定数据库条目的关联值。
+// RemoveNewItemTemplateRelationItems removes, from all new-item templates, relation values pointing at the
+// given database items.
 func (av *AttributeView) RemoveNewItemTemplateRelationItems(targetAvID string, itemIDs []string) (changed bool) {
 	if 0 == len(itemIDs) {
 		return
@@ -210,7 +211,8 @@ func (av *AttributeView) RemoveNewItemTemplateRelationItems(targetAvID string, i
 	return
 }
 
-// PruneInvalidNewItemTemplateFieldValues 清理因字段结构或候选值变化而失效的模板字段值。
+// PruneInvalidNewItemTemplateFieldValues removes template field values that became invalid due to changes in
+// field structure or options.
 func (av *AttributeView) PruneInvalidNewItemTemplateFieldValues() {
 	for _, itemTemplate := range av.NewItemTemplates {
 		if nil == itemTemplate || nil == itemTemplate.FieldValues {

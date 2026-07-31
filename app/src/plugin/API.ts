@@ -52,7 +52,7 @@ openWindow = (options: {
     tab?: Tab,
     alwaysOnTop?: boolean,
     doc?: {
-        id: string,     // 块 id
+        id: string,     // block id
     },
 }) => {
     if (options.doc && options.doc.id) {
@@ -78,14 +78,14 @@ openWindow = (options: {
 openTab = (options: {
     app: App,
     doc?: {
-        id: string,     // 块 id
-        action?: TProtyleAction [] // cb-get-all：获取所有内容；cb-get-focus：打开后光标定位在 id 所在的块；cb-get-hl: 打开后 id 块高亮
-        zoomIn?: boolean // 是否缩放
-        mode?: TEditorMode  // 文档打开模式，默认 "wysiwyg"
+        id: string,     // block id
+        action?: TProtyleAction [] // cb-get-all: get all content; cb-get-focus: place cursor on the id's block after opening; cb-get-hl: highlight the id's block after opening
+        zoomIn?: boolean // whether to zoom in
+        mode?: TEditorMode  // document open mode, default "wysiwyg"
     },
     pdf?: {
         path: string,
-        page?: number,  // pdf 页码
+        page?: number,  // pdf page number
         id?: string,    // File Annotation id
     },
     asset?: {
@@ -94,8 +94,8 @@ openTab = (options: {
     search?: Config.IUILayoutTabSearchConfig
     card?: {
         type: TCardType,
-        id?: string, //  cardType 为 all 时不传，否则传文档或笔记本 id
-        title?: string //  cardType 为 all 时不传，否则传文档或笔记本名称
+        id?: string, // not passed when cardType is "all", otherwise pass the document or notebook id
+        title?: string // not passed when cardType is "all", otherwise pass the document or notebook name
     },
     custom?: {
         title: string,
@@ -104,9 +104,9 @@ openTab = (options: {
         id: string
     }
     position?: "right" | "bottom",
-    keepCursor?: boolean // 是否跳转到新 tab 上
-    removeCurrentTab?: boolean // 在当前页签打开时需移除原有页签
-    afterOpen?: (model?: Model) => void // 打开后回调
+    keepCursor?: boolean // whether to switch focus to the new tab
+    removeCurrentTab?: boolean // whether to remove the existing tab when opening in the current tab
+    afterOpen?: (model?: Model) => void // callback after opening
 }) => {
     if (options.doc) {
         if (options.doc.zoomIn) {
@@ -204,10 +204,10 @@ const getModelByDockType = (type: TDock | string) => {
 };
 
 const openAttributePanel = (options: {
-    data?: Record<string, string>  // 块属性值
-    nodeElement?: HTMLElement,  // 块元素
-    focusName: "bookmark" | "name" | "alias" | "memo" | "av" | "custom",    // av 为数据库页签，custom 为自定义页签，其余为内置输入框
-    protyle?: IProtyle, // 有数据库时需要传入 protyle
+    data?: Record<string, string>  // block attribute values
+    nodeElement?: HTMLElement,  // block element
+    focusName: "bookmark" | "name" | "alias" | "memo" | "av" | "custom",    // "av" is the database tab, "custom" is a custom tab, the rest are built-in input fields
+    protyle?: IProtyle, // must be passed when there is a database
 }) => {
     if (options.data) {
         openFileAttr(options.data, options.focusName, options.protyle);

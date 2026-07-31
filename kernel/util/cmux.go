@@ -10,14 +10,17 @@ import (
 	"github.com/soheilhy/cmux"
 )
 
-// ServeMultiplexed 在同一个 listener 上同时承载 HTTP 与 HTTPS（含 HTTP/2）。
+// ServeMultiplexed serves both HTTP and HTTPS (including HTTP/2) on the same listener.
 //
-// httpServer / httpsServer 用于承载两种连接的 *http.Server，传 nil 时内部自行创建。
-// 返回实际使用的两个 server，方便调用方在需要时关闭其上的活跃连接（如发布服务）。
+// httpServer / httpsServer are the *http.Server instances that carry the two kinds of connections; when nil is
+// passed, they are created internally.
+// It returns the two servers actually used, so the caller can close their active connections when needed (e.g.
+// the publish service).
 //
-// 注意：cmux 派生出的 listener 内部嵌入的是底层 root listener，对其调用 Close 实际会关闭 root，
-// 因此 HTTP 与 HTTPS 必须使用各自的 *http.Server，不能共用——否则共用 server 的 Close 会把 root
-// 一并关掉，导致 m.Serve 提前返回非关闭类错误。
+// Note: the listener derived by cmux internally embeds the underlying root listener, so calling Close on it
+// actually closes root. Therefore HTTP and HTTPS must each use their own *http.Server and must not share one --
+// otherwise closing the shared server would also close root, causing m.Serve to return prematurely with a
+// non-closed-type error.
 func ServeMultiplexed(ln net.Listener, handler http.Handler, certPath, keyPath string, httpServer, httpsServer *http.Server) (*http.Server, *http.Server, error) {
 	m := cmux.New(ln)
 

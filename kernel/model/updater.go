@@ -77,7 +77,7 @@ func checkDownloadInstallPkg() {
 
 	existingPkgPath := getNewVerInstallPkgPath()
 	if "" != existingPkgPath {
-		// 存在经过 sha256Hash 检查的安装包
+		// An install package that has already passed the sha256Hash check exists
 		util.PushUpdateMsg("update-pkg-ready", Conf.Language(62), 15*1000)
 		return
 	}
@@ -237,7 +237,7 @@ func CheckUpdate(showMsg bool) {
 	if releaseLangArg := result["release_"+Conf.Lang]; nil != releaseLangArg {
 		releaseLang = releaseLangArg.(string)
 	} else if releaseLangArg := result["release_"+util.LangToLegacy(Conf.Lang)]; nil != releaseLangArg {
-		// 兼容云端 JSON 数据中历史下划线 key（release_zh_CN 等）
+		// For compatibility with legacy underscore-style keys in cloud JSON data (release_zh_CN, etc.)
 		releaseLang = releaseLangArg.(string)
 	}
 
@@ -256,7 +256,8 @@ func isVersionUpToDate(releaseVer string) bool {
 	return semver.Compare("v"+releaseVer, "v"+util.Ver) <= 0
 }
 
-// skipInstallPkgPlatformCached 缓存平台相关判断，-1 未初始化，0 表示不跳过，1 表示跳过
+// skipInstallPkgPlatformCached caches the platform-specific decision: -1 means uninitialized, 0 means
+// do not skip, 1 means skip.
 var skipInstallPkgPlatformCached = -1
 
 func skipNewVerInstallPkg() bool {

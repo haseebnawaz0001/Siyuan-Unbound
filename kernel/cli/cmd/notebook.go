@@ -197,8 +197,8 @@ func printNotebookTable(boxes []*model.Box) {
 	w.Flush()
 }
 
-// notebookSetIconCmd 设置笔记本图标。
-// icon 取值格式：emoji hex 码点（如 "1f4ca"）、emoji 字符、自定义图片路径或动态图标 URL。
+// notebookSetIconCmd sets a notebook's icon.
+// The icon value format is: an emoji hex code point (e.g. "1f4ca"), an emoji character, a custom image path, or a dynamic icon URL.
 var notebookSetIconCmd = &cobra.Command{
 	Use:   "set-icon --id <id> --icon <icon>",
 	Short: "Set a notebook icon",
@@ -212,7 +212,7 @@ var notebookSetIconCmd = &cobra.Command{
 			return fmt.Errorf("--icon is required")
 		}
 
-		// 校验笔记本存在，避免对一个不存在的 id 静默写入图标。
+		// Verify the notebook exists, to avoid silently writing an icon for a non-existent id.
 		exists := false
 		notebooks, err := model.ListNotebooks()
 		if err != nil {
@@ -233,7 +233,7 @@ var notebookSetIconCmd = &cobra.Command{
 			return nil
 		}
 
-		// SetBoxIcon 内部对自定义图片名做 XSS 过滤。
+		// SetBoxIcon internally applies XSS filtering to custom image names.
 		model.SetBoxIcon(id, icon)
 		util.PushReloadFiletree()
 
@@ -248,8 +248,8 @@ var notebookSetIconCmd = &cobra.Command{
 	},
 }
 
-// notebookRandomIconCmd 为笔记本随机换一个内置 emoji 图标。
-// 传 --id 仅换该笔记本；不传则对全部笔记本各随机换一个。
+// notebookRandomIconCmd randomly assigns a built-in emoji icon to a notebook.
+// Passing --id changes only that notebook; without it, each notebook gets a random icon.
 var notebookRandomIconCmd = &cobra.Command{
 	Use:   "random-icon [--id <id>]",
 	Short: "Randomly set notebook icon(s) from built-in emojis",
@@ -261,7 +261,7 @@ var notebookRandomIconCmd = &cobra.Command{
 			return err
 		}
 
-		// 目标范围：传 id 仅换该笔记本；不传则对全部笔记本各随机换一个。
+		// Target scope: passing id changes only that notebook; without it, each notebook gets a random icon.
 		targets := notebooks
 		if id != "" {
 			var found *model.Box
@@ -280,7 +280,7 @@ var notebookRandomIconCmd = &cobra.Command{
 			return fmt.Errorf("no notebooks to update")
 		}
 
-		// 先把拟定的新图标算好，便于 dry-run 预览与失败回滚。
+		// Compute the proposed new icons up front, to make dry-run preview and rollback-on-failure easier.
 		type change struct {
 			ID      string `json:"id"`
 			Name    string `json:"name"`
@@ -320,16 +320,17 @@ var notebookRandomIconCmd = &cobra.Command{
 	},
 }
 
-// builtinEmojiUnicodes 缓存内置 emoji 的全部 unicode 码点（来自 appearance/emojis/conf.json）。
-// 与前端 getRandomEmoji() 数据源一致，但刻意排除用户自定义图片，
-// 保持随机图标风格统一、避免误用用户的重要图片。
+// builtinEmojiUnicodes caches all unicode code points of the built-in emoji (sourced from
+// appearance/emojis/conf.json).
+// This matches the frontend getRandomEmoji() data source, but deliberately excludes user-customized images, to
+// keep the random-icon style consistent and avoid accidentally using the user's important images.
 var (
 	builtinEmojiUnicodes     []string
 	builtinEmojiUnicodesOnce sync.Once
 )
 
-// loadBuiltinEmojiUnicodes 懒加载内置 emoji 的 unicode 列表。
-// 失败时回退到一个固定码点，调用方始终拿到可用值。
+// loadBuiltinEmojiUnicodes lazily loads the list of built-in emoji unicode code points.
+// On failure it falls back to a fixed code point, so the caller always gets a usable value.
 func loadBuiltinEmojiUnicodes() {
 	builtinEmojiUnicodesOnce.Do(func() {
 		confPath := filepath.Join(util.AppearancePath, "emojis", "conf.json")
@@ -367,7 +368,7 @@ func loadBuiltinEmojiUnicodes() {
 	})
 }
 
-// randomEmoji 返回一个随机的内置 emoji unicode 码点（如 "1f4d6"）。
+// randomEmoji returns a random built-in emoji unicode code point (e.g. "1f4d6").
 func randomEmoji() string {
 	loadBuiltinEmojiUnicodes()
 	return builtinEmojiUnicodes[rand.Intn(len(builtinEmojiUnicodes))]

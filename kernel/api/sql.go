@@ -54,14 +54,14 @@ func SQL(c *gin.Context) {
 
 	switch mode {
 	case "":
-		// 默认模式，允许单条语句
+		// Default mode, a single statement is allowed
 		if err := sql.CheckSingleStatement(stmt); err != nil {
 			ret.Code = -1
 			ret.Msg = err.Error()
 			return
 		}
 	case "readonly":
-		// 只读模式，允许单条语句
+		// Read-only mode, a single statement is allowed
 		if err := sql.CheckSingleStatement(stmt); err != nil {
 			ret.Code = -1
 			ret.Msg = err.Error()
@@ -73,9 +73,9 @@ func SQL(c *gin.Context) {
 			return
 		}
 	case "multiple":
-		// 多语句模式，不做校验
+		// Multi-statement mode, no validation is performed
 	default:
-		// 未知模式
+		// Unknown mode
 		ret.Code = -1
 		ret.Msg = "unknown [mode]"
 		return

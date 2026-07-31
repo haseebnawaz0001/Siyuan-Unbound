@@ -139,7 +139,8 @@ export const removeCellOption = (protyle: IProtyle, cellElements: HTMLElement[],
             return true;
         }
     });
-    // chips 减少导致菜单高度变化后重新定位（锁底部，顶部自适应），需在移除 target 前获取 menuElement
+    // When a decrease in chips changes the menu height, it needs to be repositioned (locked to the
+    // bottom, top adapts), so menuElement must be obtained before removing target
     const menuElement = hasClosestByClassName(target, "b3-menu");
     target.remove();
     if (menuElement) {
@@ -164,7 +165,7 @@ export const setColOption = (protyle: IProtyle, data: IAV, target: HTMLElement, 
         if ((name === inputElement.value && desc === descElement.value) || !inputElement.value) {
             return;
         }
-        // cell 不判断重名 https://github.com/siyuan-note/siyuan/issues/11484
+        // Don't check for duplicate names at the cell level https://github.com/siyuan-note/siyuan/issues/11484
         transaction(protyle, [{
             action: "updateAttrViewColOption",
             id: colId,
@@ -192,7 +193,7 @@ export const setColOption = (protyle: IProtyle, data: IAV, target: HTMLElement, 
         }]);
         fields.find(column => {
             if (column.id === colId) {
-                // 重名不进行更新 https://github.com/siyuan-note/siyuan/issues/13554
+                // Don't update on a duplicate name https://github.com/siyuan-note/siyuan/issues/13554
                 const sameItem = column.options.find((item) => {
                     if (item.name === inputElement.value && item.desc === descElement.value) {
                         return true;
@@ -243,7 +244,8 @@ export const setColOption = (protyle: IProtyle, data: IAV, target: HTMLElement, 
         }
         if (selectedElement) {
             menuElement.querySelector(".b3-menu__items").scrollTop = oldScroll + (menuElement.querySelector(".b3-chips").clientHeight - oldChipsHeight);
-            // chips 增减导致菜单高度变化后重新定位（锁底部，顶部自适应，避免底部溢出视口）
+            // When chips being added/removed changes the menu height, reposition it (locked to the
+            // bottom, top adapts, to avoid the bottom overflowing the viewport)
             const cellRect = cellElements[cellElements.length - 1].getBoundingClientRect();
             setPosition(menuElement, cellRect.left, cellRect.bottom, cellRect.height, 0, true);
         }
@@ -363,7 +365,8 @@ export const setColOption = (protyle: IProtyle, data: IAV, target: HTMLElement, 
                 }
                 if (selectedElement) {
                     menuElement.querySelector(".b3-menu__items").scrollTop = oldScroll + (menuElement.querySelector(".b3-chips").clientHeight - oldChipsHeight);
-                    // chips 增减导致菜单高度变化后重新定位（锁底部，顶部自适应，避免底部溢出视口）
+                    // When chips being added/removed changes the menu height, reposition it (locked to the
+            // bottom, top adapts, to avoid the bottom overflowing the viewport)
                     const cellRect = cellElements[cellElements.length - 1].getBoundingClientRect();
                     setPosition(menuElement, cellRect.left, cellRect.bottom, cellRect.height, 0, true);
                 }
@@ -456,7 +459,8 @@ export const setColOption = (protyle: IProtyle, data: IAV, target: HTMLElement, 
                         bindSelectEvent(protyle, data, menuElement, cellElements, blockElement);
                     }
                     menuElement.querySelector(".b3-menu__items").scrollTop = oldScroll;
-                    // chips 增减导致菜单高度变化后重新定位（锁底部，顶部自适应，避免底部溢出视口）
+                    // When chips being added/removed changes the menu height, reposition it (locked to the
+            // bottom, top adapts, to avoid the bottom overflowing the viewport)
                     const cellRect = cellElements[cellElements.length - 1].getBoundingClientRect();
                     setPosition(menuElement, cellRect.left, cellRect.bottom, cellRect.height, 0, true);
                     name = inputElement.value;
@@ -659,7 +663,8 @@ export const addColOptionOrCell = (protyle: IProtyle, data: IAV, cellElements: H
         bindSelectEvent(protyle, data, menuElement, cellElements, blockElement);
         menuElement.querySelector("input").focus();
         menuElement.querySelector(".b3-menu__items").scrollTop = oldScroll + (menuElement.querySelector(".b3-chips").clientHeight - oldChipsHeight);
-        // chips 增减导致菜单高度变化后重新定位（锁底部，顶部自适应，避免底部溢出视口）
+        // When chips being added/removed changes the menu height, reposition it (locked to the
+        // bottom, top adapts, to avoid the bottom overflowing the viewport)
         const cellRect = cellElements[cellElements.length - 1].getBoundingClientRect();
         setPosition(menuElement, cellRect.left, cellRect.bottom, cellRect.height, 0, true);
     }
@@ -667,7 +672,8 @@ export const addColOptionOrCell = (protyle: IProtyle, data: IAV, cellElements: H
 
 export const getSelectHTML = (fields: IAVColumn[], cellElements: HTMLElement[], init = false, blockElement: Element) => {
     if (init) {
-        // 快速选中后如果 render 了再使用 genCellValueByElement 获取的元素和当前选中的不一致， https://github.com/siyuan-note/siyuan/issues/11268
+        // After a quick selection, if it renders and genCellValueByElement is used again, the
+        // obtained element would not match what's currently selected, https://github.com/siyuan-note/siyuan/issues/11268
         cellValues = [];
         const isCustomAttr = cellElements[0].classList.contains("custom-attr__avvalue");
         cellElements.forEach(item => {

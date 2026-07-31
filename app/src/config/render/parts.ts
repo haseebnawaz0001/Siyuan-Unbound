@@ -1,6 +1,6 @@
 import type {SettingControl} from "../setting/control";
 
-/** 组合式行：文案与控件部件（引擎统一渲染 / 检索） */
+/** Composite row: text and control parts, rendered and indexed for search by the engine */
 export type RowPart =
     | {
         kind: "title";
@@ -15,26 +15,26 @@ export type RowPart =
 export const isSettingControl = (part: RowPart): part is SettingControl =>
     "readConfig" in part && "readValue" in part;
 
-/** `config-query` 网格内单条开关 */
+/** A single switch inside a `config-query` grid */
 type SwitchQuerySwitchItem = Extract<SettingControl, {kind: "switch"}> & {
     label: string;
     icon?: string;
 };
 
-/** `config-query` 网格内单条数字框 */
+/** A single number box inside a `config-query` grid */
 type SwitchQueryNumberItem = Extract<SettingControl, {kind: "number"}> & {
     label: string;
 };
 
 export type SwitchQueryItem = SwitchQuerySwitchItem | SwitchQueryNumberItem;
 
-/** stack 左列 */
+/** Left column of a stack row */
 export type StackLeft =
     | {kind: "title"; text: string}
     | {kind: "desc"; text: string}
     | Extract<SettingControl, {kind: "textBlock"}>;
 
-/** stack 右列控件 */
+/** Control in the right column of a stack row */
 export type StackRight =
     | {kind: "button"; id: string; label: string; icon: string}
     | Extract<SettingControl, {kind: "switch" | "number" | "select"}>;

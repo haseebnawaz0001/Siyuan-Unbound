@@ -27,8 +27,10 @@ import (
 	"github.com/mattn/go-sqlite3"
 )
 
-// tailIsOnlyWhitespaceOrSQLComments 判断分号之后的片段是否仅由空白、行注释（-- 至换行或 EOF）、
-// 块注释（/* … */，含未闭合则吞至 EOF）构成。与 SQLite 解析对齐：分号后若只有这些内容，不会被视为另一条可执行的 SQL 语句。
+// tailIsOnlyWhitespaceOrSQLComments determines whether the fragment after a semicolon consists solely of
+// whitespace, line comments (-- through the newline or EOF), and block comments (/* ... */, consuming through
+// EOF if unclosed). This matches SQLite's parsing: if only this content follows a semicolon, it isn't treated as
+// another executable SQL statement.
 func tailIsOnlyWhitespaceOrSQLComments(s string) bool {
 	runes := []rune(s)
 	for i := 0; i < len(runes); {
@@ -141,7 +143,8 @@ func containsMultipleStatements(stmt string) bool {
 		case ';' == ch:
 			tail := string(runes[i+1:])
 			if tailIsOnlyWhitespaceOrSQLComments(tail) {
-				// 分号后仅有空白与 SQL 注释时，SQLite 仍视为同一条语句末尾，不应判为多语句。
+				// When only whitespace and SQL comments follow the semicolon, SQLite still treats it as the end
+				// of the same statement, so it shouldn't be judged as multiple statements.
 				continue
 			}
 			return true
@@ -157,22 +160,25 @@ func CheckSingleStatement(stmt string) error {
 	return nil
 }
 
-// CheckReadonlyStatement 对整段 SQL 做 prepare（不执行），用 sqlite3_stmt_readonly 判断首条语句是否只读。
-// 见 https://sqlite.org/c3ref/stmt_readonly.html
+// CheckReadonlyStatement prepares (without executing) the whole SQL string, and uses sqlite3_stmt_readonly to
+// determine whether the first statement is read-only.
+// See https://sqlite.org/c3ref/stmt_readonly.html
 //
-// 注意：若字符串里在语法上还有第二条及以后的语句，本函数只针对「首条」对应的 stmt 做判断，
-// 不会拒绝多语句。与 CheckSingleStatement 组合即可得到「单条 + 只读」策略。
-// 仅允许 SELECT 和 WITH 查询，避免 SQLite 将 ATTACH、DETACH 和事务控制语句标记为只读后放行。
+// Note: if, syntactically, the string still contains a second or later statement, this function only judges the
+// stmt corresponding to the "first" statement -- it does not reject multiple statements. Combine it with
+// CheckSingleStatement to get a "single statement + read-only" policy.
+// Only SELECT and WITH queries are allowed, to avoid SQLite marking ATTACH, DETACH, and transaction-control
+// statements as read-only and letting them through.
 func CheckReadonlyStatement(stmt string) error {
 	return checkReadonlyStatement(stmt, db)
 }
 
-// CheckAssetContentReadonlyStatement 在资源文件内容数据库连接上检查 SQL 是否只读。
+// CheckAssetContentReadonlyStatement checks whether the SQL is read-only on the asset content database connection.
 func CheckAssetContentReadonlyStatement(stmt string) error {
 	return checkReadonlyStatement(stmt, assetContentDB)
 }
 
-// CheckReadonlyStatementInBox 在指定笔记本对应的数据库连接上检查 SQL 是否只读。
+// CheckReadonlyStatementInBox checks whether the SQL is read-only on the database connection for the given notebook.
 func CheckReadonlyStatementInBox(stmt, boxID string) error {
 	targetDB := db
 	if boxDB := GetEncryptedDB(boxID); nil != boxDB {
@@ -222,8 +228,9 @@ func checkReadonlyStatement(stmt string, targetDB *sql.DB) error {
 	})
 }
 
-// isReadonlyQueryStatement 仅允许查询语句进入 SQLite prepare，提前拒绝会被 sqlite3_stmt_readonly
-// 视为只读的 ATTACH、DETACH 和事务控制语句。WITH 中的写操作仍由 sqlite3_stmt_readonly 拒绝。
+// isReadonlyQueryStatement only allows query statements through to SQLite's prepare step, rejecting upfront the
+// ATTACH, DETACH, and transaction-control statements that sqlite3_stmt_readonly would otherwise treat as
+// read-only. A write operation inside WITH is still rejected by sqlite3_stmt_readonly.
 func isReadonlyQueryStatement(stmt string) bool {
 	stmt = strings.TrimSpace(stmt)
 	for "" != stmt {

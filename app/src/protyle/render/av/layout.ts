@@ -257,7 +257,8 @@ export const updateLayout = async (options: {
     });
     const menuElement = document.querySelector(".av__panel").lastElementChild as HTMLElement;
     menuElement.innerHTML = getLayoutHTML(response.data);
-    // 切换布局类型后菜单高度变化（如表格→看板），需重新定位避免底部溢出视窗
+    // The menu height changes after switching layout type (e.g. table -> kanban), so it needs to be
+    // repositioned to avoid the bottom overflowing the viewport
     const tabRect = options.nodeElement.querySelector(".av__views").getBoundingClientRect();
     setPosition(menuElement, tabRect.right - menuElement.clientWidth, tabRect.bottom, tabRect.height, 0, true);
     bindLayoutEvent({

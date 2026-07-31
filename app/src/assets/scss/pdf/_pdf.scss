@@ -32,7 +32,7 @@
 
     .textLayer,
     .pdf__resize {
-      /* dark 蓝色、紫色背景显示不清楚，文档位于 https://github.com/siyuan-note/siyuan/issues/5351 */
+      /* Dark blue/purple backgrounds are hard to see, see https://github.com/siyuan-note/siyuan/issues/5351 */
       mix-blend-mode: multiply;
     }
   }
@@ -97,7 +97,7 @@
 
   .textLayer,
   .pdf__resize {
-    z-index: 2; // pdf 缩放后 canvas 会出现在末尾，导致无法选中和查看标注
+    z-index: 2; // After zooming the PDF, the canvas ends up on top, blocking text selection and annotation viewing
     mix-blend-mode: screen;
   }
 }
@@ -338,7 +338,7 @@
   top: 42px;
   overflow: auto;
   -webkit-overflow-scrolling: touch;
-  // 需高于 pdf 中的链接
+  // Must be higher than links inside the PDF
   z-index: 38;
 
   .b3-menu__items {

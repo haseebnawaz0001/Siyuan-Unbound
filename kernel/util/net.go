@@ -38,9 +38,9 @@ import (
 	"github.com/siyuan-note/logging"
 )
 
-var auditedAddresses sync.Map // 用于记录已审计的 SSRF 地址，避免重复日志输出
+var auditedAddresses sync.Map // Used to record SSRF addresses already audited, avoiding duplicate log output
 
-// GetPrivateIPv4s 获取本地所有的私有 IPv4 地址（排除虚拟网卡）
+// GetPrivateIPv4s gets all local private IPv4 addresses (excluding virtual network interfaces)
 func GetPrivateIPv4s() (ret []string) {
 	ret = []string{}
 
@@ -49,21 +49,21 @@ func GetPrivateIPv4s() (ret []string) {
 		return
 	}
 
-	// 常见的虚拟网卡名称关键字黑名单
+	// Blacklist of common virtual network interface name keywords
 	virtualKeywords := []string{"docker", "veth", "br-", "vmnet", "vbox", "utun", "tun", "tap", "bridge", "cloud", "hyper-"}
 
 	for _, itf := range interfaces {
-		// 1. 基础状态过滤：必须是启动状态且不能是回环网卡
+		// 1. Basic status filter: must be up and must not be a loopback interface
 		if itf.Flags&net.FlagUp == 0 || itf.Flags&net.FlagLoopback != 0 {
 			continue
 		}
 
-		// 2. 硬件地址过滤：物理网卡通常必须有 MAC 地址
+		// 2. Hardware address filter: a physical NIC normally must have a MAC address
 		if len(itf.HardwareAddr) == 0 {
 			continue
 		}
 
-		// 3. 名称过滤：排除已知虚拟网卡前缀
+		// 3. Name filter: exclude known virtual interface name prefixes
 		name := strings.ToLower(itf.Name)
 		isVirtual := false
 		for _, kw := range virtualKeywords {
@@ -76,7 +76,7 @@ func GetPrivateIPv4s() (ret []string) {
 			continue
 		}
 
-		// 4. 提取并校验 IP
+		// 4. Extract and validate the IP
 		addrs, err := itf.Addrs()
 		if err != nil {
 			continue
@@ -89,7 +89,7 @@ func GetPrivateIPv4s() (ret []string) {
 			}
 
 			ip := ipNet.IP
-			// 仅保留 IPv4 且必须是私有局域网地址 (10.x, 172.16.x, 192.168.x)
+			// Only keep IPv4 addresses, and they must be private LAN addresses (10.x, 172.16.x, 192.168.x)
 			if ip.To4() != nil && ip.IsPrivate() {
 				ret = append(ret, ip.String())
 			}
@@ -203,7 +203,7 @@ func isOnline(checkURL string, skipTlsVerify bool, timeout int) (ret bool) {
 
 		var urlErr *url.Error
 		if errors.As(err, &urlErr) && urlErr.URL != checkURL {
-			// DNS 重定向
+			// DNS redirect
 			logging.LogWarnf("network is online [DNS redirect, checkURL=%s, retURL=%s]", checkURL, urlErr.URL)
 			return true
 		}
@@ -292,11 +292,13 @@ func GetRequestStringParam(c *gin.Context, key string, result *gulu.Result) stri
 	return value
 }
 
-// ParseJsonArg 使用泛型从 JSON 参数中提取指定键的值。
-//   - 如果 required 为 true 但参数缺失，则会在 ret.Msg 中说明需要传入的键
-//   - 如果 rejectEmpty 为 true 但参数值为空，则会在 ret.Msg 中说明该键必须不为空（字符串去空白后、空数组、无任何键的对象）
-//   - 如果参数存在但类型不匹配，则会在 ret.Msg 中说明该键期望的类型
-//   - 返回值 ok 为 false 时，表示提取失败、类型不匹配或不满足非空约束
+// ParseJsonArg uses generics to extract the value of the given key from JSON arguments.
+//   - If required is true but the argument is missing, ret.Msg explains which key needs to be supplied
+//   - If rejectEmpty is true but the argument value is empty, ret.Msg explains that the key must not be empty
+//     (a string after trimming whitespace, an empty array, or an object with no keys)
+//   - If the argument exists but its type doesn't match, ret.Msg explains the expected type for the key
+//   - When the returned ok is false, it means extraction failed, the type didn't match, or the non-empty
+//     constraint wasn't satisfied
 func ParseJsonArg[T any](key string, arg map[string]any, ret *gulu.Result, required, rejectEmpty bool) (value T, ok bool) {
 	raw, exists := arg[key]
 	if !exists || raw == nil {
@@ -314,7 +316,7 @@ func ParseJsonArg[T any](key string, arg map[string]any, ret *gulu.Result, requi
 		var zero T
 		ret.Code = -1
 
-		// 返回对应的 JSON 类型
+		// Return the corresponding JSON type
 		jsonType := ""
 		switch any(zero).(type) {
 		case string:
@@ -358,10 +360,10 @@ func ParseJsonArg[T any](key string, arg map[string]any, ret *gulu.Result, requi
 	return
 }
 
-// JsonArgParseFunc 为单次提取函数，用于 ParseJsonArgs 批量提取。
+// JsonArgParseFunc is a single-field extraction function, used by ParseJsonArgs for batch extraction.
 type JsonArgParseFunc func(arg map[string]any, ret *gulu.Result) bool
 
-// BindJsonArg 创建一个提取函数：从 arg 取 key 并写入 dest，供 ParseJsonArgs 使用。
+// BindJsonArg creates an extraction function: it takes key from arg and writes it into dest, for use with ParseJsonArgs.
 func BindJsonArg[T any](key string, dest *T, required, rejectEmpty bool) JsonArgParseFunc {
 	return func(arg map[string]any, ret *gulu.Result) bool {
 		v, ok := ParseJsonArg[T](key, arg, ret, required, rejectEmpty)
@@ -373,9 +375,9 @@ func BindJsonArg[T any](key string, dest *T, required, rejectEmpty bool) JsonArg
 	}
 }
 
-// ParseJsonArgs 按顺序执行多个提取函数。
-//   - 任一失败返回 false 并在 ret 中写入错误信息
-//   - 全部成功返回 true
+// ParseJsonArgs runs multiple extraction functions in order.
+//   - If any fails, returns false and writes the error message into ret
+//   - Returns true if all succeed
 func ParseJsonArgs(arg map[string]any, ret *gulu.Result, extractors ...JsonArgParseFunc) bool {
 	for _, ext := range extractors {
 		if !ext(arg, ret) {

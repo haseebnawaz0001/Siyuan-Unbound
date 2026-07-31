@@ -23,8 +23,8 @@ export class Graph extends Model {
     private panelElement: HTMLElement;
     private element: HTMLElement;
     private network: any;
-    public blockId: string; // "local" / "pin" 必填
-    public rootId: string; // "local" 必填
+    public blockId: string; // Required when type is "local" / "pin"
+    public rootId: string; // Required when type is "local"
     public graphData: {
         nodes: { box: string, id: string, path: string, type: string, color: IObject }[],
         links: Record<string, unknown>[],
@@ -451,7 +451,7 @@ export class Graph extends Model {
             linkWidth: parseFloat((this.panelElement.querySelector("[data-type='linkWidth']") as HTMLInputElement).value),
         };
         if (this.type === "global") {
-            // 全局
+            // Global
             fetchPost("/api/graph/getGraph", {
                 k: this.inputElement.value,
                 conf: {
@@ -468,7 +468,8 @@ export class Graph extends Model {
             });
         } else {
             fetchPost("/api/graph/getLocalGraph", {
-                type: this.type, // 用于如下场景：当打开文档A的关系图、关系图、文档A后刷新，由于防止请求重复处理，文档A关系图无法渲染。
+                type: this.type, // Used for the following scenario: after opening document A's graph, then the graph, then
+                // document A and refreshing, document A's graph fails to render because duplicate request handling is prevented.
                 k: this.inputElement.value,
                 id: id || this.blockId,
                 conf: {
@@ -522,14 +523,14 @@ export class Graph extends Model {
 
     public onGraph(hl: boolean) {
         if (this.graphElement.clientHeight === 0) {
-            // 界面没有渲染时不能进行渲染
+            // Cannot render while the UI itself is not rendered
             return;
         }
         this.network?.destroy();
         if (!this.graphData || !this.graphData.nodes || this.graphData.nodes.length === 0) {
             return;
         }
-        // 使用颜色
+        // Apply colors
         const rootStyle = getComputedStyle(document.body);
         this.graphData.nodes.forEach(item => {
             switch (item.type) {

@@ -3,7 +3,7 @@ import {genUUID} from "../util/genID";
 import {addResize, fixWndFlex1} from "./util";
 import {resizeTabs} from "./tabUtil";
 /// #if MOBILE
-// 检测移动端是否引入了桌面端的代码
+// Detect whether desktop-only code has been pulled into the mobile build
 console.error("Need remove unused code");
 /// #endif
 
@@ -83,7 +83,7 @@ export class Layout {
                         this.children.splice(index, 0, child);
                     }
                     if (this.direction === "lr") {
-                        // 向右分屏，左侧文档抖动，移除动画和边距
+                        // Splitting right shakes the left document; remove the transition and padding
                         item.element.querySelectorAll(".protyle-content").forEach((element: HTMLElement) => {
                             if (!element.parentElement.classList.contains("fn__none")) {
                                 element.classList.remove("protyle-content--transition");

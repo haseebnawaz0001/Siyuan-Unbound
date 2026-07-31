@@ -507,7 +507,7 @@ func (c *Contacts) PutAddressObject(addressPath string, card vcard.Card, opts *c
 		return
 	}
 
-	// TODO: 处理 opts.IfNoneMatch (If-None-Match) 与 opts.IfMatch (If-Match)
+	// TODO: handle opts.IfNoneMatch (If-None-Match) and opts.IfMatch (If-Match)
 
 	var address *AddressObject
 	if value, ok := addressBook.Addresses.Load(addressID); ok {

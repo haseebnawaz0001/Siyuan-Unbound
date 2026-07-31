@@ -16,7 +16,7 @@
 
 package util
 
-// StatusBar 底部状态栏配置。https://github.com/siyuan-note/siyuan/issues/16236
+// StatusBar is the bottom status bar configuration. https://github.com/siyuan-note/siyuan/issues/16236
 type StatusBar struct {
 	MsgTaskDatabaseIndexCommitDisabled        bool `json:"msgTaskDatabaseIndexCommitDisabled"`
 	MsgTaskHistoryDatabaseIndexCommitDisabled bool `json:"msgTaskHistoryDatabaseIndexCommitDisabled"`
@@ -26,16 +26,16 @@ type StatusBar struct {
 
 var StatusBarCfg *StatusBar
 
-// Notifications 外观通知开关配置。https://github.com/siyuan-note/siyuan/issues/17797
-// Appearance.Notifications 为 nil 时表示旧配置尚未迁移，整体按默认启用处理。
+// Notifications is the appearance notification toggle configuration. https://github.com/siyuan-note/siyuan/issues/17797
+// When Appearance.Notifications is nil, it means the legacy config hasn't been migrated yet, and everything is treated as enabled by default.
 type Notifications struct {
-	DocTreeMaxList       bool `json:"docTreeMaxList"`       // 文档面板展开上限提示，默认启用
-	TagMaxList           bool `json:"tagMaxList"`           // 标签面板展开上限提示，默认启用
-	WorkspaceNotSSD      bool `json:"workspaceNotSSD"`      // 工作空间未放置在固态硬盘警告，默认启用
-	BrowserCompatibility bool `json:"browserCompatibility"` // 浏览器兼容性提示，默认启用
+	DocTreeMaxList       bool `json:"docTreeMaxList"`       // Doc tree panel expansion limit notice, enabled by default
+	TagMaxList           bool `json:"tagMaxList"`           // Tag panel expansion limit notice, enabled by default
+	WorkspaceNotSSD      bool `json:"workspaceNotSSD"`      // Warning that the workspace isn't on an SSD, enabled by default
+	BrowserCompatibility bool `json:"browserCompatibility"` // Browser compatibility notice, enabled by default
 }
 
-// NewNotifications 创建默认全部启用的通知配置。新增内置通知时在此统一调整默认值，避免多处分散。
+// NewNotifications creates a notification configuration with everything enabled by default. Adjust the defaults here in one place when adding a new built-in notification, to avoid scattering changes across multiple locations.
 func NewNotifications() *Notifications {
 	return &Notifications{
 		DocTreeMaxList:       true,

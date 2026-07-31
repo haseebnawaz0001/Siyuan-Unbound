@@ -18,29 +18,30 @@ package conf
 
 import "github.com/siyuan-note/siyuan/kernel/util"
 
-// BoxConf 维护 .siyuan/conf.json 笔记本配置。
+// BoxConf maintains the notebook configuration in .siyuan/conf.json.
 type BoxConf struct {
-	Name                  string         `json:"name"`                  // 笔记本名称
-	Sort                  int            `json:"sort"`                  // 排序字段
-	Icon                  string         `json:"icon"`                  // 图标
-	Closed                bool           `json:"closed"`                // 是否处于关闭状态
-	RefCreateSaveBox      string         `json:"refCreateSaveBox"`      // 块引时新建文档存储笔记本
-	RefCreateSavePath     string         `json:"refCreateSavePath"`     // 块引时新建文档存储路径
-	DocCreateSaveBox      string         `json:"docCreateSaveBox"`      // 新建文档存储笔记本
-	DocCreateSavePath     string         `json:"docCreateSavePath"`     // 新建文档存储路径
-	DailyNoteSavePath     string         `json:"dailyNoteSavePath"`     // 新建日记存储路径
-	DailyNoteTemplatePath string         `json:"dailyNoteTemplatePath"` // 新建日记使用的模板路径
-	SortMode              int            `json:"sortMode"`              // 排序方式
-	Encrypted             bool           `json:"encrypted"`             // 是否为加密笔记本
-	BoxCrypt              *BoxEncryption `json:"boxCrypt"`              // 笔记本加密参数，仅 Encrypted=true 时有值
+	Name                  string         `json:"name"`                  // Notebook name
+	Sort                  int            `json:"sort"`                  // Sort field
+	Icon                  string         `json:"icon"`                  // Icon
+	Closed                bool           `json:"closed"`                // Whether it's closed
+	RefCreateSaveBox      string         `json:"refCreateSaveBox"`      // Notebook to store new documents created via block ref
+	RefCreateSavePath     string         `json:"refCreateSavePath"`     // Path to store new documents created via block ref
+	DocCreateSaveBox      string         `json:"docCreateSaveBox"`      // Notebook to store new documents
+	DocCreateSavePath     string         `json:"docCreateSavePath"`     // Path to store new documents
+	DailyNoteSavePath     string         `json:"dailyNoteSavePath"`     // Path to store new daily notes
+	DailyNoteTemplatePath string         `json:"dailyNoteTemplatePath"` // Template path used for new daily notes
+	SortMode              int            `json:"sortMode"`              // Sort mode
+	Encrypted             bool           `json:"encrypted"`             // Whether this is an encrypted notebook
+	BoxCrypt              *BoxEncryption `json:"boxCrypt"`              // Notebook encryption parameters, only set when Encrypted=true
 }
 
-// BoxEncryption 维护单个加密笔记本的密钥包络参数。WrappedDEK 是用全局 KEK 加密后的 DEK，本身可落盘。
+// BoxEncryption maintains the key envelope parameters for a single encrypted notebook. WrappedDEK is the DEK
+// encrypted with the global KEK, and can itself be persisted.
 type BoxEncryption struct {
-	Spec       int    `json:"spec,omitempty"` // 包络规范版本，1 表示 WrappedDEK 已绑定 boxID AAD
-	WrappedDEK []byte `json:"wrappedDEK"`     // 用 KEK 经 AES-GCM 加密后的 DEK
-	WrapNonce  []byte `json:"wrapNonce"`      // 包络用的 GCM nonce（从加密信封中提取）
-	CreatedAt  int64  `json:"createdAt"`      // 创建时间，单位毫秒，便于未来按时间轮换密钥
+	Spec       int    `json:"spec,omitempty"` // Envelope spec version; 1 means WrappedDEK is bound to the boxID AAD
+	WrappedDEK []byte `json:"wrappedDEK"`     // The DEK encrypted with the KEK via AES-GCM
+	WrapNonce  []byte `json:"wrapNonce"`      // The GCM nonce used for the envelope (extracted from the encryption envelope)
+	CreatedAt  int64  `json:"createdAt"`      // Creation time, in milliseconds, to facilitate future time-based key rotation
 }
 
 func NewBoxConf() *BoxConf {

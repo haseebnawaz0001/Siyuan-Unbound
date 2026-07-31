@@ -141,7 +141,7 @@ func QueryRootChildrenRefCount(defRootID string) (ret map[string]int) {
 func QueryRootBlockRefCount() (ret map[string]int) {
 	ret = map[string]int{}
 
-	// 全局 refs
+	// Global refs
 	rows, err := query("SELECT def_block_root_id, COUNT(DISTINCT block_id) AS ref_cnt FROM refs GROUP BY def_block_root_id")
 	if err != nil {
 		logging.LogErrorf("sql query failed: %s", err)
@@ -158,7 +158,7 @@ func QueryRootBlockRefCount() (ret map[string]int) {
 		ret[id] = cnt
 	}
 
-	// 加密笔记本的 refs
+	// Refs from encrypted notebooks
 	for _, encBoxID := range GetEncryptedBoxIDs() {
 		encRows, encErr := queryForBox(encBoxID, "SELECT def_block_root_id, COUNT(DISTINCT block_id) AS ref_cnt FROM refs GROUP BY def_block_root_id")
 		if encErr != nil {
@@ -311,8 +311,10 @@ func queryDefIDsByNameAliasAndDocTitle(keyword string) (ret []string) {
 		docCond = "content LIKE ? ESCAPE '\\'"
 		exactArg = escaped
 	}
-	// 命名精确匹配；别名按逗号整段匹配（','||alias||',' LIKE '%,kw,%'）；文档标题单独 LIMIT 32
-	// 大小写均跟随 caseSensitive / case_sensitive_like 配置；LIKE 参数转义 %/_/\ 以免通配符改变语义
+	// Exact match on name; alias matched as a whole comma-delimited segment (','||alias||',' LIKE '%,kw,%');
+	// document titles get their own LIMIT 32.
+	// Case sensitivity follows the caseSensitive / case_sensitive_like config in both cases; LIKE arguments escape
+	// %/_/\ so wildcards don't change the intended meaning.
 	q := "SELECT id FROM blocks WHERE " + nameCond + " OR (',' || alias || ',') LIKE ? ESCAPE '\\'" +
 		" UNION ALL SELECT id FROM (" +
 		"SELECT id FROM blocks WHERE type = 'd' AND " + docCond + " LIMIT ?" +
