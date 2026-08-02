@@ -39,17 +39,6 @@ var (
 	rhyBazaarHashLock sync.RWMutex
 )
 
-func RefreshRhyResultJob() {
-	_, err := GetRhyResult(context.TODO(), true)
-	if nil != err {
-		// The network connection may not be up yet right after the system wakes, so wait here before retrying
-		go func() {
-			time.Sleep(7 * time.Second)
-			GetRhyResult(context.TODO(), true)
-		}()
-	}
-}
-
 func GetRhyResult(ctx context.Context, force bool) (map[string]any, error) {
 	if ContainerDocker == Container {
 		RhyCacheDuration = int64(3600 * 24)

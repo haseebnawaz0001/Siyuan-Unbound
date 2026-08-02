@@ -911,21 +911,14 @@ var exitLock = sync.Mutex{}
 //
 // setCurrentWorkspace: whether to move the current workspace to the end of the workspace list
 //
-// execInstallPkg: whether to return the new version's install package
-//
-//	0: check per the System.DownloadInstallPkg setting and push a prompt by default
-//	1: never return the new version's install package
-//	2: return the new version's install package path and exit, letting the desktop host run the install
+// execInstallPkg and installPkgPath are vestigial. This fork has no update checker, so no install package is ever
+// downloaded and installPkgPath is always empty; exitCode is therefore never 2. Both are kept so the exit API the
+// desktop host calls does not change shape.
 //
 // Return value exitCode:
 //
 //	0: exited normally
 //	1: sync failed
-//	2: a new install package is available
-//
-// When force is true (forced exit), execInstallPkg is 0 (the default update check), and a new version's install
-// package is already ready, the install package path is returned to the desktop host
-// https://github.com/siyuan-note/siyuan/issues/10288
 func Close(force, setCurrentWorkspace bool, execInstallPkg int) (exitCode int, installPkgPath string) {
 	exitLock.Lock()
 	defer exitLock.Unlock()
@@ -947,9 +940,6 @@ func Close(force, setCurrentWorkspace bool, execInstallPkg int) (exitCode int, i
 			syncData(true, false)
 			if 0 != ExitSyncSucc {
 				exitCode = 1
-				if 1 != execInstallPkg && !skipNewVerInstallPkg() {
-					installPkgPath = getNewVerInstallPkgPath()
-				}
 				return
 			}
 		}
@@ -962,18 +952,6 @@ func Close(force, setCurrentWorkspace bool, execInstallPkg int) (exitCode int, i
 	sql.FlushQueue()
 
 	util.IsExiting.Store(true)
-	newVerInstallPkgPath := getNewVerInstallPkgPath()
-	if !skipNewVerInstallPkg() && "" != newVerInstallPkgPath {
-		if 2 == execInstallPkg || (force && 0 == execInstallPkg) { // hand the new version's install package off to the desktop host to run
-			installPkgPath = newVerInstallPkgPath
-			logging.LogInfof("the new version install pkg is ready for the desktop host [%s]", newVerInstallPkgPath)
-		} else if 0 == execInstallPkg { // the new version's install package is already ready
-			installPkgPath = newVerInstallPkgPath
-			exitCode = 2
-			logging.LogInfof("the new version install pkg is ready [%s], waiting for the user's next instruction", newVerInstallPkgPath)
-			return
-		}
-	}
 
 	Conf.Close()
 	// Before exiting, close any open encrypted notebooks and push closeBox so the frontend closes the corresponding
@@ -990,7 +968,7 @@ func Close(force, setCurrentWorkspace bool, execInstallPkg int) (exitCode int, i
 	sql.CloseDatabase()
 	closePushQueue()
 	util.SaveAssetsTexts()
-	clearWorkspaceTemp("" != installPkgPath)
+	clearWorkspaceTemp()
 	clearCorruptedNotebooks()
 	clearPortJSON()
 
@@ -1377,7 +1355,7 @@ func clearCorruptedNotebooks() {
 	}
 }
 
-func clearWorkspaceTemp(preserveInstallPkgs bool) {
+func clearWorkspaceTemp() {
 	os.RemoveAll(filepath.Join(util.TempDir, "bazaar"))
 	os.RemoveAll(filepath.Join(util.TempDir, "export"))
 	os.RemoveAll(filepath.Join(util.TempDir, "import"))
@@ -1387,9 +1365,10 @@ func clearWorkspaceTemp(preserveInstallPkgs bool) {
 	os.RemoveAll(filepath.Join(util.TempDir, "base64"))
 	os.RemoveAll(filepath.Join(util.TempDir, "ai"))
 
-	// Automatically delete install packages older than 7 days on exit https://github.com/siyuan-note/siyuan/issues/6128
+	// Prune install packages older than 7 days. Nothing downloads them any more -- the update checker is gone -- but
+	// an install carried over from upstream can still have leftovers here https://github.com/siyuan-note/siyuan/issues/6128
 	install := filepath.Join(util.TempDir, "install")
-	if !preserveInstallPkgs && gulu.File.IsDir(install) {
+	if gulu.File.IsDir(install) {
 		monthAgo := time.Now().Add(-time.Hour * 24 * 7)
 		entries, err := os.ReadDir(install)
 		if err != nil {

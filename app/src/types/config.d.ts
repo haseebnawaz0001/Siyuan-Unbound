@@ -1787,10 +1787,6 @@ declare namespace Config {
          */
         dataDir: string;
         /**
-         * Whether to automatically download the installation package for the new version
-         */
-        downloadInstallPkg: boolean;
-        /**
          * The absolute path of the user's home directory for the current operating system user
          */
         homeDir: string;

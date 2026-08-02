@@ -151,13 +151,13 @@ func TestClearWorkspaceTempRemovesImageOperations(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	clearWorkspaceTemp(false)
+	clearWorkspaceTemp()
 	if _, err := os.Stat(operationDir); !os.IsNotExist(err) {
 		t.Fatalf("image operation directory was not removed: %v", err)
 	}
 }
 
-func TestClearWorkspaceTempPreservesInstallPackages(t *testing.T) {
+func TestClearWorkspaceTempPrunesStaleInstallPackages(t *testing.T) {
 	originalDataDir, originalTempDir, originalWorkspaceDir := util.DataDir, util.TempDir, util.WorkspaceDir
 	t.Cleanup(func() {
 		util.DataDir, util.TempDir, util.WorkspaceDir = originalDataDir, originalTempDir, originalWorkspaceDir
@@ -178,13 +178,11 @@ func TestClearWorkspaceTempPreservesInstallPackages(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	clearWorkspaceTemp(true)
-	if _, err := os.Stat(installPkgPath); err != nil {
-		t.Fatalf("install package should be preserved during update: %v", err)
-	}
-	clearWorkspaceTemp(false)
+	// Nothing downloads install packages any more, but an install carried over from upstream can have leftovers,
+	// so exit still prunes the stale ones. The old "preserve during an update" case is gone with the updater.
+	clearWorkspaceTemp()
 	if _, err := os.Stat(installPkgPath); !os.IsNotExist(err) {
-		t.Fatalf("old install package should be removed during normal exit: %v", err)
+		t.Fatalf("stale install package should be removed on exit: %v", err)
 	}
 }
 

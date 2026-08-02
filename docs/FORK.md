@@ -10,13 +10,17 @@ Licence is unchanged: AGPL-3.0, as upstream. Running a modified copy for yoursel
 
 ## 1. Telemetry removed
 
-**Upstream:** derives a device identifier from the host hardware via `denisbrodbeck/machineid`, pulls an announcement feed from the cloud on startup, and reports through several paths in `kernel/model/cloud_service.go`.
+**Upstream:** derives a device identifier from the host hardware via `denisbrodbeck/machineid`, pulls an announcement feed from the cloud on startup, reports through several paths in `kernel/model/cloud_service.go`, and checks for new versions — on a six-hourly timer, ten seconds after the user guide opens, and from a button in Settings. On Windows and macOS it downloads the installer unprompted, since that setting defaults to on.
 
-**This fork:** `util.GetDeviceID()` returns a random string generated once per installation. The hardware fingerprint dependency is gone from `kernel/go.mod`. The automatic announcement pull in `kernel/model/updater.go` and the reporting paths in `cloud_service.go` were deleted.
+**This fork:** `util.GetDeviceID()` returns a random string generated once per installation, and the hardware fingerprint dependency is gone from `kernel/go.mod`. The announcement pull and the `cloud_service.go` reporting paths were deleted. The whole update checker went with them — `kernel/model/updater.go`, both six-hourly cron entries, the user-guide trigger, `/api/system/checkUpdate`, `/api/system/setDownloadInstallPkg` and the `downloadInstallPkg` setting. There is no release channel here; you get a new version by pulling and rebuilding, which is what `docs/BUILD.md` describes.
 
-**What was deliberately kept:** the `rhy` endpoint. It looks like a telemetry endpoint and partly is, but `kernel/model/bazaar.go` depends on it to resolve the marketplace index. Removing it breaks browsing and installing plugins, themes, icons and templates. The trade was judged the wrong way round, so it stayed.
+**What was kept, and what that costs:** the `rhy` endpoint — `GET <cloud>/apis/siyuan/version?ver=<version>` — survives because the marketplace resolves its index through it (`kernel/bazaar/stage.go` → `util.GetRhyBazaarHash` → `util.GetRhyResult`). Removing it would break browsing and installing plugins, themes, icons and templates.
 
-Commit `91af2265e`.
+It is now reached **only on demand.** `GetRhyBazaarHash` fetches lazily when its cache is empty, and with the cron warmer gone it is the sole path to the endpoint — verifiably so: `GetRhyResult` has exactly one caller in the whole kernel, inside `GetRhyBazaarHash`, which in turn is called only from `kernel/bazaar/stage.go`. Nothing on boot, nothing on a timer, nothing when the user guide opens. The endpoint is contacted the first time you open the marketplace in a session, and not otherwise.
+
+Two things still contact SiYuan's servers, but only once you have asked them to: sync, if you have configured the official cloud provider, and the account refresh, which runs two-hourly but returns immediately unless you are signed in. Sync to your own storage and an unauthenticated install trigger neither.
+
+Commits `91af2265e`, and the update-checker removal that followed.
 
 ## 2. English is the primary language
 

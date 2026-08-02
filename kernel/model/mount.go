@@ -354,12 +354,6 @@ func Mount(boxID string) (alreadyMount bool, err error) {
 		}
 
 		task.AppendAsyncTaskWithDelay(task.PushMsg, 3*time.Second, util.PushErrMsg, Conf.Language(244), 7000)
-		go func() {
-			// Automatically check for a version update and notify the user every time the user guide is
-			// opened https://github.com/siyuan-note/siyuan/issues/5057
-			time.Sleep(time.Second * 10)
-			CheckUpdate(true)
-		}()
 	}
 
 	if !gulu.File.IsDir(localPath) {

@@ -20,10 +20,6 @@ package util
 // defaults to North America; InitConf overwrites it with the value persisted in conf.json.
 var CurrentCloudRegion = 1
 
-func IsChinaCloud() bool {
-	return 0 == CurrentCloudRegion
-}
-
 func GetCloudServer() string {
 	if 0 == CurrentCloudRegion {
 		return chinaServer

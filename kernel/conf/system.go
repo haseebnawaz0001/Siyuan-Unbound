@@ -40,9 +40,8 @@ type System struct {
 	NetworkServeTLS bool          `json:"networkServeTLS"` // Whether HTTPS network serving is enabled
 	NetworkProxy    *NetworkProxy `json:"networkProxy"`
 
-	DownloadInstallPkg bool `json:"downloadInstallPkg"`
-	AutoLaunch2        int  `json:"autoLaunch2"`    // 0: do not auto-launch, 1: auto-launch, 2: auto-launch + hide main window
-	LockScreenMode     int  `json:"lockScreenMode"` // 0: manual, 1: manual + follow system https://github.com/siyuan-note/siyuan/issues/9087
+	AutoLaunch2    int `json:"autoLaunch2"`    // 0: do not auto-launch, 1: auto-launch, 2: auto-launch + hide main window
+	LockScreenMode int `json:"lockScreenMode"` // 0: manual, 1: manual + follow system https://github.com/siyuan-note/siyuan/issues/9087
 
 	DisabledFeatures []string `json:"disabledFeatures"`
 
@@ -67,11 +66,10 @@ type Onboarding struct {
 
 func NewSystem() *System {
 	return &System{
-		ID:                 util.GetDeviceID(),
-		Name:               util.GetDeviceName(),
-		KernelVersion:      util.Ver,
-		NetworkProxy:       &NetworkProxy{},
-		DownloadInstallPkg: true,
+		ID:            util.GetDeviceID(),
+		Name:          util.GetDeviceName(),
+		KernelVersion: util.Ver,
+		NetworkProxy:  &NetworkProxy{},
 	}
 }
 

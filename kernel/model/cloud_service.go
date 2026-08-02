@@ -160,10 +160,6 @@ func RefreshCheckJob2H() {
 	go refreshUser()
 }
 
-func RefreshCheckJob6H() {
-	go refreshCheckDownloadInstallPkg()
-}
-
 func refreshSubscriptionExpirationRemind() {
 	if subscriptionExpirationReminded {
 		return
@@ -208,13 +204,6 @@ func refreshUser() {
 		}
 		subscriptionExpirationReminded = false
 	}
-}
-
-func refreshCheckDownloadInstallPkg() {
-	defer logging.Recover()
-
-	time.Sleep(3 * time.Minute)
-	checkDownloadInstallPkg()
 }
 
 func RefreshUser(token string) {
