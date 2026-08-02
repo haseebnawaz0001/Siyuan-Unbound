@@ -131,9 +131,11 @@ Four webpack configs each emit a separate bundle to `app/stage/build/{app,deskto
    - Domains: `ld246.com` only in `zh-CN.json`; use `liuyun.io` in all other languages
    - After modifying i18n files, run `python scripts/check-lang-keys.py` to verify key completeness across all language files
 2. **Windows scripting:** Prefer Node.js / Python; avoid PowerShell unless necessary
-3. **Frontend verification:** Do not use `npx webpack` or `pnpm dev` to verify changes; after changes, run `cd app && pnpm run lint` to check code style
-4. **Frontend build:** Do NOT run `pnpm build` — the developer runs `pnpm dev` manually, and `pnpm build` will conflict with it, producing broken bundles
-5. **Kernel development:** After modifying Go code, do not compile the kernel binary or restart a running kernel; the developer handles both manually
+3. **Frontend verification:** Never verify a change by building. `cd app && pnpm run lint` (typecheck + eslint) is the verification step; `npx webpack` and `pnpm dev` are not
+4. **Building is on request only.** Do not build to check your work, to "make sure it compiles", or as a final step nobody asked for — that is what rule 3 and `go vet` are for. When the user **explicitly asks for a build**, build it: `pnpm run build` for the frontend, `go build -tags "fts5 sqlcipher"` for the kernel. Two preconditions, every time:
+   - **Check nothing is already running first** (`ps aux | grep -iE "webpack|pnpm|electron|SiYuan-Kernel"`). A concurrent `pnpm dev` is the reason this rule exists: `pnpm build` writes the same output tree and will corrupt it. If something is running, say so and stop rather than racing it
+   - **Never restart a kernel the developer is running.** Building the binary is fine; killing their process is not
+5. **Kernel build specifics:** CGO is required (`CGO_ENABLED=1`). If the machine has no system C compiler, `zig cc` works — this repo has been built that way
 6. **Sync engine verification:** `third_party/dejavu` is a separate Go module, so verifying it from `kernel/` proves nothing. Run `gofmt -l .`, `go vet ./...` and `go test -count=1 ./...` **from inside `third_party/dejavu`**. Its `test/sync` package is a data-driven two-client sync simulation and is the best regression signal in the repo — keep it green
 7. **Icons:** Do not hand-write SVG; use existing icons from `app/appearance/icons/litheness/icon.js` when possible
 8. **User guide:** When editing the user guide, follow `docs/SY-FORMAT.md`
