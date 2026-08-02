@@ -17,6 +17,7 @@
 package tools
 
 import (
+	"github.com/siyuan-note/siyuan/kernel/model"
 	"github.com/siyuan-note/siyuan/kernel/util"
 )
 
@@ -37,10 +38,29 @@ func init() {
 	register(WebSearchTool)
 }
 
+// WebSearchEnabled reports whether the user has opted in to web search. It is off by default because the query is
+// sent to Exa, a third party, rather than to the user's own model provider.
+func WebSearchEnabled() bool {
+	return nil != model.Conf && nil != model.Conf.AI && nil != model.Conf.AI.WebSearch && model.Conf.AI.WebSearch.Enabled
+}
+
 func webSearchHandler(args map[string]any) (CallToolResult, error) {
+	if !WebSearchEnabled() {
+		// GetAllTools already withholds this tool when it is disabled, so a model never sees it. This guards the
+		// direct-lookup path a caller could still reach, and says why rather than reporting an unknown tool.
+		return CallToolResult{
+			Content: []ContentItem{{Type: "text", Text: "web_search is disabled; enable it in Settings - AI - Web search"}},
+			IsError: true,
+		}, nil
+	}
+
 	query, _ := args["query"].(string)
 
-	result, err := util.WebSearch(query, "")
+	exaAPIKey := ""
+	if nil != model.Conf && nil != model.Conf.AI && nil != model.Conf.AI.WebSearch {
+		exaAPIKey = model.Conf.AI.WebSearch.ExaAPIKey
+	}
+	result, err := util.WebSearch(query, exaAPIKey)
 	if err != nil {
 		return CallToolResult{
 			Content: []ContentItem{{Type: "text", Text: "web_search error: " + err.Error()}},

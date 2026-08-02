@@ -1,4 +1,8 @@
 {
+	"configGroupWebSearch": "Web search",
+	"webSearchEnabled": "Enable web search",
+	"webSearchEnabledTip": "Allows the AI agent to search the web. Queries are sent to Exa, a third-party service, not to your configured AI provider. Off by default. Providing an API key is optional; without one, requests are anonymous.",
+	"agentEffectWebRequest": "A web request will be sent to a third-party service",
 	"rebuildHistoryIndex": "Rebuild history index",
 	"rebuildAssetContentIndex": "Rebuild asset content index",
 	"newItemWithTemplate": "Create item with template",

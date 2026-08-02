@@ -1126,8 +1126,15 @@ var safeActions = map[string]bool{
 	"md": true, "query": true,
 }
 
+// safeWholeTools lists tools whose every action is safe to run unprompted.
+//
+// web_fetch is deliberately absent: it declares DataEgress instead, which needsConfirm checks before consulting this
+// map, so each call is confirmed with its URL shown. web_search stays here because its control is the opt-in setting
+// rather than a per-call prompt -- it is withheld from the tool list entirely until the user enables it, and enabling
+// it is the consent. Removing an entry from this map without declaring ActionEffects on the tool would also make
+// needsLocalSnapshot fall through to its default branch and snapshot the repository on every call.
 var safeWholeTools = map[string]bool{
-	"question": true, "todo_write": true, "web_fetch": true, "web_search": true,
+	"question": true, "todo_write": true, "web_search": true,
 	"search": true, "sql": true,
 }
 

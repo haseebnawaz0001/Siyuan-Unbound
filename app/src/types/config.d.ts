@@ -135,6 +135,7 @@ declare namespace Config {
         mcp: IMCP;
         embedding: IEmbedding;
         rerank: IRerank;
+        webSearch: IWebSearch;
     }
 
     /**
@@ -188,6 +189,14 @@ declare namespace Config {
         name: string;
         timeout: number;
         dimensions: number;
+    }
+
+    /**
+     * Web search configuration (agent web_search tool)
+     */
+    export interface IWebSearch {
+        enabled: boolean;
+        exaApiKey: string;
     }
 
     /**

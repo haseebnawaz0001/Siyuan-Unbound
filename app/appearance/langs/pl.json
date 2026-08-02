@@ -1,4 +1,8 @@
 {
+	"configGroupWebSearch": "Wyszukiwanie internetowe",
+	"webSearchEnabled": "Włącz wyszukiwanie internetowe",
+	"webSearchEnabledTip": "Umożliwia agentowi AI wyszukiwanie w internecie. Zapytania są wysyłane do Exa, usługi firmy trzeciej, a nie do skonfigurowanego dostawcy API. Domyślnie wyłączone. Podanie klucza API jest opcjonalne; bez niego żądania są anonimowe.",
+	"agentEffectWebRequest": "Żądanie sieciowe zostanie wysłane do usługi firmy trzeciej",
 	"rebuildHistoryIndex": "Odbuduj indeks historii",
 	"rebuildAssetContentIndex": "Odbuduj indeks zawartości zasobów",
 	"newItemWithTemplate": "Utwórz element z szablonu",

@@ -1,4 +1,8 @@
 {
+	"configGroupWebSearch": "Web araması",
+	"webSearchEnabled": "Web aramasını etkinleştir",
+	"webSearchEnabledTip": "Yapay zekâ ajanının internette arama yapmasına olanak tanır. Sorgular, yapılandırılmış API sağlayıcısına değil, üçüncü taraf hizmeti olan Exa'ya gönderilir. Varsayılan olarak kapalıdır. API anahtarı sağlamak isteğe bağlıdır; sağlanmazsa istekler anonim olarak gönderilir.",
+	"agentEffectWebRequest": "Üçüncü taraf bir hizmete web isteği gönderilecek",
 	"rebuildHistoryIndex": "Geçmiş indeksini yeniden oluştur",
 	"rebuildAssetContentIndex": "Varlık içeriği indeksini yeniden oluştur",
 	"newItemWithTemplate": "Şablonla öge oluştur",

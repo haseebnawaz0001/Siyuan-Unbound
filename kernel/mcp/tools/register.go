@@ -58,17 +58,35 @@ func LookupTool(name string) *Tool {
 	return nil
 }
 
+// GetAllTools returns the tools currently on offer. Tools the user has opted out of are withheld here rather than at
+// each call site, so both the agent's tool list and the tools advertised to external MCP clients are filtered by the
+// one check; a withheld tool is never described to any model.
 func GetAllTools() []*Tool {
 	registryMu.RLock()
 	defer registryMu.RUnlock()
 	result := make([]*Tool, 0, len(Registry))
 	for _, t := range Registry {
+		if !toolOffered(t) {
+			continue
+		}
 		result = append(result, t)
 	}
 	sort.Slice(result, func(i, j int) bool {
 		return result[i].Name < result[j].Name
 	})
 	return result
+}
+
+// toolOffered reports whether a registered tool should be advertised. GetTool stays unfiltered so a direct lookup
+// still resolves and the handler can explain itself instead of the caller seeing an unknown tool.
+func toolOffered(t *Tool) bool {
+	if nil == t {
+		return false
+	}
+	if "web_search" == t.Name {
+		return WebSearchEnabled()
+	}
+	return true
 }
 
 func SetTool(name string, t *Tool) {

@@ -1,4 +1,8 @@
 {
+	"configGroupWebSearch": "Websuche",
+	"webSearchEnabled": "Websuche aktivieren",
+	"webSearchEnabledTip": "Ermöglicht dem KI-Agenten, im Web zu suchen. Anfragen werden an Exa gesendet, einen Drittanbieterdienst, nicht an den konfigurierten API-Anbieter. Standardmäßig deaktiviert. Die Angabe eines API-Schlüssels ist optional; ohne ihn sind die Anfragen anonym.",
+	"agentEffectWebRequest": "Eine Webanfrage wird an einen Drittanbieterdienst gesendet",
 	"rebuildHistoryIndex": "Verlaufsindex neu aufbauen",
 	"rebuildAssetContentIndex": "Index für Asset-Inhalte neu aufbauen",
 	"newItemWithTemplate": "Eintrag mit Vorlage erstellen",

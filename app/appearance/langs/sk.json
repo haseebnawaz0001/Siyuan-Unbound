@@ -1,4 +1,8 @@
 {
+	"configGroupWebSearch": "Webové vyhľadávanie",
+	"webSearchEnabled": "Povoliť webové vyhľadávanie",
+	"webSearchEnabledTip": "Umožňuje AI agentovi vyhľadávať na webe. Dopyty sa odosielajú službe tretej strany Exa, nie nakonfigurovanému poskytovateľovi API. V predvolenom nastavení vypnuté. Zadanie API kľúča je voliteľné; bez neho sú požiadavky anonymné.",
+	"agentEffectWebRequest": "Webová požiadavka bude odoslaná službe tretej strany",
 	"rebuildHistoryIndex": "Znovu vytvoriť index histórie",
 	"rebuildAssetContentIndex": "Znovu vytvoriť index obsahu zdrojov",
 	"newItemWithTemplate": "Vytvoriť položku zo šablóny",

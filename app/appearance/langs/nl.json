@@ -1,4 +1,8 @@
 {
+	"configGroupWebSearch": "Web zoeken",
+	"webSearchEnabled": "Web zoeken inschakelen",
+	"webSearchEnabledTip": "Hiermee kan de AI-agent op het web zoeken. Zoekopdrachten worden naar Exa gestuurd, een dienst van derden, niet naar de door u geconfigureerde API-provider. Standaard uitgeschakeld. Het opgeven van een API-sleutel is optioneel; zonder sleutel zijn de verzoeken anoniem.",
+	"agentEffectWebRequest": "Er wordt een webverzoek naar een dienst van derden verzonden",
 	"rebuildHistoryIndex": "Geschiedenisindex herbouwen",
 	"rebuildAssetContentIndex": "Index voor assetinhoud herbouwen",
 	"newItemWithTemplate": "Item maken met sjabloon",

@@ -8,7 +8,10 @@
 
 package conf
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestNewAIAddsKeylessProviderFromEnvironment(t *testing.T) {
 	t.Setenv("SIYUAN_OPENAI_API_KEY", "")
@@ -83,5 +86,51 @@ func TestAssignDefaultModelIDsUsesKeylessProvider(t *testing.T) {
 	assignDefaultModelIDs(ai)
 	if ai.Agent.ModelID != model.ID || ai.Editing.ModelID != model.ID {
 		t.Fatalf("unexpected default model IDs: agent=%q editing=%q", ai.Agent.ModelID, ai.Editing.ModelID)
+	}
+}
+
+// TestEncryptAPIKeysCoversEveryStoredSecret guards the failure mode where a new secret field is added to the config
+// but not to EncryptAPIKeys/DecryptAPIKeys, which enumerate their fields by hand -- the key then lands in conf.json
+// as plaintext and nothing complains. Every secret the AI config holds must round-trip.
+func TestEncryptAPIKeysCoversEveryStoredSecret(t *testing.T) {
+	ai := NewAI()
+	ai.Providers = []*Provider{{APIKey: "provider-secret"}}
+	ai.Embedding = &Embedding{APIKey: "embedding-secret"}
+	ai.Rerank = &Rerank{APIKey: "rerank-secret"}
+	ai.WebSearch = &WebSearch{ExaAPIKey: "exa-secret"}
+
+	ai.EncryptAPIKeys()
+	for name, got := range map[string]string{
+		"provider":  ai.Providers[0].APIKey,
+		"embedding": ai.Embedding.APIKey,
+		"rerank":    ai.Rerank.APIKey,
+		"webSearch": ai.WebSearch.ExaAPIKey,
+	} {
+		if strings.Contains(got, "-secret") {
+			t.Errorf("%s key was left in plaintext by EncryptAPIKeys: %q", name, got)
+		}
+	}
+
+	ai.DecryptAPIKeys()
+	for name, want := range map[string]string{
+		"provider":  "provider-secret",
+		"embedding": "embedding-secret",
+		"rerank":    "rerank-secret",
+		"webSearch": "exa-secret",
+	} {
+		var got string
+		switch name {
+		case "provider":
+			got = ai.Providers[0].APIKey
+		case "embedding":
+			got = ai.Embedding.APIKey
+		case "rerank":
+			got = ai.Rerank.APIKey
+		case "webSearch":
+			got = ai.WebSearch.ExaAPIKey
+		}
+		if got != want {
+			t.Errorf("%s key did not round-trip: got %q, want %q", name, got, want)
+		}
 	}
 }

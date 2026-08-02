@@ -1,4 +1,8 @@
 {
+	"configGroupWebSearch": "חיפוש באינטרנט",
+	"webSearchEnabled": "הפעלת חיפוש באינטרנט",
+	"webSearchEnabledTip": "מאפשר לסוכן ה-AI לחפש באינטרנט. השאילתות נשלחות אל Exa, שירות צד שלישי, ולא לספק ה-API שהגדרת. כבוי כברירת מחדל. אספקת מפתח API היא אופציונלית; ובלעדיו, הבקשות נשלחות באופן אנונימי.",
+	"agentEffectWebRequest": "בקשת רשת תישלח לשירות צד שלישי",
 	"rebuildHistoryIndex": "בנה מחדש את אינדקס ההיסטוריה",
 	"rebuildAssetContentIndex": "בנה מחדש את אינדקס תוכן הנכסים",
 	"newItemWithTemplate": "יצירת פריט באמצעות תבנית",

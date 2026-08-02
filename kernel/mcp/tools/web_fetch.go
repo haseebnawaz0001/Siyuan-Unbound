@@ -31,6 +31,13 @@ var WebFetchTool = &Tool{
 		},
 		Required: []string{"url"},
 	},
+	// The model chooses the URL, so each call is a fresh outbound request to a destination the user has not seen.
+	// Declaring the egress makes the agent ask first and show the URL; a one-time opt-in could not, since the
+	// destination differs every call. This tool takes no action argument, so the effects are keyed on "".
+	EffectScope: EffectScopeExternal,
+	ActionEffects: map[string]ToolEffects{
+		"": {DataEgress: true, ExternalCost: true},
+	},
 	Handler: webFetchHandler,
 }
 

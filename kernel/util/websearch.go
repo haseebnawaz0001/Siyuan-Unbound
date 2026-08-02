@@ -90,11 +90,9 @@ func WebSearch(query, exaApiKey string) (string, error) {
 	}
 	body := string(bodyBytes)
 
-	preview := body
-	if len(preview) > 500 {
-		preview = body[:500]
-	}
-	logging.LogInfof("websearch response: status=%d, len=%d, preview=%s", resp.StatusCode, len(body), preview)
+	// Status and length are enough to diagnose a failing search. The body is search results derived from whatever
+	// the user was working on, so it does not belong in a log file that gets attached to bug reports.
+	logging.LogInfof("websearch response: status=%d, len=%d", resp.StatusCode, len(body))
 
 	text := parseMcpResponse(body)
 	if text == "" {

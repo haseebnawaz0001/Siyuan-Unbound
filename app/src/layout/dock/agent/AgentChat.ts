@@ -1267,7 +1267,7 @@ export class AgentChat extends Model {
         }
         el.innerHTML = '<div class="agent-chat__confirm-card">' +
             '<div class="agent-chat__confirm-header"><svg class="agent-chat__confirm-icon"><use xlink:href="#iconInfo"></use></svg> ' + desc + "</div>" +
-            this.renderConfirmEffects(entry.effects) +
+            this.renderConfirmEffects(entry.effects, entry.name) +
             '<pre class="agent-chat__confirm-args">' + escapeHtml(argsStr) + "</pre>" +
             (statusLabel ? '<div class="agent-chat__confirm-actions"><span class="agent-chat__confirm-done">' + statusLabel + "</span></div>" : "") +
             "</div>";
@@ -3124,14 +3124,18 @@ export class AgentChat extends Model {
         }
     }
 
-    private renderConfirmEffects(effects?: IToolEffects) {
+    private renderConfirmEffects(effects?: IToolEffects, name?: string) {
         if (!effects) {
             return "";
         }
         const L = window.siyuan.languages;
         const items: string[] = [];
         if (effects.dataEgress) {
-            items.push(L.agentEffectDataEgress);
+            // web_fetch also sets dataEgress (it egresses the target URL, not document content), but the
+            // wire protocol has no separate flag to distinguish it from the "your data is sent" cases like
+            // image.analyze / search.semantic. IToolEffects (agentSSE.ts) is out of scope for this change,
+            // so key off the known tool name here instead of adding a field.
+            items.push(name === "web_fetch" ? L.agentEffectWebRequest : L.agentEffectDataEgress);
         }
         if (effects.externalCost) {
             items.push(L.agentEffectExternalCost);
@@ -3155,7 +3159,7 @@ export class AgentChat extends Model {
         const desc = (L.agentConfirmDesc || "Agent: {category} operation").replace("{category}", escapeHtml(this.toolCategory(name)));
         el.innerHTML = '<div class="agent-chat__confirm-card">' +
             '<div class="agent-chat__confirm-header"><svg class="agent-chat__confirm-icon"><use xlink:href="#iconInfo"></use></svg> ' + desc + "</div>" +
-            this.renderConfirmEffects(effects) +
+            this.renderConfirmEffects(effects, name) +
             '<pre class="agent-chat__confirm-args">' + escapeHtml(argsStr) + "</pre>" +
             '<div class="agent-chat__confirm-actions">' +
             '<button class="b3-button b3-button--cancel agent-chat__confirm-reject">' + (L.agentConfirmReject || "Reject") + "</button>" +

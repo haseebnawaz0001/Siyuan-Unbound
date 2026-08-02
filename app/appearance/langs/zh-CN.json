@@ -1,4 +1,8 @@
 {
+	"configGroupWebSearch": "联网搜索",
+	"webSearchEnabled": "启用联网搜索",
+	"webSearchEnabledTip": "允许智能体联网搜索，搜索请求将发送至第三方服务 Exa，而非您配置的 API 提供商。默认关闭，提供 API Key 为可选项，未提供时请求将以匿名方式发送。",
+	"agentEffectWebRequest": "将向第三方服务发送网络请求",
 	"rebuildHistoryIndex": "重建历史索引",
 	"rebuildAssetContentIndex": "重建资源文件索引",
 	"newItemWithTemplate": "使用模板新建条目",

@@ -1,4 +1,8 @@
 {
+	"configGroupWebSearch": "웹 검색",
+	"webSearchEnabled": "웹 검색 활성화",
+	"webSearchEnabledTip": "AI 에이전트가 웹을 검색할 수 있도록 허용합니다. 쿼리는 설정된 API 제공업체가 아니라 타사 서비스인 Exa로 전송됩니다. 기본적으로 비활성화되어 있습니다. API 키 제공은 선택 사항이며, 제공하지 않으면 요청이 익명으로 전송됩니다.",
+	"agentEffectWebRequest": "타사 서비스로 웹 요청이 전송됩니다",
 	"rebuildHistoryIndex": "기록 인덱스 재구축",
 	"rebuildAssetContentIndex": "에셋 콘텐츠 인덱스 재구축",
 	"newItemWithTemplate": "템플릿으로 항목 만들기",

@@ -134,8 +134,11 @@ func TestNeedsConfirmScopesReadOnlyActionsByToolSource(t *testing.T) {
 	if !needsConfirm("unzip", "", nil) || !needsLocalSnapshot("unzip", "") {
 		t.Fatal("actionless write tool must require confirmation and create a local snapshot")
 	}
-	if needsConfirm("web_fetch", "", nil) || needsLocalSnapshot("web_fetch", "") {
-		t.Fatal("actionless read-only tool must not require confirmation or create a snapshot")
+	if !needsConfirm("web_fetch", "", nil) {
+		t.Fatal("fetching a model-chosen URL must be confirmed; the destination differs on every call")
+	}
+	if needsLocalSnapshot("web_fetch", "") {
+		t.Fatal("fetching a URL writes nothing locally, so it must not snapshot the repository")
 	}
 	if needsConfirm("todo_write", "", nil) || needsLocalSnapshot("todo_write", "") {
 		t.Fatal("agent session todo updates must not require confirmation or create a repository snapshot")
@@ -157,6 +160,24 @@ func TestImageToolActionEffects(t *testing.T) {
 	}
 	if needsConfirm("image", "analyze", map[string]bool{"image::analyze": true}) {
 		t.Fatal("an explicitly allowed image action should not ask again")
+	}
+}
+
+// TestWebToolConfirmation pins the two halves of the web egress policy. web_fetch asks every time because the model
+// picks the destination; web_search does not ask, because it is withheld entirely until the user enables it and
+// enabling it is the consent. Getting either backwards is what this test exists to catch.
+func TestWebToolConfirmation(t *testing.T) {
+	if !needsConfirm("web_fetch", "", nil) || needsLocalSnapshot("web_fetch", "") {
+		t.Fatal("web_fetch must confirm its outbound request without snapshotting the repository")
+	}
+	if needsConfirm("web_fetch", "", map[string]bool{"web_fetch::": true}) {
+		t.Fatal("an explicitly allowed web_fetch should not ask again")
+	}
+	if needsConfirm("web_search", "", nil) {
+		t.Fatal("web_search is gated by the opt-in setting, not by a per-call prompt")
+	}
+	if needsLocalSnapshot("web_search", "") {
+		t.Fatal("searching the web writes nothing locally, so it must not snapshot the repository")
 	}
 }
 

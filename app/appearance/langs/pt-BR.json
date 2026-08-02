@@ -1,4 +1,8 @@
 {
+	"configGroupWebSearch": "Busca na web",
+	"webSearchEnabled": "Habilitar busca na web",
+	"webSearchEnabledTip": "Permite que o agente de IA pesquise na web. As consultas são enviadas à Exa, um serviço de terceiros, e não ao provedor de API configurado. Desativado por padrão. Fornecer uma chave API é opcional; sem ela, as solicitações são enviadas de forma anônima.",
+	"agentEffectWebRequest": "Uma solicitação web será enviada a um serviço de terceiros",
 	"rebuildHistoryIndex": "Reconstruir índice do histórico",
 	"rebuildAssetContentIndex": "Reconstruir índice de conteúdo de recursos",
 	"newItemWithTemplate": "Criar item com modelo",

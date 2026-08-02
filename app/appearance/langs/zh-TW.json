@@ -1,4 +1,8 @@
 {
+	"configGroupWebSearch": "網路搜索",
+	"webSearchEnabled": "啟用網路搜索",
+	"webSearchEnabledTip": "允許智能體進行網路搜索，搜索請求將傳送至第三方服務 Exa，而非您設定的 API 提供者。預設為關閉，提供 API Key 為選填項目，未提供時請求將以匿名方式傳送。",
+	"agentEffectWebRequest": "將向第三方服務傳送網路請求",
 	"rebuildHistoryIndex": "重建歷史索引",
 	"rebuildAssetContentIndex": "重建資源檔案索引",
 	"newItemWithTemplate": "使用範本新增條目",

@@ -164,6 +164,20 @@ const registerAiMcpGroup = (tab: SettingTabBuilder) => {
     });
 };
 
+const registerAiWebSearchGroup = (tab: SettingTabBuilder) => {
+    const group = tab.group("webSearch", window.siyuan.languages.configGroupWebSearch);
+
+    group.switch("ai.webSearch.enabled", {
+        title: window.siyuan.languages.webSearchEnabled,
+        desc: window.siyuan.languages.webSearchEnabledTip,
+    });
+    group.textBlock("ai.webSearch.exaApiKey", {
+        title: window.siyuan.languages.apiKey,
+        desc: window.siyuan.languages.apiKeyTip,
+        mode: "input-password",
+    });
+};
+
 const registerAiEmbeddingGroup = (tab: SettingTabBuilder) => {
     const group = tab.group("embedding", window.siyuan.languages.configGroupEmbedding);
 
@@ -271,6 +285,7 @@ export const registerAiTab = (tab: SettingTabBuilder) => {
     registerAiVisionGroup(tab);
     registerAiImageGenerationGroup(tab);
     registerAiMcpGroup(tab);
+    registerAiWebSearchGroup(tab);
     // TODO: add skills group?
     registerAiEmbeddingGroup(tab);
     registerAiRerankGroup(tab);

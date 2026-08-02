@@ -1,4 +1,8 @@
 {
+	"configGroupWebSearch": "Pencarian web",
+	"webSearchEnabled": "Aktifkan pencarian web",
+	"webSearchEnabledTip": "Mengizinkan agen AI mencari di web. Kueri dikirim ke Exa, layanan pihak ketiga, bukan ke penyedia API yang Anda konfigurasi. Nonaktif secara default. Menyediakan kunci API bersifat opsional; tanpa kunci, permintaan dikirim secara anonim.",
+	"agentEffectWebRequest": "Permintaan web akan dikirim ke layanan pihak ketiga",
 	"rebuildHistoryIndex": "Bangun ulang indeks riwayat",
 	"rebuildAssetContentIndex": "Bangun ulang indeks konten aset",
 	"newItemWithTemplate": "Buat item dengan templat",

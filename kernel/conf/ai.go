@@ -36,7 +36,18 @@ type AI struct {
 	Editing         *Editing         `json:"editing"`
 	Vision          *Vision          `json:"vision"`
 	ImageGeneration *ImageGeneration `json:"imageGeneration"`
+	WebSearch       *WebSearch       `json:"webSearch"`
 	Providers       []*Provider      `json:"providers"`
+}
+
+// WebSearch configures the agent's web_search tool. It is off by default: the tool sends the query to Exa, a third
+// party, rather than to the user's own model provider, so it stays unavailable until the user opts in. When disabled
+// the tool is withheld from the tool list entirely, so no model is ever offered it.
+type WebSearch struct {
+	Enabled bool `json:"enabled"`
+	// ExaAPIKey is optional. Without it the query is sent anonymously; it is stored encrypted, like every other key
+	// in this file, so it has to be handled in EncryptAPIKeys and DecryptAPIKeys.
+	ExaAPIKey string `json:"exaApiKey"`
 }
 
 type Agent struct {
@@ -145,6 +156,12 @@ func defaultEmbedding() *Embedding {
 	return &Embedding{Timeout: 30}
 }
 
+// defaultWebSearch returns the disabled-by-default web search configuration; opting in is the user's consent to
+// send queries to a third party.
+func defaultWebSearch() *WebSearch {
+	return &WebSearch{}
+}
+
 func defaultRerank() *Rerank {
 	return &Rerank{Timeout: 30, CandidateCount: 30}
 }
@@ -187,6 +204,7 @@ func NewAI() *AI {
 		Editing:         defaultEditing(),
 		Vision:          defaultVision(),
 		ImageGeneration: defaultImageGeneration(),
+		WebSearch:       defaultWebSearch(),
 	}
 
 	apiKey := os.Getenv("SIYUAN_OPENAI_API_KEY")
@@ -500,6 +518,9 @@ func (ai *AI) Normalize() {
 		providers = append(providers, p)
 	}
 	ai.Providers = providers
+	if ai.WebSearch == nil {
+		ai.WebSearch = defaultWebSearch()
+	}
 	if ai.Embedding == nil {
 		ai.Embedding = defaultEmbedding()
 	}
@@ -559,6 +580,15 @@ func (ai *AI) DecryptAPIKeys() {
 			ai.Rerank.APIKey = string(plain)
 		}
 	}
+	if ai.WebSearch != nil && ai.WebSearch.ExaAPIKey != "" {
+		dec := util.AESDecrypt(ai.WebSearch.ExaAPIKey)
+		if dec == nil {
+			return
+		}
+		if plain, err := hex.DecodeString(string(dec)); err == nil {
+			ai.WebSearch.ExaAPIKey = string(plain)
+		}
+	}
 }
 
 func (ai *AI) EncryptAPIKeys() {
@@ -573,6 +603,9 @@ func (ai *AI) EncryptAPIKeys() {
 	}
 	if ai.Rerank != nil && ai.Rerank.APIKey != "" {
 		ai.Rerank.APIKey = util.AESEncrypt(ai.Rerank.APIKey)
+	}
+	if ai.WebSearch != nil && ai.WebSearch.ExaAPIKey != "" {
+		ai.WebSearch.ExaAPIKey = util.AESEncrypt(ai.WebSearch.ExaAPIKey)
 	}
 }
 
