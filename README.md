@@ -107,6 +107,7 @@ This fork publishes no image and cannot: `.github/workflows/dockerimage.yml` is 
 |---|---|
 | [FORK.md](docs/FORK.md) | How this fork differs from upstream, and why |
 | [SYNC.md](docs/SYNC.md) | Setting up sync against your own S3, WebDAV or local storage |
+| [AI.md](docs/AI.md) | What the AI can do, what it can change, and where your data goes |
 | [BUILD.md](docs/BUILD.md) | Building from source, every platform |
 | [DEPLOY.md](docs/DEPLOY.md) | Docker, Compose, Unraid, TrueNAS |
 | [WORKSPACE.md](docs/WORKSPACE.md) | What a workspace looks like on disk |
