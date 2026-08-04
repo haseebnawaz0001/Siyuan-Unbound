@@ -132,8 +132,10 @@ if defined BUILD_ARM64 (
     echo.
     echo Building Kernel arm64
     set GOARCH=arm64
-    @REM if you want to build arm64, you need to install aarch64-w64-mingw32-gcc
-    set CC="D:/Program Files/llvm-mingw-20240518-ucrt-x86_64/bin/aarch64-w64-mingw32-gcc.exe"
+    call :resolve_arm64_cc
+    if errorlevel 1 (
+        exit /b 1
+    )
     go build -tags "fts5 sqlcipher" -o "%PROJECT_ROOT%\app\kernel-arm64\SiYuan-Kernel.exe" -ldflags "-s -w" .
     if errorlevel 1 (
         exit /b %errorlevel%
@@ -221,3 +223,22 @@ echo ==============================
 
 REM Return to the initial directory
 cd /d "%INITIAL_DIR%"
+
+exit /b 0
+
+@REM Resolve the C cross compiler for the arm64 kernel. It needs aarch64-w64-mingw32-gcc from llvm-mingw.
+@REM This used to be one machine's absolute install path, so the target built for nobody else.
+:resolve_arm64_cc
+if defined SIYUAN_ARM64_CC (
+    set CC=%SIYUAN_ARM64_CC%
+    goto :eof
+)
+where aarch64-w64-mingw32-gcc.exe >nul 2>&1
+if errorlevel 1 (
+    echo ERROR: aarch64-w64-mingw32-gcc.exe was not found.
+    echo        Install llvm-mingw from https://github.com/mstorsjo/llvm-mingw/releases and add its bin
+    echo        directory to PATH, or set SIYUAN_ARM64_CC to the full path of aarch64-w64-mingw32-gcc.exe.
+    exit /b 1
+)
+set CC=aarch64-w64-mingw32-gcc.exe
+goto :eof

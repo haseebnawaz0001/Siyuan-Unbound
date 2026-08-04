@@ -14,15 +14,15 @@ files:
 afterPack: "./scripts/afterPack.js"
 
 mac:
-  identity: "Yunnan Liandi Technology Co., Ltd."
-  provisioningProfile: "../../SiYuan.provisionprofile"
+  # Unsigned. This fork has no Apple Developer certificate, and the identity, provisioning profile and entitlements
+  # this previously referenced are upstream's -- the two files sat outside the repository and were never part of it,
+  # so the dmg target could not build for anyone else. To sign your own build, set identity to your certificate name
+  # and restore provisioningProfile, hardenedRuntime and entitlements/entitlementsInherit pointing at your own files.
+  identity: null
   icon: "src/assets/icon.icns"
   gatekeeperAssess: false
-  hardenedRuntime: true
-  entitlements: "../../entitlements.mas.plist"
   extendInfo:
     - NSMicrophoneUsageDescription: "This app requires microphone access to record audio."
-  entitlementsInherit: "../../entitlements.mas.plist"
   minimumSystemVersion: "12.0.0"
   protocols:
     - name: "SiYuan"

@@ -1,198 +1,288 @@
-# Building from source — Reference
+# Building from source
 
-Everything here is taken from a file in this repository: `.github/workflows/cd.yml` (the release pipeline, and the authority when sources disagree), the three `scripts/*-build.*` helpers, the root `Dockerfile`, and `app/package.json`. Where the repo does not establish something, this document says so rather than guessing.
+Step-by-step per platform. Every build command here is quoted from a file in this repository — `.github/workflows/cd.yml`, the three `scripts/*-build.*` files, the root `Dockerfile`, or `app/package.json`. The **toolchain setup** blocks are the exception and are marked as such: those are ordinary install instructions, not something the repo can vouch for.
 
-**Nothing in this document has been run end to end here.** The commands are verified to exist and to agree with CI; they are not observed to succeed. Treat a first build as a first build.
-
----
-
-## 0. In one sentence
-
-Build the TypeScript frontend with pnpm, build the Go kernel into `app/kernel*/`, then let electron-builder wrap the two into an installer — or skip the wrapper and run the kernel binary on its own.
+**Only the Linux path in this document has been run end to end.** The macOS and Windows sections are assembled from the repo's own scripts and CI, which is strong but is not the same as observed.
 
 ---
 
-## 1. Prerequisites
+## What you are building
+
+Two halves:
+
+- **The kernel** — a single Go binary. It is the server, the database, the sync engine and the CLI all at once.
+- **The frontend** — four webpack bundles under `app/stage/build/`.
+
+The kernel serves the frontend over HTTP. That means **you do not need an installer to have a working install**: build both halves, run the binary, open the port. Installers exist to wrap the two in an Electron shell with a desktop icon.
+
+---
+
+## Versions
 
 | Tool | Version | Where that comes from |
 |---|---|---|
-| Go | `1.26` | `kernel/go.mod:3` — CI resolves the toolchain from this same line via `go-version-file` (`cd.yml:142`) |
-| Node | `24` | `cd.yml:161`. The Docker image builds the frontend on Node 22 instead (`Dockerfile:1`), so the two release paths do not use the same Node |
-| pnpm | `11.12.0` | `app/package.json:8` (`packageManager`). CI reads this field rather than hardcoding it (`cd.yml:63-66`) |
-| A C compiler | see below | `CGO_ENABLED=1` everywhere; the kernel links SQLite |
-| Git | any | the build needs a full clone, not a tarball of `kernel/` — see §7 |
-
-### The C toolchain
-
-CGO is on in every build path, so a C compiler is mandatory.
-
-- **Linux.** `scripts/linux-build.sh:70-102` wants a **musl** cross compiler, not plain gcc: `x86_64-linux-musl-gcc` for amd64, `aarch64-linux-musl-gcc` for arm64. It looks in `~/<target>-cross/bin/`, then `PATH`, then falls back to the system `musl-gcc` only when building for the host's own architecture, and finally downloads a prebuilt toolchain from `musl.cc` into `muslbin/`. If you build with plain `go build` instead of the script, your system gcc is fine — you simply will not get the static-PIE binary the script produces.
-- **Windows.** MinGW-w64 gcc on `PATH` (`scripts/win-build.bat:93`). For arm64, see the trap in §7.
-- **macOS.** The repo never states this. `scripts/darwin-build.sh` sets no `CC` and performs no toolchain detection, so it relies on whatever `clang` is already on `PATH` — in practice the Xcode Command Line Tools. This is inference, not something the repo documents.
-- **Alpine / Docker.** `Dockerfile:30` installs `gcc musl-dev`.
-
-### One thing to know before you start
-
-Three build scripts and several npm scripts route downloads through Chinese mirrors. This is not wrong and it falls through to the real source, but it is worth knowing if you audit network egress:
-
-- `GOPROXY=https://mirrors.aliyun.com/goproxy/,https://goproxy.cn,direct` in `scripts/darwin-build.sh:66`, `scripts/linux-build.sh:66` and `scripts/win-build.bat:100`.
-- `ELECTRON_MIRROR=https://npmmirror.com/mirrors/electron/` in `app/package.json`'s `install:electron` and every `dist*` script.
-
-Plain `go build` and `pnpm install` do not set either.
+| Go | `1.26` | `kernel/go.mod` |
+| Node | `24` | `.github/workflows/cd.yml` |
+| pnpm | `11.12.0` | `app/package.json` (`packageManager`) |
+| A C compiler | see each platform | CGO is on in every build path |
 
 ---
 
-## 2. Frontend
+## The short version, any platform
+
+```bash
+git clone git@github.com:haseebnawaz0001/Siyuan-Unbound.git
+cd Siyuan-Unbound
+
+cd app && pnpm install && pnpm run install:electron && pnpm run build && cd ..
+cd kernel && CGO_ENABLED=1 go build -tags "fts5 sqlcipher" -o "../app/kernel/SiYuan-Kernel" . && cd ..
+
+./app/kernel/SiYuan-Kernel serve
+```
+
+Open the port it prints. That is a complete install. Everything below is detail, cross-compilation, and installers.
+
+Both build tags matter. `fts5` is SQLite full-text search, which backs all search in the app; `sqlcipher` backs encrypted notebooks. Drop either and you get a kernel that starts but is quietly missing a feature.
+
+---
+
+## Linux
+
+### Toolchain *(setup commands are not verified against this repo)*
+
+```bash
+# Go 1.26 -- distro packages are often older, so prefer the tarball
+curl -fsSL https://go.dev/dl/go1.26.0.linux-amd64.tar.gz | sudo tar -C /usr/local -xz
+export PATH=/usr/local/go/bin:$PATH
+
+# Node 24 + pnpm
+curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
+sudo apt-get install -y nodejs
+npm install -g pnpm@11.12.0
+
+# C compiler, plus the packaging tools -- build-essential brings binutils, which the deb target needs for `ar`
+sudo apt-get install -y build-essential rpm
+```
+
+No system gcc? `zig cc` works — set `CC` and `CXX` to it. This repository has been built that way.
+
+### Build
 
 ```bash
 cd app
 pnpm install
-pnpm run install:electron   # fetches the Electron binary; desktop builds only
+pnpm run install:electron     # only needed if you want an installer
 pnpm run build
+cd ../kernel
+CGO_ENABLED=1 go build -tags "fts5 sqlcipher" -o "../app/kernel-linux/SiYuan-Kernel" .
 ```
 
-`pnpm run build` is `pnpm run /build:.*/` (`app/package.json`), a glob that runs all four webpack builds. Each emits its own bundle:
+Run it directly with `./app/kernel-linux/SiYuan-Kernel serve`, or carry on to an installer.
 
-| Script | Config | Output |
-|---|---|---|
-| `build:app` | `webpack.config.js` | `app/stage/build/app` |
-| `build:mobile` | `webpack.mobile.js` | `app/stage/build/mobile` |
-| `build:desktop` | `webpack.desktop.js` | `app/stage/build/desktop` |
-| `build:export` | `webpack.export.js` | `app/stage/build/export` |
-
-The kernel picks which of the first three to serve from the User-Agent. The fourth is not an app UI — it is the client-side renderer library loaded by exported HTML and the PDF preview window.
-
-For iterating on the frontend use `pnpm run dev` (or `dev:mobile` / `dev:desktop` / `dev:export`), which is the same webpack in development mode and watches. **Do not run `pnpm run build` while a `pnpm dev` is running** — see `AGENTS.md` §5.4.
-
----
-
-## 3. Kernel
-
-The canonical command, from `cd.yml:198`, with `CGO_ENABLED=1` and `GO111MODULE=on` (`cd.yml:200-205`):
-
-```bash
-cd kernel
-CGO_ENABLED=1 go build -tags "fts5 sqlcipher" \
-  -o "../app/kernel/SiYuan-Kernel" \
-  -ldflags "-s -w -X github.com/siyuan-note/siyuan/kernel/util.Mode=prod"
-```
-
-Drop the `-ldflags` entirely for a local development build; `.github/CONTRIBUTING.md:54-55` documents exactly that shorter form. Without `-X ...util.Mode=prod` the kernel runs in dev mode.
-
-The two build tags are not optional. `fts5` enables SQLite full-text search, which backs all search in the app. `sqlcipher` backs encrypted notebooks — `kernel/sql/database.go:1863` and `kernel/treenode/blocktree.go:908` derive SQLCipher keys for content and block trees.
-
-### Where the binary has to go
-
-electron-builder picks the kernel up from a directory whose name encodes the target, so the `-o` path matters (`cd.yml` matrix, lines 91-118):
-
-| Target | Output path |
-|---|---|
-| Windows amd64 | `app/kernel/SiYuan-Kernel.exe` |
-| Linux amd64 | `app/kernel-linux/SiYuan-Kernel` |
-| macOS amd64 | `app/kernel-darwin/SiYuan-Kernel` |
-| macOS arm64 | `app/kernel-darwin-arm64/SiYuan-Kernel` |
-
-The helper scripts add `app/kernel-arm64/` (Windows arm64) and `app/kernel-linux-arm64/`.
-
-### The five build paths do not agree
-
-This matters if you compare a binary you built against a release:
-
-| Source | Command | How it differs |
-|---|---|---|
-| `cd.yml:198` | `-tags "fts5 sqlcipher"`, `-ldflags "-s -w -X ...Mode=prod"` | **the reference build** |
-| `scripts/linux-build.sh:109` | adds `-buildmode=pie` and `-extldflags -static-pie` | no `Mode=prod`, so the binary reports dev mode |
-| `scripts/darwin-build.sh:74` | `-ldflags "-s -w"` | no `Mode=prod` |
-| `scripts/win-build.bat:126` | `-ldflags "-s -w"` | no `Mode=prod` |
-| `Dockerfile:46` | **`-tags fts5` only** | **`sqlcipher` is missing** — see below |
-
-**The Docker image is built without `sqlcipher`.** That is a functional difference, not a cosmetic one: encrypted notebooks depend on it. A Docker-built kernel is not equivalent to a release binary and encrypted notebooks should not be assumed to work in it. This predates the fork; it is documented here rather than changed.
-
-### Cross-compiling
-
-Set `GOOS` and `GOARCH` as CI does (`cd.yml:200-205`) and supply a matching C cross compiler. Cross-compiling with CGO is the hard part; the C toolchain is what will stop you, not Go.
-
----
-
-## 4. Desktop installers
-
-With the frontend built (§2) and the kernel in the right directory (§3):
+### Installers
 
 ```bash
 cd app
-pnpm run dist-linux          # or: dist, dist-arm64, dist-darwin, dist-darwin-arm64, dist-linux-arm64
+pnpm run dist-linux           # amd64
+pnpm run dist-linux-arm64     # arm64
 ```
 
-Each maps to `electron-builder --config electron-builder-<variant>.yml --publish=never`. Output lands in `app/build`, named `siyuan-<version>-<os>.<ext>`.
+Produces `tar.gz`, `AppImage`, `deb` and `rpm` in `app/build`, named `siyuan-<version>-linux.<ext>`.
 
-| Script | Config | Produces |
+The four targets have different requirements, and electron-builder stops at the first one it cannot build. Observed on a machine with neither `binutils` nor `rpm` installed:
+
+| Target | Needs | Result |
 |---|---|---|
-| `dist` | `electron-builder.yml` | Windows `nsis` installer |
-| `dist-arm64` | `electron-builder-arm64.yml` | Windows arm64 `nsis` |
-| `dist-darwin` / `dist-darwin-arm64` | `electron-builder-darwin*.yml` | macOS `dmg` |
-| `dist-linux` / `dist-linux-arm64` | `electron-builder-linux*.yml` | `tar.gz`, `AppImage`, `deb`, `rpm` |
+| `tar.gz` | nothing extra | built, ~247 MB |
+| `AppImage` | nothing extra | built, ~249 MB |
+| `deb` | `ar`, from `binutils` | failed: `Need executable 'ar' to convert dir to deb` |
+| `rpm` | `rpm` / `rpmbuild` | not reached |
 
-Linux RPM output additionally needs the `rpm` tool installed (`cd.yml:207-209`).
+So `sudo apt-get install -y binutils rpm` before packaging, or accept the two targets that need nothing and ignore the failure. CI installs `rpm` explicitly and its runners already carry `binutils`; the local script installs neither.
 
-### Or skip the installer entirely
+### What `scripts/linux-build.sh` does differently
 
-The kernel binary is self-contained — it serves the frontend over HTTP. Build §2 and §3, then:
+Running the script rather than the commands above gets you a **static-PIE** binary:
 
 ```bash
-./app/kernel/SiYuan-Kernel serve --mode=dev
+go build -buildmode=pie -tags "fts5 sqlcipher" -o "../app/kernel-linux/SiYuan-Kernel" -ldflags "-s -w -extldflags -static-pie" .
 ```
 
-and open the port it reports. `.github/CONTRIBUTING.md:57-58` documents this as the normal development loop. `SiYuan-Kernel` is also the CLI: `kernel/main.go` calls into a Cobra root command (`kernel/cli/cmd/root.go:42`) whose subcommands include `serve`, `search`, `export`, `sql`, `sync` and `workspace`. One binary, many subcommands.
+Neither the macOS nor Windows scripts nor CI does this. For that it wants a **musl** cross compiler — `x86_64-linux-musl-gcc` or `aarch64-linux-musl-gcc`, not plain gcc. `setup_cc()` looks in `~/<target>-cross/bin/`, then `PATH`, then falls back to the system `musl-gcc` when building for the host's own architecture, and finally downloads a toolchain from `musl.cc` into `muslbin/`. That last step reaches out to a third-party host, which is worth knowing before you run it.
+
+### Cross-compiling to arm64
+
+```bash
+cd kernel
+GOOS=linux GOARCH=arm64 CGO_ENABLED=1 CC=aarch64-linux-musl-gcc \
+  go build -tags "fts5 sqlcipher" -o "../app/kernel-linux-arm64/SiYuan-Kernel" .
+```
+
+The C cross compiler is what makes this hard, not Go. `linux-build.sh` will fetch one for you if it is missing.
 
 ---
 
-## 5. Docker
+## macOS
+
+### Toolchain *(setup commands are not verified against this repo)*
+
+```bash
+xcode-select --install                 # provides clang, which CGO needs
+brew install go node
+npm install -g pnpm@11.12.0
+```
+
+The build scripts never set `CC` on macOS and never check for a compiler, so they assume Xcode Command Line Tools are already present. If clang is missing you get a cgo linker error rather than a useful message.
+
+### Build
+
+```bash
+cd app
+pnpm install
+pnpm run install:electron
+pnpm run build
+cd ../kernel
+CGO_ENABLED=1 go build -tags "fts5 sqlcipher" -o "../app/kernel-darwin/SiYuan-Kernel" .          # Intel
+CGO_ENABLED=1 GOARCH=arm64 go build -tags "fts5 sqlcipher" -o "../app/kernel-darwin-arm64/SiYuan-Kernel" .   # Apple silicon
+```
+
+The two architectures go to **different directories**, and electron-builder picks the one matching the config you run.
+
+### Installers
+
+```bash
+cd app
+pnpm run dist-darwin          # Intel  -> siyuan-<version>-mac.dmg
+pnpm run dist-darwin-arm64    # Apple silicon -> siyuan-<version>-mac-arm64.dmg
+```
+
+**These dmgs are unsigned.** Upstream's configs referenced an Apple Developer identity, a provisioning profile and an entitlements file — none of which are in this repository, so the target could not build for anyone outside upstream. Both darwin configs now set `identity: null`, which produces an unsigned build that works.
+
+The consequence: macOS Gatekeeper will refuse to open the app on first launch. Right-click → Open, or `xattr -dr com.apple.quarantine /Applications/SiYuan.app`. If you have a Developer ID certificate, set `identity` to its name and restore `provisioningProfile`, `hardenedRuntime` and `entitlements` — the comment in `app/electron-builder-darwin.yml` says exactly which keys.
+
+---
+
+## Windows
+
+### Toolchain *(setup commands are not verified against this repo)*
+
+```powershell
+winget install GoLang.Go
+winget install OpenJS.NodeJS
+npm install -g pnpm@11.12.0
+```
+
+You also need **MinGW-w64 gcc on `PATH`** for CGO — MSYS2 (`pacman -S mingw-w64-x86_64-gcc`) is the usual route. `scripts/win-build.bat` names this requirement in a comment but does not check for it.
+
+### Build
+
+Use the script; it handles the Windows-only steps below that the raw commands do not.
+
+```cmd
+scripts\win-build.bat --target=amd64
+```
+
+Or by hand:
+
+```cmd
+cd app
+pnpm install && pnpm run install:electron && pnpm run build
+cd ..\kernel
+set CGO_ENABLED=1
+go build -tags "fts5 sqlcipher" -o "..\app\kernel\SiYuan-Kernel.exe" -ldflags "-s -w" .
+```
+
+Installer: `pnpm run dist` in `app/`, producing an NSIS `siyuan-<version>-win.exe` in `app/build`.
+
+### arm64
+
+```cmd
+scripts\win-build.bat --target=arm64
+```
+
+This needs an **aarch64-w64-mingw32** cross compiler from [llvm-mingw](https://github.com/mstorsjo/llvm-mingw/releases). Put its `bin` directory on `PATH`, or point `SIYUAN_ARM64_CC` at the compiler:
+
+```cmd
+set SIYUAN_ARM64_CC=C:\llvm-mingw\bin\aarch64-w64-mingw32-gcc.exe
+scripts\win-build.bat --target=arm64
+```
+
+The script used to hardcode one developer's install path, so this target built for nobody else; it now resolves the compiler and fails with a clear message if it cannot.
+
+### Windows-only steps the script performs
+
+Worth knowing if you build by hand and get a package that behaves differently from a scripted one:
+
+- **Version resource** — installs and runs `goversioninfo` to embed the icon and version metadata into the exe.
+- **`elevator.exe`** — copies `app/elevator/elevator-<arch>.exe` into the kernel directory before packaging.
+- **`siyuan.exe` hard link** — created *after* packaging, deliberately, so it is not bundled into the installer. This is what makes `siyuan` work as a CLI command.
+
+CI does none of these three, and CI never builds Windows arm64 or the appx packages at all.
+
+### Unsigned
+
+No code-signing certificate is configured — the `certificateSubjectName` line in `app/electron-builder.yml` is commented out and no workflow supplies `CSC_*` secrets. The installer runs, but SmartScreen will warn about an unknown publisher.
+
+---
+
+## Docker
 
 ```bash
 docker build -t siyuan-unbound .
 ```
 
-Run it from the **repository root** — the build context must include `third_party/`, not just `kernel/` (§7). See [`DEPLOY.md`](./DEPLOY.md) for running the image, and note the missing `sqlcipher` tag from §3.
+**Run it from the repository root.** The build context must include `third_party/`, not just `kernel/` — `kernel/go.mod` replaces dejavu with `../third_party/dejavu`, and the Dockerfile stages it as a sibling of `/kernel` for exactly that reason.
+
+Two things differ from every other build:
+
+- **The image omits the `sqlcipher` tag.** `Dockerfile` builds with `-tags fts5` only, so a Docker kernel is not feature-equivalent to a desktop one and encrypted notebooks should not be assumed to work in it.
+- **The binary is called `kernel`, not `SiYuan-Kernel`**, because that build passes no `-o`.
+
+See [`DEPLOY.md`](./DEPLOY.md) for running the container, Compose, Unraid and TrueNAS.
 
 ---
 
-## 6. Mobile
+## Mobile
 
-Android, from `cd.yml:316`, run inside `kernel/`:
+Android, run from `kernel/`, exactly as CI does:
 
 ```bash
 gomobile bind -tags "fts5 sqlcipher" -ldflags "-s -w" -v -o kernel.aar -target android/arm64 -androidapi 26 ./mobile/
 ```
 
-Prerequisites named in CI: JDK 21 (`cd.yml:277-281`), Android NDK `28.2.13676358` (`cd.yml:283-302`), and gomobile installed at the commit matching `golang.org/x/mobile` in `kernel/go.mod` (`cd.yml:304-311`).
+CI pins JDK 21, Android NDK `28.2.13676358`, and installs gomobile at the commit matching `golang.org/x/mobile` in `kernel/go.mod`. Only `android/arm64` is built.
 
-**This does not produce an APK.** It produces `kernel.aar`, which CI then copies into a checkout of the separate `siyuan-note/siyuan-android` repository and builds there with Gradle (`cd.yml:323-380`). Building the Android app from this repository alone is not possible, and that CI job will fail on a fork because it pushes to a repository you do not control.
+**This produces `kernel.aar` and stops there.** Turning it into an APK needs the separate `siyuan-android` repository plus keystore signing secrets, neither of which is here — so the Android app cannot be built from this repository alone, and the Android job in `cd.yml` will fail on a fork because it pushes to a repository you do not control. The desktop artifacts in that workflow are unaffected.
 
-iOS is documented only in `.github/CONTRIBUTING.md:60-64` and has no CI job. HarmonyOS (`CONTRIBUTING.md:73-100`) is Linux-only and requires patching the Go standard library by hand.
-
----
-
-## 7. Traps
-
-**`third_party/` must sit next to `kernel/`.** `kernel/go.mod:230` carries `replace github.com/siyuan-note/dejavu => ../third_party/dejavu`. Build from a full clone and this is automatic. Build from a copy of `kernel/` alone — a sparse checkout, a hand-rolled Dockerfile with `COPY kernel/ .` — and `go mod download` fails with `reading ../third_party/dejavu/go.mod: no such file or directory`. The root `Dockerfile:40` handles this explicitly with `ADD third_party/ /third_party/`; none of the four build scripts guard against it, because they all assume a full clone.
-
-**`third_party/dejavu` is a separate Go module.** `go test ./...` in `kernel/` does not run its tests. Verify it from inside that directory:
-
-```bash
-cd third_party/dejavu && gofmt -l . && go vet ./... && go test -count=1 ./...
-```
-
-Its `test/sync` package is a two-client sync simulation and is the best regression signal in the repo.
-
-**Windows arm64 will not build as committed.** `scripts/win-build.bat:136` hardcodes `CC="D:/Program Files/llvm-mingw-20240518-ucrt-x86_64/bin/aarch64-w64-mingw32-gcc.exe"` — one developer's absolute path. Install `llvm-mingw` and edit that line.
-
-**`win-build.bat` and CI differ on Windows.** The script copies `app/elevator/elevator-amd64.exe` into the kernel folder and hard-links `siyuan.exe` after packaging (`win-build.bat:156,165,210-215`); the CI job does not show those steps. If a locally built Windows package behaves differently from a released one, start here.
+iOS is documented in `.github/CONTRIBUTING.md` and has no CI job. HarmonyOS is Linux-only and requires patching the Go standard library by hand.
 
 ---
 
-## 8. Verifying without building
+## The build paths disagree with each other
 
-These are the checks that are safe to run and are what CI would catch:
+Five ways to build the kernel, and they do not produce the same binary. This matters when comparing a local build against a release.
+
+| Source | Command shape | How it differs |
+|---|---|---|
+| `cd.yml` | `-tags "fts5 sqlcipher"`, `-ldflags "-s -w -X ...util.Mode=prod"` | **the reference build** |
+| `scripts/linux-build.sh` | adds `-buildmode=pie`, `-extldflags -static-pie` | no `Mode=prod`, so the binary reports dev mode |
+| `scripts/darwin-build.sh` | `-ldflags "-s -w"` | no `Mode=prod` |
+| `scripts/win-build.bat` | `-ldflags "-s -w"` | no `Mode=prod` |
+| `Dockerfile` | **`-tags fts5` only** | **no `sqlcipher`** — encrypted notebooks |
+
+And around the kernel build:
+
+- CI builds **Windows amd64 only** — never arm64, never appx. Nothing validates those paths.
+- `win-build.bat` copies `elevator.exe` and hard-links `siyuan.exe`; CI does neither, so a scripted Windows package and a CI one are assembled from different directory contents.
+- The Windows **arm64** electron-builder config bundles no pandoc; the amd64 one does.
+- Only CI installs `rpm`. A local Linux build fails that target without it.
+- The three local scripts route Go module downloads through `mirrors.aliyun.com` and `goproxy.cn` before falling back to `direct`, and the npm scripts fetch Electron from `npmmirror.com`. Plain `go build` and `pnpm install` do neither.
+
+---
+
+## Verifying without building
+
+These are what CI would catch, and they are safe to run at any time:
 
 ```bash
 cd app && pnpm run lint                 # tsc typecheck + eslint
@@ -201,14 +291,39 @@ cd kernel && gofmt -l . && go vet ./...
 cd third_party/dejavu && gofmt -l . && go vet ./... && go test -count=1 ./...
 ```
 
-No workflow in this repo runs `go test`, `go vet` or `gofmt` — CI builds but never tests. Run them yourself.
+`third_party/dejavu` is a **separate Go module** — `go test ./...` in `kernel/` does not run its tests. Its `test/sync` package is a two-client sync simulation and the best regression signal in the repo.
+
+No workflow runs `go test`, `go vet` or `gofmt`. CI builds but never tests, so run these yourself.
 
 ---
 
-## 9. Releases
+## Releases through CI
 
-`.github/workflows/cd.yml` has **no owner gate**, so it runs on a fork. It triggers on tags matching `*-alpha*`, `*-beta*` or `*-rc*`, and on manual `workflow_dispatch`. Pushing such a tag builds Windows, macOS and Linux installers and attaches them to a GitHub Release on your own repository.
+`.github/workflows/cd.yml` has no owner gate, so it runs on a fork. Push a tag matching `*-alpha*`, `*-beta*` or `*-rc*`, or dispatch the workflow manually, and it builds Windows, macOS and Linux installers and attaches them to a Release on your own repository.
 
-Two caveats. The Android job in that workflow pushes to `siyuan-note/siyuan-android` and will fail for anyone who is not upstream — the desktop artifacts are unaffected. And `.github/workflows/dockerimage.yml` is gated `if: github.repository_owner == 'siyuan-note'` (line 19), so it never runs on a fork and no image is ever published; build your own per §5.
+Two caveats: the Android job pushes to a repository you do not control and will fail, leaving the desktop artifacts intact; and this path has not been exercised on this fork.
 
-This path has not been exercised on this fork.
+`.github/workflows/dockerimage.yml` is gated on the upstream owner and never runs here — build images yourself.
+
+---
+
+## Troubleshooting
+
+| Symptom | Cause |
+|---|---|
+| `reading ../third_party/dejavu/go.mod: no such file or directory` | Building from a copy of `kernel/` alone. The vendored sync engine must sit beside it; build from a full clone |
+| cgo or linker errors mentioning `gcc`/`clang` | No C compiler. `CGO_ENABLED=1` is required — see your platform's toolchain section |
+| `Need executable 'ar' to convert dir to deb` | `binutils` is not installed. `sudo apt-get install binutils` |
+| electron-builder fails on the `rpm` target | `rpm` is not installed. `sudo apt-get install rpm`, or take the `tar.gz`/`AppImage` output and ignore the rest |
+| macOS: "app is damaged and can't be opened" | Gatekeeper on an unsigned build. `xattr -dr com.apple.quarantine <app>` |
+| Windows: SmartScreen "unknown publisher" | Expected — no signing certificate is configured |
+| Windows arm64: compiler not found | Install llvm-mingw and set `SIYUAN_ARM64_CC`, or put it on `PATH` |
+| Search returns nothing, or encrypted notebooks fail | Built without `fts5` or `sqlcipher`. Both tags are required |
+
+---
+
+## See also
+
+- [`FORK.md`](./FORK.md) — what diverges from upstream, and why
+- [`DEPLOY.md`](./DEPLOY.md) — Docker, Compose, Unraid, TrueNAS
+- [`../.github/CONTRIBUTING.md`](../.github/CONTRIBUTING.md) — development loop and conventions
